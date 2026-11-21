@@ -25,7 +25,7 @@ void globe_shutdown(Globe& g) {
 void globe_draw(const Globe& g, const Camera& cam, float aspect) {
     Mat4 proj  = cam.proj_matrix(aspect);
     Mat4 view  = cam.view_matrix();
-    Mat4 model = cam.model_matrix();
+    Mat4 model = Mat4::identity(); // Earth fixed in world; camera orbits
     Mat4 mvp   = Mat4::multiply(proj, Mat4::multiply(view, model));
 
     use_shader(g.shader);
@@ -35,8 +35,8 @@ void globe_draw(const Globe& g, const Camera& cam, float aspect) {
     if (g.shader.u_shading >= 0)
         glUniform1f(g.shader.u_shading, g.shading ? 1.f : 0.f);
     if (g.shader.u_light_dir >= 0) {
-        // Soft key light from upper-left of the view
-        glUniform3f(g.shader.u_light_dir, -0.4f, 0.5f, 0.7f);
+        // Light fixed in world (sun-like); moves across surface as camera orbits
+        glUniform3f(g.shader.u_light_dir, -0.4f, 0.35f, 0.85f);
     }
 
     if (g.texture.id) {

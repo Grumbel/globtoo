@@ -19,6 +19,7 @@ add_executable(globtoo
   src/mesh.cpp
   src/shader.cpp
   src/texture.cpp
+  src/stars.cpp
   src/math.cpp
 )
 

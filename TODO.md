@@ -1,22 +1,17 @@
 # TODO.md — globtoo
 
 ## Current tip
-- Grab control mode (surface under cursor) + Arcball via Tab
-- Optional Lambert shading toggle with Space
-- Prior: speed/mirror/texture, Mat4 order, arcball, RGBA, winding
+- Camera orbits fixed Earth; stars fixed in world (real bright-star positions)
+- Prior: Grab/Arcball, shading, texture/winding/arcball fixes
+
+## Model
+- Earth is fixed in world space (identity model).
+- Camera orientation quaternion places the eye; controls orbit the camera.
+- Stars: ~50–60 brightest catalog stars as points; view translation stripped so they sit at infinity. Rotate with the camera orbit (not with a spinning Earth).
 
 ## Open / next
-- [ ] Confirm grab feels locked to the surface at different zoom levels
-- [ ] Optional: NASA BMNG higher res
+- [ ] Confirm grab still feels right after camera-orbit switch
+- [ ] Optional: denser catalog or milky-way band
 - [ ] Optional: country borders / political overlay
-- [ ] Optional: atmosphere rim, day/night, clouds
+- [ ] Optional: atmosphere, day/night
 - [ ] VR later
-
-## Controls
-- Tab — Grab ↔ Arcball
-- Space — shading on/off
-- Drag / wheel / Esc as before
-
-## Notes
-- Grab uses ray–sphere hits; rotation axis = cross(prev, curr).
-- Default mode is Grab; shading defaults on.

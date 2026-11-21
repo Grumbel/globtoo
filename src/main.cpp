@@ -8,6 +8,7 @@
 #include "globe.hpp"
 #include "camera.hpp"
 #include "input.hpp"
+#include "stars.hpp"
 
 static SDL_Window*   window  = nullptr;
 static SDL_GLContext glctx   = nullptr;
@@ -66,8 +67,12 @@ int main(int argc, char** argv) {
     input.viewport_w = width;
     input.viewport_h = height;
 
+    Stars stars{};
+    if (!stars_init(stars))
+        fprintf(stderr, "Warning: stars failed to init\n");
+
     fprintf(stderr, "Controls: drag=spin, wheel=zoom, Tab=mode, Space=shading, Esc=quit\n");
-    fprintf(stderr, "Control mode: Grab (surface under cursor)\n");
+    fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
 
@@ -94,11 +99,13 @@ int main(int argc, char** argv) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         float aspect = (float)input.viewport_w / (float)input.viewport_h;
+        stars_draw(stars, cam, aspect);
         globe_draw(globe, cam, aspect);
 
         SDL_GL_SwapWindow(window);
     }
 
+    stars_shutdown(stars);
     globe_shutdown(globe);
     SDL_GL_DestroyContext(glctx);
     SDL_DestroyWindow(window);
