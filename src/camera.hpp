@@ -12,7 +12,9 @@ struct Camera {
     Vec3 ang_vel = {0, 0, 0};
 
     float distance = 3.2f;
-    float min_dist = 1.15f;
+    // Keep the camera outside the 1.0015-radius political layer and the near plane.
+    // Distance 1.08 gives almost twice the linear magnification of 1.15.
+    float min_dist = 1.08f;
     float max_dist = 8.0f;
 
     ControlMode mode = ControlMode::Grab;

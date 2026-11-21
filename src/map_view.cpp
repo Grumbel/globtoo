@@ -143,7 +143,8 @@ void map_select(MapView& m, MapProjection selected, Camera& cam) {
             m.center_lon = ll[0] * geo::to_rad;
             m.center_lat = ll[1] * geo::to_rad;
             // Preserve regional zoom when flattening a close-up globe.
-            m.zoom = std::clamp(1.f / std::max(.12f, cam.distance - 1.f), 1.f, 9.f);
+            m.zoom = std::clamp(1.f / std::max(.08f, cam.distance - 1.f),
+                                1.f, 14.f);
             m.from = m.to = selected;
             m.projection_blend = 1.f;
         } else {
@@ -179,7 +180,7 @@ void map_pan(MapView& m, float dx_pixels, float dy_pixels, int height) {
 }
 
 void map_zoom(MapView& m, float wheel) {
-    m.zoom = std::clamp(m.zoom * std::pow(1.15f, wheel), .6f, 60.f);
+    m.zoom = std::clamp(m.zoom * std::pow(1.15f, wheel), .6f, MapView::max_zoom);
 }
 
 std::array<double, 2> timezone_center() {

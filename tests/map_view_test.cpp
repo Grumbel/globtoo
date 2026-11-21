@@ -40,9 +40,21 @@ int main() {
     assert(map.center_lat > coords[1]*geo::to_rad);
     map_zoom(map,1);
     assert(map.zoom > 1);
+    for (int i=0;i<200;i++) map_zoom(map,1);
+    assert(near(map.zoom,MapView::max_zoom));
+    for (int i=0;i<400;i++) map_zoom(map,-1);
+    assert(near(map.zoom,.6f));
     map_select(map,MapProjection::Globe,cam);
     for (int i=0;i<120;i++) map_update(map,.016f);
     assert(near(map.globe_to_flat,0.f,.001));
+    // Switching a tightly zoomed globe to a map must not reset to a
+    // whole-world view. Both on-screen buttons and wheel call these paths.
+    cam.distance=cam.min_dist;
+    map_select(map,MapProjection::Equirectangular,cam);
+    assert(map.zoom >= 12.f);
+    assert(map.zoom <= MapView::max_zoom);
+    map_select(map,MapProjection::Globe,cam);
+
     // TZ database coordinate lookup, when available, supersedes coarse UTC.
     setenv("TZ", "Europe/Berlin", 1);
     const auto berlin = timezone_center();

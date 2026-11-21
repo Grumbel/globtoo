@@ -4,7 +4,10 @@
 #include <cstdio>
 
 bool globe_init(Globe& g, const char* texture_path) {
-    g.mesh = create_sphere(128, 64);
+    // Extra tessellation keeps the texture/silhouette smooth at close zoom.
+    // 257 * 129 vertices still fit GLES2 16-bit element indices.
+    static_assert(257 * 129 <= 65536);
+    g.mesh = create_sphere(256, 128);
     g.shader = load_shader("shaders/globe.vert", "shaders/globe.frag");
     if (!g.shader.program) {
         fprintf(stderr, "Failed to load shaders\n");

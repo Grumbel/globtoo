@@ -16,6 +16,7 @@ struct MapView {
     float projection_blend = 1.f;
     float map_distance = 5.8f;
     float zoom = 1.f;
+    static constexpr float max_zoom = 80.f;
     double center_lon = 0.0; // radians, projection's central meridian
     double center_lat = 0.0; // radians, vertical offset
 };

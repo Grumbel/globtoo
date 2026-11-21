@@ -83,6 +83,14 @@ int main() {
     assert(project(geo::lonlat_to_xyz(0, 10))[1] > 0.0);
     assert(project(geo::lonlat_to_xyz(0, -10))[1] < 0.0);
 
+    // A high-resolution country can now fill the screen without moving the
+    // camera inside the globe or clipping the near-surface country mesh.
+    assert(cam.min_dist < 1.1f && cam.min_dist > 1.0015f);
+    for (int i = 0; i < 80; ++i) camera_apply_zoom(cam, 1.f);
+    near(cam.distance, cam.min_dist, 1e-5);
+    for (int i = 0; i < 200; ++i) camera_apply_zoom(cam, -1.f);
+    near(cam.distance, cam.max_dist, 1e-5);
+
     for (float distance : {cam.min_dist, 3.2f, cam.max_dist}) {
         cam.distance = distance;
         const auto projection = cam.proj_matrix(1.6f);
