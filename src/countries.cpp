@@ -52,7 +52,28 @@ static void mapcolor_rgb(int mc, unsigned name_hash, float& r, float& g, float& 
     r = pal[idx][0]; g = pal[idx][1]; b = pal[idx][2];
 }
 
-// Fan triangulation from 3D centroid on the sphere (robust for 110m countries).
+// Spherical fan: edges are subdivided and every vertex is projected onto the
+// sphere so triangles stay outside the unit globe (no chord clipping).
+static void slerp_unit(float ax, float ay, float az, float bx, float by, float bz,
+                       float t, float& ox, float& oy, float& oz) {
+    float dot = ax * bx + ay * by + az * bz;
+    if (dot > 1.f) dot = 1.f;
+    if (dot < -1.f) dot = -1.f;
+    float omega = acosf(dot);
+    if (omega < 1e-5f) {
+        ox = ax; oy = ay; oz = az;
+        return;
+    }
+    float so = sinf(omega);
+    float s0 = sinf((1.f - t) * omega) / so;
+    float s1 = sinf(t * omega) / so;
+    ox = s0 * ax + s1 * bx;
+    oy = s0 * ay + s1 * by;
+    oz = s0 * az + s1 * bz;
+    float len = sqrtf(ox * ox + oy * oy + oz * oz);
+    ox /= len; oy /= len; oz /= len;
+}
+
 static void fan_fill(const std::vector<float>& ring_lonlat,
                      std::vector<float>& out_xyz_rgb,
                      float cr, float cg, float cb, float radius) {
@@ -66,9 +87,8 @@ static void fan_fill(const std::vector<float>& ring_lonlat,
     if (n < 3)
         return;
 
-    // Average unit positions → centroid direction
-    float cx = 0, cy = 0, cz = 0;
     std::vector<float> pts(n * 3);
+    float cx = 0, cy = 0, cz = 0;
     for (int i = 0; i < n; ++i) {
         float x, y, z;
         lonlat_to_xyz(ring_lonlat[i * 2], ring_lonlat[i * 2 + 1], 1.f, x, y, z);
@@ -78,24 +98,41 @@ static void fan_fill(const std::vector<float>& ring_lonlat,
     float len = sqrtf(cx * cx + cy * cy + cz * cz);
     if (len < 1e-6f)
         return;
-    cx = cx / len * radius;
-    cy = cy / len * radius;
-    cz = cz / len * radius;
+    cx /= len; cy /= len; cz /= len;
 
     auto emit = [&](float x, float y, float z) {
-        out_xyz_rgb.push_back(x);
-        out_xyz_rgb.push_back(y);
-        out_xyz_rgb.push_back(z);
+        out_xyz_rgb.push_back(x * radius);
+        out_xyz_rgb.push_back(y * radius);
+        out_xyz_rgb.push_back(z * radius);
         out_xyz_rgb.push_back(cr);
         out_xyz_rgb.push_back(cg);
         out_xyz_rgb.push_back(cb);
     };
 
+    // ~2° segments along each boundary edge
+    const float max_ang = 2.f * 3.14159265f / 180.f;
     for (int i = 0; i < n; ++i) {
         int j = (i + 1) % n;
-        emit(cx, cy, cz);
-        emit(pts[i * 3] * radius, pts[i * 3 + 1] * radius, pts[i * 3 + 2] * radius);
-        emit(pts[j * 3] * radius, pts[j * 3 + 1] * radius, pts[j * 3 + 2] * radius);
+        float ax = pts[i * 3], ay = pts[i * 3 + 1], az = pts[i * 3 + 2];
+        float bx = pts[j * 3], by = pts[j * 3 + 1], bz = pts[j * 3 + 2];
+        float d = ax * bx + ay * by + az * bz;
+        if (d > 1.f) d = 1.f;
+        if (d < -1.f) d = -1.f;
+        float ang = acosf(d);
+        int segs = (int)ceilf(ang / max_ang);
+        if (segs < 1) segs = 1;
+        if (segs > 32) segs = 32;
+
+        float px = ax, py = ay, pz = az;
+        for (int s = 1; s <= segs; ++s) {
+            float t = (float)s / (float)segs;
+            float qx, qy, qz;
+            slerp_unit(ax, ay, az, bx, by, bz, t, qx, qy, qz);
+            emit(cx, cy, cz);
+            emit(px, py, pz);
+            emit(qx, qy, qz);
+            px = qx; py = qy; pz = qz;
+        }
     }
 }
 
@@ -201,7 +238,7 @@ static bool parse_features(const std::string& text,
                     ring.push_back(lon); ring.push_back(lat);
                     GLint first = (GLint)(border_verts.size() / 3);
                     float x, y, z;
-                    lonlat_to_xyz(lon, lat, 1.012f, x, y, z);
+                    lonlat_to_xyz(lon, lat, 1.0f, x, y, z);
                     border_verts.push_back(x); border_verts.push_back(y); border_verts.push_back(z);
                     while (true) {
                         skip_ws();
@@ -209,7 +246,7 @@ static bool parse_features(const std::string& text,
                             ++p;
                             if (!try_read_position(lon, lat)) break;
                             ring.push_back(lon); ring.push_back(lat);
-                            lonlat_to_xyz(lon, lat, 1.012f, x, y, z);
+                            lonlat_to_xyz(lon, lat, 1.0f, x, y, z);
                             border_verts.push_back(x); border_verts.push_back(y); border_verts.push_back(z);
                         } else break;
                     }
@@ -218,7 +255,7 @@ static bool parse_features(const std::string& text,
                         strips.push_back({ first, count });
                     // Fill from exterior rings (caller treats every ring; holes get same color — ok at 110m)
                     if (ring.size() >= 6)
-                        fan_fill(ring, fill_xyz_rgb, cr, cg, cb, 1.008f);
+                        fan_fill(ring, fill_xyz_rgb, cr, cg, cb, 1.0f);
                     skip_ws();
                     if (*p == ']') ++p;
                 } else {
@@ -330,7 +367,8 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
     Mat4 view = cam.view_matrix();
     Mat4 mvp = Mat4::multiply(proj, view);
 
-    // Fill under borders
+    // Political overlay is drawn after the globe depth buffer is cleared (see main),
+    // so flat/chord geometry cannot "cut into" the ocean sphere.
     if (c.fill_visible && c.fill_vbo && c.fill_shader.program && c.fill_count > 0) {
         use_shader(c.fill_shader);
         GLint u_mvp = glGetUniformLocation(c.fill_shader.program, "u_mvp");
@@ -344,10 +382,7 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         if (u_sh >= 0)
             glUniform1f(u_sh, 1.f);
 
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(-2.f, -2.f);
+        glDisable(GL_DEPTH_TEST);
 
         glBindBuffer(GL_ARRAY_BUFFER, c.fill_vbo);
         glEnableVertexAttribArray(0);
@@ -357,8 +392,6 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         glDrawArrays(GL_TRIANGLES, 0, c.fill_count);
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
-        glDisable(GL_POLYGON_OFFSET_FILL);
-        glDepthFunc(GL_LESS);
     }
 
     if (c.borders_visible && c.border_vbo && c.border_shader.program) {
@@ -368,9 +401,7 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
         glUniform4f(u_color, 0.12f, 0.10f, 0.08f, 1.f);
 
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
-        glDepthMask(GL_FALSE); // don't fight fill depth
+        glDisable(GL_DEPTH_TEST);
         glLineWidth(1.f);
 
         glBindBuffer(GL_ARRAY_BUFFER, c.border_vbo);
@@ -379,7 +410,7 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         for (const auto& r : c.strips)
             glDrawArrays(GL_LINE_STRIP, r.first, r.count);
         glDisableVertexAttribArray(0);
-        glDepthMask(GL_TRUE);
-        glDepthFunc(GL_LESS);
     }
+
+    glEnable(GL_DEPTH_TEST);
 }

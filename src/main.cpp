@@ -107,6 +107,9 @@ int main(int argc, char** argv) {
         float aspect = (float)input.viewport_w / (float)input.viewport_h;
         stars_draw(stars, cam, aspect);
         globe_draw(globe, cam, aspect, !countries.fill_visible);
+        // Political overlay: clear depth so country meshes cannot clip into the sphere
+        if (countries.fill_visible || countries.borders_visible)
+            glClear(GL_DEPTH_BUFFER_BIT);
         countries_draw(countries, cam, aspect);
 
         SDL_GL_SwapWindow(window);
