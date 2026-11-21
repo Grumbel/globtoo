@@ -6,55 +6,6 @@ struct Vec2 { float x, y; };
 struct Vec3 { float x, y, z; };
 struct Vec4 { float x, y, z, w; };
 
-struct Quat {
-    float x = 0.f, y = 0.f, z = 0.f, w = 1.f; // identity
-
-    static Quat identity() { return {}; }
-
-    static Quat from_axis_angle(Vec3 axis, float angle) {
-        float half = angle * 0.5f;
-        float s = sinf(half);
-        float len = sqrtf(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
-        if (len < 1e-8f) return identity();
-        float inv = 1.f / len;
-        return { axis.x * inv * s, axis.y * inv * s, axis.z * inv * s, cosf(half) };
-    }
-
-    static Quat multiply(Quat a, Quat b) {
-        return {
-            a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-            a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-            a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
-            a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
-        };
-    }
-
-    static Quat normalize(Quat q) {
-        float n = sqrtf(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
-        if (n < 1e-8f) return identity();
-        float inv = 1.f / n;
-        return { q.x * inv, q.y * inv, q.z * inv, q.w * inv };
-    }
-
-    // Column-major Mat4 from unit quaternion
-    Mat4 to_mat4() const {
-        float xx = x * x, yy = y * y, zz = z * z;
-        float xy = x * y, xz = x * z, yz = y * z;
-        float wx = w * x, wy = w * y, wz = w * z;
-        Mat4 r = Mat4::identity();
-        r.m[0]  = 1.f - 2.f * (yy + zz);
-        r.m[1]  = 2.f * (xy + wz);
-        r.m[2]  = 2.f * (xz - wy);
-        r.m[4]  = 2.f * (xy - wz);
-        r.m[5]  = 1.f - 2.f * (xx + zz);
-        r.m[6]  = 2.f * (yz + wx);
-        r.m[8]  = 2.f * (xz + wy);
-        r.m[9]  = 2.f * (yz - wx);
-        r.m[10] = 1.f - 2.f * (xx + yy);
-        return r;
-    }
-};
-
 struct Mat4 {
     float m[16];
 
@@ -125,5 +76,54 @@ struct Mat4 {
         float len = sqrtf(dot(v, v));
         if (len < 1e-8f) return {0, 0, 0};
         return {v.x / len, v.y / len, v.z / len};
+    }
+};
+
+struct Quat {
+    float x = 0.f, y = 0.f, z = 0.f, w = 1.f; // identity
+
+    static Quat identity() { return {}; }
+
+    static Quat from_axis_angle(Vec3 axis, float angle) {
+        float half = angle * 0.5f;
+        float s = sinf(half);
+        float len = sqrtf(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+        if (len < 1e-8f) return identity();
+        float inv = 1.f / len;
+        return { axis.x * inv * s, axis.y * inv * s, axis.z * inv * s, cosf(half) };
+    }
+
+    static Quat multiply(Quat a, Quat b) {
+        return {
+            a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+            a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+            a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+            a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
+        };
+    }
+
+    static Quat normalize(Quat q) {
+        float n = sqrtf(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+        if (n < 1e-8f) return identity();
+        float inv = 1.f / n;
+        return { q.x * inv, q.y * inv, q.z * inv, q.w * inv };
+    }
+
+    // Column-major Mat4 from unit quaternion (Mat4 is fully defined above)
+    Mat4 to_mat4() const {
+        float xx = x * x, yy = y * y, zz = z * z;
+        float xy = x * y, xz = x * z, yz = y * z;
+        float wx = w * x, wy = w * y, wz = w * z;
+        Mat4 r = Mat4::identity();
+        r.m[0]  = 1.f - 2.f * (yy + zz);
+        r.m[1]  = 2.f * (xy + wz);
+        r.m[2]  = 2.f * (xz - wy);
+        r.m[4]  = 2.f * (xy - wz);
+        r.m[5]  = 1.f - 2.f * (xx + zz);
+        r.m[6]  = 2.f * (yz + wx);
+        r.m[8]  = 2.f * (xz + wy);
+        r.m[9]  = 2.f * (yz - wx);
+        r.m[10] = 1.f - 2.f * (xx + yy);
+        return r;
     }
 };
