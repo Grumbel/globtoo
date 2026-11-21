@@ -39,7 +39,7 @@ target_compile_options(globtoo PRIVATE -Wall -Wextra -O2)
 # Copy assets next to binary for development
 add_custom_command(TARGET globtoo POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:globe>/assets
+    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:globtoo>/assets
   COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:globe>/shaders
+    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:globtoo>/shaders
 )
