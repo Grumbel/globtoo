@@ -1,6 +1,6 @@
-# Globe
+# globtoo
 
-Tactile free-spinning Earth globe for Linux.
+Tactile free-spinning Earth globe (globtoo) for Linux.
 
 - SDL3 + OpenGL ES 2.0
 - Data-oriented / ECS-ish (plain structs + free functions, no class hierarchies)
@@ -12,7 +12,7 @@ Tactile free-spinning Earth globe for Linux.
 
 ```bash
 nix build
-./result/bin/globe
+./result/bin/globtoo
 ```
 
 Or development shell:
@@ -25,7 +25,7 @@ make -j
 # optional: drop a real texture next to the binary
 curl -L -o assets/earth.jpg \
   https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg
-./globe
+./globtoo
 ```
 
 ## Texture

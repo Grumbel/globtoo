@@ -1,5 +1,5 @@
 {
-  description = "Tactile free-spinning Earth globe - SDL3 + GLES2, ECS-style";
+  description = "globtoo – tactile free-spinning Earth globe - SDL3 + GLES2, ECS-style";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -38,7 +38,7 @@
       in
       {
         packages.default = pkgs.stdenv.mkDerivation {
-          pname = "globe";
+          pname = "globtoo";
           version = "0.1.0";
           src = ./.;
 
@@ -64,24 +64,24 @@
 
           installPhase = ''
             runHook preInstall
-            mkdir -p $out/bin $out/share/globe/{assets,shaders}
-            cp globe $out/bin/globe-bin
-            cp assets/earth.jpg $out/share/globe/assets/
-            cp -r ${./shaders}/* $out/share/globe/shaders/ 2>/dev/null || true
+            mkdir -p $out/bin $out/share/globtoo/{assets,shaders}
+            cp globtoo $out/bin/globtoo-bin
+            cp assets/earth.jpg $out/share/globtoo/assets/
+            cp -r ${./shaders}/* $out/share/globtoo/shaders/ 2>/dev/null || true
 
             # Thin wrapper so the binary finds its assets
-            cat > $out/bin/globe << WRAP
+            cat > $out/bin/globtoo << WRAP
             #!${pkgs.runtimeShell}
-            export GLOBE_ASSET_DIR="$out/share/globe"
-            cd "$out/share/globe"
-            exec $out/bin/globe-bin "\$@"
+            export GLOBE_ASSET_DIR="$out/share/globtoo"
+            cd "$out/share/globtoo"
+            exec $out/bin/globtoo-bin "\$@"
             WRAP
-            chmod +x $out/bin/globe
+            chmod +x $out/bin/globtoo
             runHook postInstall
           '';
 
           meta = with pkgs.lib; {
-            description = "Tactile free-spinning Earth globe (texture fetched at build time)";
+            description = "globtoo – tactile free-spinning Earth globe (texture fetched at build time)";
             license = licenses.mit;
             platforms = platforms.linux;
           };
@@ -103,7 +103,7 @@
 
         apps.default = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/globe";
+          program = "${self.packages.${system}.default}/bin/globtoo";
         };
       });
 }

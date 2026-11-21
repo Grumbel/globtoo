@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(globe LANGUAGES CXX)
+project(globtoo LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ pkg_check_modules(SDL3 REQUIRED sdl3)
 find_library(GLES2_LIB GLESv2 REQUIRED)
 find_library(EGL_LIB EGL REQUIRED)
 
-add_executable(globe
+add_executable(globtoo
   src/main.cpp
   src/globe.cpp
   src/camera.cpp
@@ -22,22 +22,22 @@ add_executable(globe
   src/math.cpp
 )
 
-target_include_directories(globe PRIVATE
+target_include_directories(globtoo PRIVATE
   ${SDL3_INCLUDE_DIRS}
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(globe PRIVATE
+target_link_libraries(globtoo PRIVATE
   ${SDL3_LIBRARIES}
   ${GLES2_LIB}
   ${EGL_LIB}
   m
 )
 
-target_compile_options(globe PRIVATE -Wall -Wextra -O2)
+target_compile_options(globtoo PRIVATE -Wall -Wextra -O2)
 
 # Copy assets next to binary for development
-add_custom_command(TARGET globe POST_BUILD
+add_custom_command(TARGET globtoo POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:globe>/assets
   COMMAND ${CMAKE_COMMAND} -E copy_directory
