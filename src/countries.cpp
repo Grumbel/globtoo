@@ -102,6 +102,10 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         }
         if (u_shading >= 0) glUniform1f(u_shading, 1.f);
 
+        // Push only the rasterized fill depth back by a few depth-buffer
+        // units. Fill and outline coordinates are otherwise identical.
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.f, 1.f);
         glBindBuffer(GL_ARRAY_BUFFER, c.fill_vbo);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
@@ -111,6 +115,7 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         glDrawArrays(GL_TRIANGLES, 0, c.fill_count);
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
+        glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
     if (c.borders_visible && c.border_vbo && c.border_shader.program) {
@@ -119,7 +124,8 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         const GLint u_color = glGetUniformLocation(c.border_shader.program, "u_color");
         if (u_color >= 0) glUniform4f(u_color, 0.12f, 0.10f, 0.08f, 1.f);
 
-        // Border radius is slightly larger than fill radius to avoid z-fighting.
+        // Same radius/geometry as fill edges; the fill's polygon offset
+        // prevents z-fighting without shifting the outlines on screen.
         glLineWidth(1.f);
         glBindBuffer(GL_ARRAY_BUFFER, c.border_vbo);
         glEnableVertexAttribArray(0);

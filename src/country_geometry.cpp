@@ -15,10 +15,16 @@
 
 namespace {
 constexpr double pi = 3.14159265358979323846;
-constexpr double fill_radius = 1.0015;
-constexpr double border_radius = 1.0025;
+// Fills and outlines MUST sit on the same surface. At close zoom a 0.001
+// radius difference moves the border several screen pixels relative to fill.
+// GL_POLYGON_OFFSET_FILL (in countries_draw) keeps the outlines visible.
+constexpr double political_radius = 1.0015;
+
+// The same densely-sampled ring is a constraint in the triangulation and is
+// uploaded as a border strip. Never subdivide the outline independently.
+constexpr double max_boundary_edge_degrees = 0.5;
+// Curved triangles need sufficient tessellation for the nearest camera zoom.
 constexpr double max_triangle_edge_degrees = 2.5;
-constexpr double max_border_edge_degrees = 1.0;
 
 struct Point { double x, y; }; // unwrapped longitude, latitude (degrees)
 using Ring = std::vector<Point>;
@@ -260,6 +266,25 @@ std::array<double, 3> sphere(Point p, double radius) {
             radius * std::sin(lat), radius * std::cos(lat) * std::sin(lon)};
 }
 
+void densify_ring(Ring& ring) {
+    if (ring.size() < 2) return;
+    Ring points;
+    points.reserve(ring.size());
+    for (std::size_t i = 0; i < ring.size(); ++i) {
+        const auto a = ring[i], b = ring[(i + 1) % ring.size()];
+        const int segments = std::max(1, static_cast<int>(std::ceil(
+            std::max(std::abs(b.x - a.x), std::abs(b.y - a.y)) /
+            max_boundary_edge_degrees)));
+        points.push_back(a);
+        for (int j = 1; j < segments; ++j) {
+            const double t = static_cast<double>(j) / segments;
+            points.push_back({a.x + (b.x - a.x) * t,
+                              a.y + (b.y - a.y) * t});
+        }
+    }
+    ring = std::move(points);
+}
+
 void emit_fill_triangle(CountryGeometry& dst, Point a, Point b, Point c,
                         const std::array<float, 3>& color, int depth = 0) {
     const auto len2 = [](Point p, Point q) {
@@ -284,7 +309,9 @@ void emit_fill_triangle(CountryGeometry& dst, Point a, Point b, Point c,
         }
         return;
     }
-    auto p = sphere(a, fill_radius), q = sphere(b, fill_radius), r = sphere(c, fill_radius);
+    auto p = sphere(a, political_radius);
+    auto q = sphere(b, political_radius);
+    auto r = sphere(c, political_radius);
     const double ux = q[0] - p[0], uy = q[1] - p[1], uz = q[2] - p[2];
     const double vx = r[0] - p[0], vy = r[1] - p[1], vz = r[2] - p[2];
     const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -301,21 +328,13 @@ void emit_fill_triangle(CountryGeometry& dst, Point a, Point b, Point c,
 void emit_border(CountryGeometry& dst, const Ring& ring) {
     if (ring.size() < 2) return;
     const int first = static_cast<int>(dst.border_xyz.size() / 3);
-    auto vertex = [&](Point p) {
-        const auto v = sphere(p, border_radius);
+    // Exactly the same vertices/edges as the triangulator's constrained
+    // boundary; no separately interpolated curve and no extra radial lift.
+    for (std::size_t i = 0; i <= ring.size(); ++i) {
+        const auto v = sphere(ring[i % ring.size()], political_radius);
         for (auto x : v) dst.border_xyz.push_back(static_cast<float>(x));
-    };
-    vertex(ring[0]);
-    for (std::size_t i = 0; i < ring.size(); ++i) {
-        const auto a = ring[i], b = ring[(i + 1) % ring.size()];
-        const int n = std::max(1, static_cast<int>(std::ceil(
-            std::max(std::abs(a.x - b.x), std::abs(a.y - b.y)) / max_border_edge_degrees)));
-        for (int j = 1; j <= n; ++j) {
-            const double t = static_cast<double>(j) / n;
-            vertex({a.x * (1 - t) + b.x * t, a.y * (1 - t) + b.y * t});
-        }
     }
-    dst.border_strips.push_back({first, static_cast<int>(dst.border_xyz.size() / 3) - first});
+    dst.border_strips.push_back({first, static_cast<int>(ring.size() + 1)});
 }
 
 GEOSGeometry* make_linear_ring(GEOSContextHandle_t ctx, const Ring& ring) {
@@ -376,16 +395,62 @@ void collect_triangles(GEOSContextHandle_t ctx, const GEOSGeometry* geometry,
     }
 }
 
+bool copy_geos_ring(GEOSContextHandle_t ctx, const GEOSGeometry* geometry,
+                    Ring& ring) {
+    if (!geometry) return false;
+    const auto* coords = GEOSGeom_getCoordSeq_r(ctx, geometry);
+    unsigned n = 0;
+    if (!coords || !GEOSCoordSeq_getSize_r(ctx, coords, &n) || n < 4)
+        return false;
+    ring.clear();
+    ring.reserve(n - 1);
+    for (unsigned i = 0; i < n - 1; ++i) {
+        Point p{};
+        if (!GEOSCoordSeq_getX_r(ctx, coords, i, &p.x) ||
+            !GEOSCoordSeq_getY_r(ctx, coords, i, &p.y)) return false;
+        ring.push_back(p);
+    }
+    return true;
+}
+
+// Only the repaired, *valid* polygon determines the border. Previously the
+// original ring was drawn even if GEOSMakeValid had changed the fill shape.
+// Densifying those rings BEFORE the constrained triangulation ensures every
+// border segment is literally an edge of the filled triangle mesh.
 void triangulate_valid_geometry(GEOSContextHandle_t ctx, const GEOSGeometry* geometry,
                                 CountryGeometry& dst, const std::array<float, 3>& color) {
     if (!geometry || GEOSisEmpty_r(ctx, geometry)) return;
     const int type = GEOSGeomTypeId_r(ctx, geometry);
     if (type == GEOS_POLYGON) {
-        GEOSGeometry* tris = GEOSConstrainedDelaunayTriangulation_r(ctx, geometry);
-        if (tris) {
-            collect_triangles(ctx, tris, dst, color);
-            GEOSGeom_destroy_r(ctx, tris);
-        } else ++dst.triangulation_failures;
+        Polygon sampled;
+        Ring shell;
+        if (!copy_geos_ring(ctx, GEOSGetExteriorRing_r(ctx, geometry), shell)) {
+            ++dst.triangulation_failures;
+            return;
+        }
+        densify_ring(shell);
+        sampled.push_back(std::move(shell));
+        const int holes = GEOSGetNumInteriorRings_r(ctx, geometry);
+        for (int i = 0; i < holes; ++i) {
+            Ring ring;
+            if (!copy_geos_ring(ctx, GEOSGetInteriorRingN_r(ctx, geometry, i), ring)) {
+                ++dst.triangulation_failures;
+                return;
+            }
+            densify_ring(ring);
+            sampled.push_back(std::move(ring));
+        }
+        GEOSGeometry* densified = make_polygon(ctx, sampled);
+        if (!densified) { ++dst.triangulation_failures; return; }
+        GEOSGeometry* triangles = GEOSConstrainedDelaunayTriangulation_r(ctx, densified);
+        if (triangles) {
+            for (const auto& ring : sampled) emit_border(dst, ring);
+            collect_triangles(ctx, triangles, dst, color);
+            GEOSGeom_destroy_r(ctx, triangles);
+        } else {
+            ++dst.triangulation_failures;
+        }
+        GEOSGeom_destroy_r(ctx, densified);
     } else if (type == GEOS_MULTIPOLYGON || type == GEOS_GEOMETRYCOLLECTION) {
         const int count = GEOSGetNumGeometries_r(ctx, geometry);
         for (int i = 0; i < count; ++i)
@@ -401,8 +466,6 @@ void triangulate_polygon(GEOSContextHandle_t ctx, GEOSGeometry* polygon,
         valid = GEOSMakeValid_r(ctx, polygon);
         if (!valid) { ++dst.triangulation_failures; return; }
     }
-    // Invalid polygons can become nested collections of polygons, lines and
-    // points. Recursively triangulate only their actual area components.
     triangulate_valid_geometry(ctx, valid, dst, color);
     if (valid != polygon) GEOSGeom_destroy_r(ctx, valid);
 }
@@ -419,7 +482,6 @@ void process_feature(GEOSContextHandle_t ctx, MultiPolygon& polygons, int mapcol
         for (auto p : poly[0]) reference += p.x;
         reference /= poly[0].size();
         for (std::size_t i = 1; i < poly.size(); ++i) unwrap(poly[i], reference, false);
-        for (const auto& ring : poly) emit_border(output, ring);
         ++output.polygon_count;
         GEOSGeometry* shape = make_polygon(ctx, poly);
         triangulate_polygon(ctx, shape, output, color);

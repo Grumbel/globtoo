@@ -7,10 +7,58 @@
 #endif
 #include <cassert>
 #include <cmath>
+#include <bit>
+#include <cstdint>
+#include <map>
+#include <set>
 #include <string>
 
 namespace {
 constexpr float pi = 3.14159265358979323846f;
+
+// Catch the close-zoom bug: the border curve must be made from precisely
+// the same 3D segments as the outside edges of the fill mesh. Comparing just
+// ring endpoints or polygon areas would miss independently subdivided curves.
+using Key = std::array<std::uint32_t, 3>;
+using Edge = std::pair<Key, Key>;
+Key xyz_key(const float* xyz) {
+    return {std::bit_cast<std::uint32_t>(xyz[0]),
+            std::bit_cast<std::uint32_t>(xyz[1]),
+            std::bit_cast<std::uint32_t>(xyz[2])};
+}
+Edge edge(Key a, Key b) {
+    if (b < a) std::swap(a, b);
+    return {a, b};
+}
+void verify_border_matches_fill(const CountryGeometry& geom,
+                                float red_channel, std::size_t first_strip,
+                                std::size_t strip_count) {
+    std::map<Edge, int> fill_edges;
+    for (std::size_t i = 0; i < geom.fill_xyz_rgb.size(); i += 18) {
+        if (std::abs(geom.fill_xyz_rgb[i + 3] - red_channel) > 1e-5f) continue;
+        Key triangle[3];
+        for (int j = 0; j < 3; ++j)
+            triangle[j] = xyz_key(&geom.fill_xyz_rgb[i + j * 6]);
+        for (int j = 0; j < 3; ++j)
+            ++fill_edges[edge(triangle[j], triangle[(j + 1) % 3])];
+    }
+    std::set<Edge> mesh_boundary;
+    for (const auto& [key, count] : fill_edges) {
+        assert(count == 1 || count == 2); // No cracks / T-junctions.
+        if (count == 1) mesh_boundary.insert(key);
+    }
+    std::set<Edge> border_segments;
+    for (std::size_t i = first_strip; i < first_strip + strip_count; ++i) {
+        const auto strip = geom.border_strips[i];
+        for (int j = 0; j + 1 < strip.count; ++j) {
+            const Key a = xyz_key(&geom.border_xyz[(strip.first + j) * 3]);
+            const Key b = xyz_key(&geom.border_xyz[(strip.first + j + 1) * 3]);
+            if (a != b) border_segments.insert(edge(a, b));
+        }
+    }
+    assert(!mesh_boundary.empty());
+    assert(mesh_boundary == border_segments);
+}
 
 void verify_triangles(const CountryGeometry& geom) {
     assert(!geom.fill_xyz_rgb.empty());
@@ -108,6 +156,23 @@ int main() {
             assert(std::abs(geo.border_xyz[first + k] - geo.border_xyz[last + k]) < 1e-5f);
     }
     verify_triangles(geo);
+    verify_border_matches_fill(geo, 0.93f, 0, 2); // shell + hole
+    verify_border_matches_fill(geo, 0.45f, 2, 1); // concave polygon
+    verify_border_matches_fill(geo, 0.90f, 3, 1); // dateline
+
+    // A self-intersecting polygon is repaired by GEOS. Its border must follow
+    // the *repaired* two lobes, not the original self-crossing ring.
+    const std::string bowtie = R"JSON({"type":"FeatureCollection","features":[
+      {"type":"Feature","properties":{"MAPCOLOR7":1},"geometry":{
+        "type":"Polygon","coordinates":[
+          [[0,0],[4,4],[0,4],[4,0],[0,0]]
+        ]}}
+    ]})JSON";
+    CountryGeometry repaired;
+    assert(build_country_geometry(bowtie, repaired));
+    assert(repaired.triangulation_failures == 0);
+    assert(repaired.border_strips.size() == 2);
+    verify_border_matches_fill(repaired, 0.93f, 0, 2);
 
     CountryGeometry invalid;
     assert(!build_country_geometry("{\"features\":[[[broken]]]}", invalid));

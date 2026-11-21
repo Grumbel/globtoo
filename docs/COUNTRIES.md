@@ -13,12 +13,21 @@ Delaunay triangulation**. This replaces the incorrect centroid triangle fan,
 which covered concavities, lakes, the opposite hemisphere, and sometimes entire
 oceans. Requires GEOS >= 3.10 (`geos_c`); Nix supplies it automatically.
 
-Triangles are subdivided in *unwrapped longitude/latitude* to at most 2.5° per
-edge, then projected onto the Y-up unit sphere. This makes even large inland
-triangles follow the sphere instead of intersecting it as planar chords.
-All triangle windings are made CCW when viewed from outside the globe, and
-triangles are lifted 0.15% above the ocean sphere. Borders use the same
-coordinates, with 1° subdivision and a 0.25% lift. Polygon holes remain ocean.
+Country boundaries (exterior rings and holes) are sampled to at most 0.5°
+*before* GEOS constrained triangulation. The **same sampled ring vertices**
+are used for the line strip and as constrained triangle edges. A border is
+therefore coincident with the fill edge at any zoom; interpolating two meshes
+independently caused gaps and overlaps along the coast and political borders.
+For self-intersecting polygons, both borders and fills use the boundary after
+`GEOSMakeValid`, rather than outlining the original invalid polygon.
+
+Triangles are subdivided in *unwrapped longitude/latitude* to at most 2.5°
+per edge, then projected onto the Y-up sphere so their interior follows the
+Earth instead of disappearing below the ocean. All triangles wind CCW when
+viewed from outside. **Fills and borders both use radius 1.0015**; the GL
+polygon-offset *depth bias* on fills keeps outlines visible without shifting
+them away from the actual fill boundary in screen space. Polygon holes stay
+ocean. Smaller sampled boundary segments make outlines smooth at close zoom.
 
 Dateline-crossing polygons are unwrapped locally; +180°/-180° polar cut edges
 are retained so the Antarctic cap doesn't become a 360° closing chord. This is
@@ -39,5 +48,7 @@ eye, so colors aren't confined to the shader's ambient term.
 
 Run `ctest --test-dir build --output-on-failure`. Unit coverage includes
 concave polygons, holes, antimeridian crossings, winding, sphere radius,
-per-country colors, and malformed input. A real Natural Earth dataset can
-also be supplied to a geometry-only integration test without an SDL window.
+per-country colors, self-intersection repair, exact line/triangle boundary
+correspondence (including holes), and malformed input. A real Natural Earth
+GeoJSON dataset can also be supplied to a geometry-only integration test
+without an SDL window.
