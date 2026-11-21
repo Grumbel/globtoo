@@ -66,12 +66,13 @@ int main(int argc, char** argv) {
     InputState input{};
     input.viewport_w = width;
     input.viewport_h = height;
+    input.window = window;
 
     Stars stars{};
     if (!stars_init(stars))
         fprintf(stderr, "Warning: stars failed to init\n");
 
-    fprintf(stderr, "Controls: drag=spin, wheel=zoom, Tab=mode, Space=shading, Esc=quit\n");
+    fprintf(stderr, "Controls: drag=spin, wheel=zoom, Tab=Grab/Arcball, T=trackball, Shift=roll, Space=shading, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();

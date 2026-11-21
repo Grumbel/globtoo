@@ -47,7 +47,9 @@ NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
 - Mouse wheel : zoom in / out
 - Tab : switch Grab ↔ Arcball
 - Shift+drag : roll around the view axis
+- T : trackball mode (mouse grabbed, move to orbit)
 - Space : toggle shading
+- Esc : leave trackball, or quit
 - Esc : quit
 
 **Grab** (default): the surface under the cursor stays under the cursor.

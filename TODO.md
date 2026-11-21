@@ -1,15 +1,16 @@
 # TODO.md — globtoo
 
 ## Current tip
-- Shift+drag rolls around the view axis (camera → Earth)
-- Prior: camera orbit, stars, grab/arcball, shading, texture fixes
+- T toggles trackball mode (relative mouse / grabbed cursor)
+- Prior: Shift+roll, stars, camera orbit, grab/arcball, shading
 
 ## Controls
-- Drag — Grab (default) or Arcball (Tab)
+- Drag — Grab or Arcball (Tab)
+- T — trackball (mouse grabbed; move to orbit; Esc exits)
 - Shift+drag — roll around view axis
 - Space — shading
 - Wheel — zoom
-- Esc — quit
+- Esc — exit trackball, else quit
 
 ## Open / next
 - [ ] Optional: denser star catalog
