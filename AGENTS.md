@@ -13,6 +13,7 @@ Data-oriented / ECS-ish: plain structs + free functions, no class hierarchies.
 
 ## Layout
 - `src/` — C++ sources (camera, mesh, texture, shader, globe, input, main)
+- `external/` — vendored third-party headers (`stb_image.h`), not in `src/`
 - `shaders/` — GLES2 vertex/fragment
 - `flake.nix` — build + texture fetch
 - `TODO.md` — current tip and open work (read this first on session start)

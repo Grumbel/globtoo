@@ -18,7 +18,13 @@ Mat4 Camera::view_matrix() const {
 }
 
 Mat4 Camera::proj_matrix(float aspect) const {
-    return Mat4::perspective(0.7f, aspect, 0.05f, 200.f);
+    // Depth precision must be concentrated around the unit-radius Earth.
+    // A fixed 0.05..200 frustum wastes most of the 24-bit depth buffer and
+    // causes the near-surface political overlay to flicker at the limb.
+    // Stars use their own projection and are drawn with depth disabled.
+    const float near_plane = std::max(0.05f, (distance - 1.01f) * 0.9f);
+    const float far_plane  = distance + 1.1f;
+    return Mat4::perspective(0.7f, aspect, near_plane, far_plane);
 }
 
 Vec3 camera_view_to_world(const Camera& cam, Vec3 v) {

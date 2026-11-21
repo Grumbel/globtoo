@@ -1,6 +1,7 @@
 #include "stars.hpp"
 #include <algorithm>
 #include "math.hpp"
+#include "geocoordinates.hpp"
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -283,12 +284,12 @@ static const StarDef k_catalog[] = {
 };
 
 static void ra_dec_to_xyz(float ra_h, float dec_deg, float radius, float& x, float& y, float& z) {
-    float ra = ra_h * (3.14159265f / 12.f);
-    float dec = dec_deg * (3.14159265f / 180.f);
-    float cdec = cosf(dec);
-    x = cdec * cosf(ra) * radius;
-    y = sinf(dec) * radius;
-    z = cdec * sinf(ra) * radius;
+    // RA increases eastward, just like geographic longitude. A single
+    // right-handed convention is used for both sky and Earth coordinates.
+    const auto p = geo::lonlat_to_xyz(ra_h * 15.0, dec_deg, radius);
+    x = static_cast<float>(p[0]);
+    y = static_cast<float>(p[1]);
+    z = static_cast<float>(p[2]);
 }
 
 bool stars_init(Stars& s) {
@@ -332,7 +333,9 @@ void stars_draw(const Stars& s, const Camera& cam, float aspect) {
     if (!s.vbo || !s.shader.program)
         return;
 
-    Mat4 proj = cam.proj_matrix(aspect);
+    // Stars are 80 units away and do not use/write depth. Give the sky its
+    // own long-range projection: the globe needs a much tighter depth range.
+    Mat4 proj = Mat4::perspective(0.7f, aspect, 0.1f, 120.f);
     Mat4 view = cam.view_matrix();
     Mat4 view_rot = view;
     view_rot.m[12] = view_rot.m[13] = view_rot.m[14] = 0.f;

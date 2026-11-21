@@ -25,6 +25,7 @@ static bool init_sdl(int w, int h) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
     window = SDL_CreateWindow("globtoo", w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (!window) {
@@ -102,7 +103,11 @@ int main(int argc, char** argv) {
 
         glViewport(0, 0, input.viewport_w, input.viewport_h);
         glClearColor(0.02f, 0.02f, 0.05f, 1.f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Globe draws the visible-disc stencil mask. Reset its writable mask
+        // before clearing, since countries render with stencil writes off.
+        glStencilMask(0xff);
+        glClearStencil(0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         float aspect = (float)input.viewport_w / (float)input.viewport_h;
         stars_draw(stars, cam, aspect);

@@ -1,4 +1,5 @@
 #include "country_geometry.hpp"
+#include "geocoordinates.hpp"
 
 #include <algorithm>
 #include <array>
@@ -96,7 +97,7 @@ void verify_triangles(const CountryGeometry& geom) {
             // Test shape: square with an interior hole.
             float lon = 0, lat = 0;
             for (const auto& a : p) {
-                lon += std::atan2(a[2], a[0]) * 180 / pi / 3;
+                lon += -std::atan2(a[2], a[0]) * 180 / pi / 3;
                 lat += std::asin(a[1] / 1.0015f) * 180 / pi / 3;
             }
             assert(!(lon > 5.001f && lon < 14.999f && lat > 5.001f && lat < 14.999f));
@@ -106,7 +107,7 @@ void verify_triangles(const CountryGeometry& geom) {
             // Concave L-shaped polygon: the removed top-right area is ocean.
             float lon = 0, lat = 0;
             for (const auto& a : p) {
-                lon += std::atan2(a[2], a[0]) * 180 / pi / 3;
+                lon += -std::atan2(a[2], a[0]) * 180 / pi / 3;
                 lat += std::asin(a[1] / 1.0015f) * 180 / pi / 3;
             }
             assert(!(lon > 35.001 && lat > 5.001));
@@ -114,7 +115,7 @@ void verify_triangles(const CountryGeometry& geom) {
             ++pink;
             // Polygon straddling 180/-180: no triangle may span the Earth.
             for (const auto& a : p)
-                assert(std::abs(std::atan2(a[2], a[0]) * 180 / pi) >= 177.0);
+                assert(std::abs(-std::atan2(a[2], a[0]) * 180 / pi) >= 177.0);
         } else assert(false); // each feature retained its own MAPCOLOR7
     }
     assert(red > 0 && green > 0 && pink > 0);

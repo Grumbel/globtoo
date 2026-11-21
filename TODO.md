@@ -1,9 +1,10 @@
 # TODO.md — globtoo
 
 ## Current tip
-- GEOS triangulation of GeoJSON polygons, including concavity, holes and antimeridian
-- Country fills subdivided onto sphere; depth-tested overlays hide rear hemisphere
-- Fixed camera headlight sign and relocated globe UV seam to +/-180°
+- Correct right-handed east/west coordinates across geographic sphere, political mesh and stars
+- Country overlay tests the globe depth without writing it and uses globe silhouette stencil
+- Adaptive globe depth range when zoomed; stars use independent sky projection
+- Third-party stb_image moved into external/
 
 ## Done
 - [x] Document coordinate system (docs/COORDINATES.md)
@@ -11,6 +12,9 @@
 - [x] Political fill from MAPCOLOR7 with proper geometry, not centroid fans
 - [x] Preserve depth for globe and country border/fill overlay
 - [x] Geometry tests for holes, concavities, winding and antimeridian
+- [x] Fix east/west mirroring and verify world/screen orientation
+- [x] Prevent political overlay depth/stencil artifacts at globe silhouette
+- [x] Move third-party headers to external/
 
 ## Next
 - [ ] Atmosphere rim / day-night / VR

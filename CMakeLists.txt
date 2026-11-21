@@ -31,6 +31,7 @@ target_include_directories(globtoo PRIVATE
   ${SDL3_INCLUDE_DIRS}
   ${GEOS_INCLUDE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/external
 )
 
 target_link_libraries(globtoo PRIVATE
@@ -59,4 +60,9 @@ if(BUILD_TESTING)
   target_link_libraries(country_geometry_test PRIVATE ${GEOS_C_LIB})
   target_compile_options(country_geometry_test PRIVATE -Wall -Wextra)
   add_test(NAME country_geometry COMMAND country_geometry_test)
+
+  add_executable(coordinates_test tests/coordinates_test.cpp src/camera.cpp)
+  target_include_directories(coordinates_test PRIVATE src)
+  target_compile_options(coordinates_test PRIVATE -Wall -Wextra)
+  add_test(NAME coordinates COMMAND coordinates_test)
 endif()

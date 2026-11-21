@@ -24,10 +24,11 @@ For self-intersecting polygons, both borders and fills use the boundary after
 Triangles are subdivided in *unwrapped longitude/latitude* to at most 2.5°
 per edge, then projected onto the Y-up sphere so their interior follows the
 Earth instead of disappearing below the ocean. All triangles wind CCW when
-viewed from outside. **Fills and borders both use radius 1.0015**; the GL
-polygon-offset *depth bias* on fills keeps outlines visible without shifting
-them away from the actual fill boundary in screen space. Polygon holes stay
-ocean. Smaller sampled boundary segments make outlines smooth at close zoom.
+viewed from outside. **Fills and borders both use radius 1.0015**. Both layers test depth against
+only the underlying globe and do not write depth. Border lines are drawn last
+with no polygon offset and no separate radial lift, so neither layer can
+occlude the other. Polygon holes stay ocean. Smaller sampled boundary segments
+make outlines smooth at close zoom.
 
 Dateline-crossing polygons are unwrapped locally; +180°/-180° polar cut edges
 are retained so the Antarctic cap doesn't become a 360° closing chord. This is
@@ -39,6 +40,18 @@ The globe is rendered first and its **depth buffer is preserved**. Countries
 and borders use depth testing, so their far-side geometry is hidden by the
 solid globe. Face culling alone is insufficient, as `GL_LINE_STRIP` is not
 culled. Do not clear depth between drawing the globe and the countries.
+
+The political geometry sits at radius 1.0015 so it remains in front of the
+base globe, but that radial lift would cause thin strips to peek outside the
+silhouette at the limb. The globe also writes a **stencil mask (value 1)**
+when it passes depth; political fills/lines require stencil == 1. The SDL
+context requests 8 stencil bits and the frame clears stencil together with
+depth. A short distance-dependent near/far clip range dramatically improves
+depth precision when zoomed in; stars use a separate sky projection.
+
+All country positions use the shared right-handed `geo::lonlat_to_xyz` mapping
+(`+X` at Greenwich, `−Z` at 90°E). The globe sphere texture and geographic
+outlines now agree without east/west mirroring.
 
 The seven-color palette uses Natural Earth's `MAPCOLOR7` (1..7), with a stable
 name-based fallback if missing. The camera light vector points *toward* the

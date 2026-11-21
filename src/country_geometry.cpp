@@ -1,4 +1,5 @@
 #include "country_geometry.hpp"
+#include "geocoordinates.hpp"
 
 #define GEOS_USE_ONLY_R_API
 #include <geos_c.h>
@@ -17,7 +18,7 @@ namespace {
 constexpr double pi = 3.14159265358979323846;
 // Fills and outlines MUST sit on the same surface. At close zoom a 0.001
 // radius difference moves the border several screen pixels relative to fill.
-// GL_POLYGON_OFFSET_FILL (in countries_draw) keeps the outlines visible.
+// The depth buffer contains only the base globe; borders are drawn last.
 constexpr double political_radius = 1.0015;
 
 // The same densely-sampled ring is a constraint in the triangulation and is
@@ -261,9 +262,7 @@ void unwrap(Ring& ring, double reference, bool outer) {
 }
 
 std::array<double, 3> sphere(Point p, double radius) {
-    const double lon = p.x * pi / 180., lat = p.y * pi / 180.;
-    return {radius * std::cos(lat) * std::cos(lon),
-            radius * std::sin(lat), radius * std::cos(lat) * std::sin(lon)};
+    return geo::lonlat_to_xyz(p.x, p.y, radius);
 }
 
 void densify_ring(Ring& ring) {

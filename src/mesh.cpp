@@ -1,4 +1,5 @@
 #include "mesh.hpp"
+#include "geocoordinates.hpp"
 #include <cmath>
 #include <cstdio>
 
@@ -6,29 +7,16 @@ Mesh create_sphere(int slices, int stacks) {
     std::vector<float> verts; // pos.xyz + uv.st
     std::vector<unsigned short> indices;
 
-    // Coordinate system (right-handed, Y-up):
-    //   lon=0°, lat=0° → +X
-    //   lon=90°E       → +Z
-    //   lon=90°W       → -Z
-    //   lat=90°N       → +Y
-    // Equirectangular texture: u=0 at 180°W, u=0.5 at 0°, u=1 at 180°E
-    //   v=0 at north pole, v=1 at south (matches stbi without vertical flip)
+    // Vertex positions and UVs must use the same geographic transform as
+    // GeoJSON. Reversing longitude flips the triangle winding as well.
     for (int i = 0; i <= stacks; ++i) {
-        float v = (float)i / stacks;
-        float phi = v * 3.14159265f; // 0 = north
-        float y = cosf(phi);
-        float r = sinf(phi);
-
+        const float v = (float)i / stacks;
         for (int j = 0; j <= slices; ++j) {
-            float t = (float)j / slices;       // 0..1
-            // Place the mesh seam at +/-180, exactly where the image seam is.
-            // Longitude 0 is halfway through the mesh (u=0.5).
-            float theta = (t - 0.5f) * 2.f * 3.14159265f;
-            float x = r * cosf(theta);
-            float z = r * sinf(theta);
-
-            // Avoid interpolating u=0 to u=1 inside any face.
-            float u = t;
+            const float u = (float)j / slices;
+            const auto pos = geo::uv_to_xyz(u, v);
+            const float x = static_cast<float>(pos[0]);
+            const float y = static_cast<float>(pos[1]);
+            const float z = static_cast<float>(pos[2]);
 
             verts.push_back(x);
             verts.push_back(y);
@@ -44,11 +32,11 @@ Mesh create_sphere(int slices, int stacks) {
             int b = a + slices + 1;
             // CCW from outside
             indices.push_back((unsigned short)a);
-            indices.push_back((unsigned short)(a + 1));
             indices.push_back((unsigned short)b);
             indices.push_back((unsigned short)(a + 1));
+            indices.push_back((unsigned short)(a + 1));
+            indices.push_back((unsigned short)b);
             indices.push_back((unsigned short)(b + 1));
-            indices.push_back((unsigned short)b);
         }
     }
 

@@ -50,8 +50,20 @@ void globe_draw(const Globe& g, const Camera& cam, float aspect, bool textured) 
     }
 
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_STENCIL_TEST);
+    glStencilMask(0xff);
+    glStencilFunc(GL_ALWAYS, 1, 0xff);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
     draw_mesh(g.mesh);
+    // Keep the stencil test enabled for political geometry. It limits the
+    // overlay to the globe's visible silhouette, even where its slight radial
+    // lift would otherwise make islands peek beyond the horizon.
+    glStencilMask(0x00);
+    glStencilFunc(GL_EQUAL, 1, 0xff);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 }
