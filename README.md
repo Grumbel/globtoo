@@ -60,3 +60,9 @@ NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
 Plain C++20 structs + free functions. No deep inheritance.
 Components live as data; systems are free functions that operate on them.
 Ready for later expansion (country borders, VR, etc.).
+
+
+## Country data
+
+Natural Earth 1:110m Admin-0 countries (public domain) is fetched at build time
+as GeoJSON for borders and political coloring. See `docs/COUNTRIES.md`.

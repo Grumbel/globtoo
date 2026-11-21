@@ -1,13 +1,18 @@
 # TODO.md — globtoo
 
 ## Current tip
-- Fixed grab-mode feedback (stable surface drag)
-- Prior: trackball, shift-roll, stars, camera orbit
+- Documented + flake-fetched Natural Earth 110m country GeoJSON
+- Prior: stars, grab fix, trackball, shift-roll, camera orbit
 
-## Grab math
-- grab_prev is the fixed world hit from mouse-down for the whole drag
-- Each move: rotate camera by conjugate of (a→b) so Earth appears to follow
-- Per-frame angle clamped; soft inertia (no angle/dt)
+## Country borders (next implementation)
+- [ ] Minimal GeoJSON loader → lon/lat rings
+- [ ] Project rings to unit sphere; draw border lines (lifted)
+- [ ] Triangulate polygons OR bake political texture; color by MAPCOLOR7 / ADM0_A3
+- [ ] Toggle political vs satellite (e.g. P)
+- [ ] Optional: 50m dataset when zoomed in
 
-## Open / next
-- [ ] Optional: denser stars, borders, atmosphere, VR
+Data: `assets/countries.geojson` (build-time fetch). See `docs/COUNTRIES.md`.
+
+## Open / other
+- [ ] Atmosphere, day/night
+- [ ] VR later

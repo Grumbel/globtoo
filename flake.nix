@@ -26,6 +26,16 @@
           sha256 = "sha256-Yc09J0idgO0CXXlUU5ptkLUNRDO73Sfowa+KbxX3HoY=";
           name = "earth.jpg";
         };
+
+        # Natural Earth 1:110m Admin-0 countries (public domain).
+        # Lon/lat polygons for borders + country fill. ~820 KB GeoJSON.
+        # For more detail when zoomed: ne_50m_admin_0_countries.geojson
+        countriesGeojson = pkgs.fetchurl {
+          url = "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_countries.geojson";
+          sha256 = "sha256-aGbId9Ocupw1diCHiDmzNtVp+MZi08+rTLHb4tOcl38=";
+          name = "ne_110m_admin_0_countries.geojson";
+        };
+
       in
       {
         packages.default = pkgs.stdenv.mkDerivation {
@@ -51,6 +61,7 @@
           postPatch = ''
             mkdir -p assets
             cp ${earthTexture} assets/earth.jpg
+            cp ${countriesGeojson} assets/countries.geojson
           '';
 
           installPhase = ''
@@ -58,6 +69,7 @@
             mkdir -p $out/bin $out/share/globtoo/{assets,shaders}
             cp globtoo $out/bin/globtoo-bin
             cp assets/earth.jpg $out/share/globtoo/assets/
+            cp ${countriesGeojson} $out/share/globtoo/assets/countries.geojson
             cp -r ${./shaders}/* $out/share/globtoo/shaders/ 2>/dev/null || true
 
             # Thin wrapper so the binary finds its assets
