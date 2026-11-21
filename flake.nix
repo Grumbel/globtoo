@@ -18,7 +18,7 @@
         # Good enough for development and still looks decent when zoomed.
         earthTexture = pkgs.fetchurl {
           url = "https://upload.wikimedia.org/wikipedia/commons/8/83/Equirectangular_projection_SW.jpg";
-          sha256 = "sha256-rzU8MSiP8PCIkH0tXJXZWazCWUxQtkIW9GzElMmASOk=";
+	  sha256 = "sha256-rzU8MSiP8PCIkH0tXJJZrFBBc7SCFiBPlsxJTJgEi+k=";
           name = "earth.jpg";
         };
 
