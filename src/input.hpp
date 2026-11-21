@@ -8,6 +8,7 @@
 struct InputState {
     bool  dragging = false;
     bool  shift_down = false;
+    bool  rotation_drag = false;
     bool  trackball = false; // T: relative mouse, continuous orbit
     float last_x = 0.f;
     float last_y = 0.f;

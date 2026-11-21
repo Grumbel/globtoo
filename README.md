@@ -63,12 +63,17 @@ Globtoo now has a small on-screen toolbar; keyboard shortcuts remain optional.
 - **Reset**: restore timezone-relative viewpoint and zoom.
 
 Mouse: drag to spin the globe or pan the flat map; wheel to zoom.
+**Shift+drag** rotates the 2D map around the viewport center, just as it
+rolls the 3D globe. The rotation is retained when unfolding or folding.
+Flat maps can be dragged north or south **through the poles**; unlike a
+simple vertical repeat, the next sheet reflects latitude and turns longitude
+by 180 degrees to represent the actual opposite side of the Earth.
 The 3D globe now permits roughly **1.9× closer** views (minimum camera
 distance 1.08 Earth radii versus 1.15 previously). Flat-map zoom reaches
 **80×** instead of 60×. The globe sphere uses a finer mesh to stay smooth
 at close range. The 10m country mesh is selected automatically at these scales;
 the raster Earth texture still has its original resolution.
-In globe mode, Shift+drag rolls around the view axis.
+Shift+drag rolls the globe or rotates the flat map around the screen center.
 Optional shortcuts: `1..5` select projection, `Space` shading, `B` borders,
 `N` names, `P` political coloring, `Tab` Grab/Arcball, `T` trackball,
 `Esc` quit (or release trackball).

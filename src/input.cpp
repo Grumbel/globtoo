@@ -9,6 +9,7 @@ static void mouse_to_ndc(const InputState& in, float mx, float my, float& ndc_x,
 void input_set_trackball(InputState& in, bool on) {
     in.trackball = on;
     in.dragging = false;
+    in.rotation_drag = false;
     if (in.window) {
         // SDL3: relative mode grabs the mouse and reports deltas
         if (!SDL_SetWindowRelativeMouseMode(in.window, on)) {
@@ -93,11 +94,12 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
         }
         if (e.button.button == SDL_BUTTON_LEFT) {
             in.dragging = true;
+            in.rotation_drag = in.shift_down || (SDL_GetModState() & SDL_KMOD_SHIFT);
             in.last_x = e.button.x;
             in.last_y = e.button.y;
             camera_grab_kill_inertia(cam);
 
-            if (map.flat_goal > .5f || in.shift_down)
+            if (map.flat_goal > .5f || in.rotation_drag)
                 break;
 
             if (cam.mode == ControlMode::Grab) {
@@ -113,6 +115,7 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
     case SDL_EVENT_MOUSE_BUTTON_UP:
         if (e.button.button == SDL_BUTTON_LEFT) {
             in.dragging = false;
+            in.rotation_drag = false;
             if (cam.mode == ControlMode::Grab)
                 camera_grab_end(cam);
         }
@@ -134,8 +137,11 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
         }
 
         if (map.flat_goal > .5f) {
-            if (in.dragging) map_pan(map,dx,dy,in.viewport_h);
-        } else if (in.shift_down) {
+            if (in.dragging) {
+                if (in.rotation_drag) map_apply_roll(map,dx);
+                else map_pan(map,dx,dy,in.viewport_h);
+            }
+        } else if (in.rotation_drag || in.shift_down) {
             camera_apply_roll(cam, dx, 0.005f);
         } else if (in.trackball) {
             // Continuous arcball-style orbit while mouse is grabbed

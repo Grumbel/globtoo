@@ -7,7 +7,9 @@ east longitude -> -Z). The same GLES2 geometry is used for all five modes:
 
 - **Globe**: perspective-projected sphere with occlusion and country depth/stencil
 - **Equirectangular (Plate Carrée)**: longitude x, latitude y
-- **Mercator**: longitude x, 0.65 × ln(tan(π/4 + latitude/2)); ±85° clamp
+- **Mercator**: longitude x, 0.65 × ln(tan(π/4 + latitude/2)); above
+  ±85° the curve extends along its tangent to give the otherwise infinite
+  poles a finite coordinate in the wrapped navigation sheet
 - **Mollweide equal-area**: solved iteratively for the auxiliary latitude
 - **Hammer equal-area**: closed elliptical/oval representation of a whole Earth
 
@@ -27,10 +29,37 @@ Animations use interruptible exponential interpolation in `src/map_view.cpp`.
 country fill triangles and border strips. Country meshes retain **unwrapped
 longitude/latitude coordinates** in addition to original 3D positions. This
 is essential to project the 180° seam without making long triangles across
-continents. In completed flat mode, three longitude-periodic mesh copies are
-rendered, with the displayed ±180° range clipped by the fragment shaders.
+continents. In completed flat mode, longitude-periodic mesh copies are rendered when
+needed at the antimeridian, with the displayed ±180° range clipped by the
+fragment shaders. The seam test accounts for the longitude shift of each
+pole-reflected band even at close zoom.
 The transitional intermediate uses one mesh copy, so seams can temporarily
 show at the far edge of the unfolding surface.
+
+## Flat navigation across the poles and rotation
+
+Latitude is stored as a continuous *unwrapped* angular coordinate. It is not
+clamped to ±85° when panning. The map is rendered in successive north/south
+bands: geographic latitude alternately reflects around the poles and
+longitude shifts 180° with each crossing. The inverse of this mapping is
+used when returning from the map to the 3D globe. All layers (textured
+surface, country fills, outlines, labels) use the same bands, so colors and
+borders remain registered. Only the bands intersecting the visible viewport
+are drawn. Longitude and latitude center coordinates are periodically
+normalized to keep shader arguments numerically bounded.
+
+The coordinate transforms have to distort or cut somewhere: no flat
+projection can cover the sphere seamlessly. In particular, Plate Carrée has
+a polar edge along which reflected copies need not match point-for-point;
+Mollweide and Hammer meet at a projection tip. This is a convenient,
+geographically correct navigation convention, not an undistorted global
+continuous map. The finite Mercator polar continuation is not conformal
+above ±85°.
+
+Shift+left-drag rotates the flat map around its center. Regular dragging
+applies the inverse roll before updating the map's geographic center,
+allowing panning in any rotated orientation. Globe↔map mode switches preserve
+this roll and the true geographic center even after crossing the poles.
 
 In spherical mode, depth is written only by the base globe and a stencil mask
 prevents visible political geometry outside the globe limb. During flattening

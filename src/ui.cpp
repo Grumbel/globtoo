@@ -221,6 +221,10 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
     // Explicitly state current mode and the interpretation of timezone start.
     const char* mode = map.selected==MapProjection::Globe ? "SPHERE" : "FLAT MAP";
     draw_text(ui,704,15,mode,2,muted);
+    if (map.flat_goal > .5f) {
+        draw_text(ui,704,41,"SHIFT DRAG: ROTATE",1,muted);
+        draw_text(ui,704,55,"DRAG THROUGH POLES",1,muted);
+    }
 }
 
 void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam,

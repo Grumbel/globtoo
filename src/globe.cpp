@@ -2,6 +2,7 @@
 #include "scene.hpp"
 #include "geocoordinates.hpp"
 #include <cstdio>
+#include <vector>
 
 bool globe_init(Globe& g, const char* texture_path) {
     // Extra tessellation keeps the texture/silhouette smooth at close zoom.
@@ -72,10 +73,13 @@ void globe_draw(const Globe& g, const Camera& cam, float aspect,
     // Copies are drawn only once the map is fully flat, avoiding ghost spheres
     // during the physical sphere-to-plane morph.
     const float wraps[] = {-static_cast<float>(2*geo::pi), 0.f, static_cast<float>(2*geo::pi)};
-    const int repeats = flat && scene_map_seam_visible(map, aspect) ? 3 : 1;
-    for (int i=0;i<repeats;i++) {
-        scene_uniforms(g.shader, cam, aspect, map, repeats==3 ? wraps[i] : 0.f);
-        draw_mesh(g.mesh);
+    const auto bands = flat ? map_visible_bands(map, aspect) : std::vector<int>{0};
+    for (int band : bands) {
+        const int repeats = flat && scene_map_seam_visible(map, aspect, band) ? 3 : 1;
+        for (int i=0;i<repeats;i++) {
+            scene_uniforms(g.shader, cam, aspect, map, repeats==3 ? wraps[i] : 0.f, band);
+            draw_mesh(g.mesh);
+        }
     }
     // Keep the stencil test enabled for political geometry. It limits the
     // overlay to the globe's visible silhouette, even where its slight radial

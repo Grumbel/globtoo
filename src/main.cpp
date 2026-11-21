@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     Ui ui{};
     if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
 
-    fprintf(stderr, "Controls: on-screen buttons, drag=spin/pan, wheel=zoom, 1..5=views, Tab=Grab/Arcball, Space=shading, B=borders, N=names, P=political, Esc=quit\n");
+    fprintf(stderr, "Controls: on-screen buttons, drag=spin/pan (cross poles in maps), Shift+drag=rotate/roll, wheel=zoom, 1..5=views, Tab=Grab/Arcball, Space=shading, B=borders, N=names, P=political, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();

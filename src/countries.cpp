@@ -5,6 +5,7 @@
 #include "scene.hpp"
 #include "geocoordinates.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -138,7 +139,7 @@ void countries_shutdown(Countries& c) {
 void countries_draw(Countries& c, const Camera& cam, float aspect,
                     const MapView& map, bool shading) {
     c.using_high = country_use_high_detail(
-        map.flat_goal > .5f ? std::min(cam.distance, 1.6f) : cam.distance,
+        map.flat_goal > .5f ? std::clamp(3.2f / map.zoom, 1.2f, 3.2f) : cam.distance,
         c.using_high, c.high.available(), c.low.available());
     const CountryMeshGPU& gpu = c.using_high ? c.high : c.low;
     if (!gpu.available()) { glDisable(GL_STENCIL_TEST); return; }
@@ -156,12 +157,14 @@ void countries_draw(Countries& c, const Camera& cam, float aspect,
     }
 
     const float wraps[] = {-static_cast<float>(2*geo::pi), 0.f, static_cast<float>(2*geo::pi)};
-    const int repeats = flat && scene_map_seam_visible(map, aspect) ? 3 : 1;
-    for (int pass=0;pass<repeats;pass++) {
+    const auto bands = flat ? map_visible_bands(map, aspect) : std::vector<int>{0};
+    for (int band : bands) {
+      const int repeats = flat && scene_map_seam_visible(map, aspect, band) ? 3 : 1;
+      for (int pass=0;pass<repeats;pass++) {
         const float wrap = repeats==3 ? wraps[pass] : 0.f;
         if (c.fill_visible && c.fill_shader.program) {
             use_shader(c.fill_shader);
-            scene_uniforms(c.fill_shader, cam, aspect, map, wrap);
+            scene_uniforms(c.fill_shader, cam, aspect, map, wrap, band);
             const GLint u_light = glGetUniformLocation(c.fill_shader.program, "u_light_dir");
             const GLint u_shading = glGetUniformLocation(c.fill_shader.program, "u_shading");
             if (u_light >= 0) {
@@ -187,7 +190,7 @@ void countries_draw(Countries& c, const Camera& cam, float aspect,
 
         if (c.borders_visible && c.border_shader.program) {
             use_shader(c.border_shader);
-            scene_uniforms(c.border_shader, cam, aspect, map, wrap);
+            scene_uniforms(c.border_shader, cam, aspect, map, wrap, band);
             const GLint u_color = glGetUniformLocation(c.border_shader.program, "u_color");
             if (u_color >= 0) glUniform4f(u_color, .12f, .10f, .08f, 1.f);
             glLineWidth(1.f);
@@ -202,6 +205,7 @@ void countries_draw(Countries& c, const Camera& cam, float aspect,
             glDisableVertexAttribArray(0);
             glDisableVertexAttribArray(2);
         }
+      }
     }
     glDepthMask(GL_TRUE);
     glDisable(GL_STENCIL_TEST);
