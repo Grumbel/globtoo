@@ -53,8 +53,11 @@ void input_handle_event(InputState& in, Camera& cam, Globe& globe, Countries& co
             globe.shading = !globe.shading;
             fprintf(stderr, "Shading: %s\n", globe.shading ? "on" : "off");
         } else if (e.key.key == SDLK_B) {
-            countries.visible = !countries.visible;
-            fprintf(stderr, "Borders: %s\n", countries.visible ? "on" : "off");
+            countries.borders_visible = !countries.borders_visible;
+            fprintf(stderr, "Borders: %s\n", countries.borders_visible ? "on" : "off");
+        } else if (e.key.key == SDLK_P) {
+            countries.fill_visible = !countries.fill_visible;
+            fprintf(stderr, "Political fill: %s\n", countries.fill_visible ? "on" : "off");
         }
         break;
 

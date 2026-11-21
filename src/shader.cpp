@@ -54,6 +54,7 @@ Shader load_shader(const char* vert_path, const char* frag_path) {
     glBindAttribLocation(s.program, 0, "a_pos");
     glBindAttribLocation(s.program, 1, "a_uv");
     glBindAttribLocation(s.program, 1, "a_bright"); // stars; same slot
+    glBindAttribLocation(s.program, 1, "a_color");  // country fill
     glLinkProgram(s.program);
 
     GLint ok = 0;

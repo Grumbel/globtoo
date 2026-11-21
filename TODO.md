@@ -1,16 +1,14 @@
 # TODO.md — globtoo
 
 ## Current tip
-- Country border lines from Natural Earth 110m GeoJSON (toggle B)
+- Political country fills (ear-clip + MAPCOLOR7) + borders
 
 ## Done
-- [x] GeoJSON ring parser → sphere line strips
-- [x] Border draw; B toggles visibility
-- [x] Flake fetches countries.geojson
+- [x] GeoJSON borders
+- [x] Triangulated fills with Natural Earth MAPCOLOR7 palette
+- [x] B borders, P political fill
 
 ## Next
-- [ ] Country fill colors (triangulate polygons or bake political texture)
-- [ ] Optional 50m when zoomed
+- [ ] Optional: hide satellite when fill on / blend modes
+- [ ] 50m data when zoomed
 - [ ] Atmosphere / day-night / VR
-
-Data: `assets/countries.geojson`. See `docs/COUNTRIES.md`.

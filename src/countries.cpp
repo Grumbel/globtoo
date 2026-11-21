@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <algorithm>
 
 static void lonlat_to_xyz(float lon_deg, float lat_deg, float radius, float& x, float& y, float& z) {
     float lon = lon_deg * (3.14159265f / 180.f);
@@ -19,175 +20,251 @@ static void lonlat_to_xyz(float lon_deg, float lat_deg, float radius, float& x, 
     z = cl * sinf(lon) * radius;
 }
 
-// Very small GeoJSON coordinate extractor: find nested [lon, lat] pairs.
-// Handles Polygon / MultiPolygon rings (arrays of positions).
-// Not a full JSON parser — good enough for Natural Earth Admin-0.
-static bool parse_geojson_rings(const std::string& text, std::vector<float>& verts,
-                                std::vector<Countries::Range>& strips) {
+// Classic atlas-ish palette (MAPCOLOR7 is 1..7)
+static void mapcolor_rgb(int mc, float& r, float& g, float& b) {
+    static const float pal[][3] = {
+        {0.75f, 0.75f, 0.72f}, // 0 fallback
+        {0.91f, 0.56f, 0.56f}, // 1 red-ish
+        {0.55f, 0.78f, 0.55f}, // 2 green
+        {0.55f, 0.65f, 0.90f}, // 3 blue
+        {0.95f, 0.85f, 0.45f}, // 4 yellow
+        {0.85f, 0.65f, 0.90f}, // 5 purple
+        {0.55f, 0.85f, 0.85f}, // 6 cyan
+        {0.95f, 0.70f, 0.45f}, // 7 orange
+    };
+    if (mc < 0 || mc > 7) mc = 0;
+    r = pal[mc][0]; g = pal[mc][1]; b = pal[mc][2];
+}
+
+// --- Ear clipping in lon/lat plane (good enough at 110m) ---
+static float cross2(float ax, float ay, float bx, float by) {
+    return ax * by - ay * bx;
+}
+
+static bool point_in_tri(float px, float py,
+                         float ax, float ay, float bx, float by, float cx, float cy) {
+    float c1 = cross2(bx - ax, by - ay, px - ax, py - ay);
+    float c2 = cross2(cx - bx, cy - by, px - bx, py - by);
+    float c3 = cross2(ax - cx, ay - cy, px - cx, py - cy);
+    bool has_neg = (c1 < 0) || (c2 < 0) || (c3 < 0);
+    bool has_pos = (c1 > 0) || (c2 > 0) || (c3 > 0);
+    return !(has_neg && has_pos);
+}
+
+static void ear_clip(const std::vector<float>& ring_lonlat, // lon,lat pairs
+                     std::vector<float>& out_xyz_rgb, // x y z r g b per vertex
+                     float r, float g, float b, float radius) {
+    int n = (int)(ring_lonlat.size() / 2);
+    if (n < 3)
+        return;
+
+    // Drop closing duplicate if present
+    if (n > 1 &&
+        fabsf(ring_lonlat[0] - ring_lonlat[(n - 1) * 2]) < 1e-6f &&
+        fabsf(ring_lonlat[1] - ring_lonlat[(n - 1) * 2 + 1]) < 1e-6f)
+        --n;
+    if (n < 3)
+        return;
+
+    std::vector<int> idx(n);
+    for (int i = 0; i < n; ++i) idx[i] = i;
+
+    // Ensure CCW in lon/lat for consistent ears (approximate)
+    double area = 0;
+    for (int i = 0; i < n; ++i) {
+        int j = (i + 1) % n;
+        area += (double)ring_lonlat[i * 2] * ring_lonlat[j * 2 + 1];
+        area -= (double)ring_lonlat[j * 2] * ring_lonlat[i * 2 + 1];
+    }
+    if (area < 0)
+        std::reverse(idx.begin(), idx.end());
+
+    auto lon = [&](int i) { return ring_lonlat[idx[i] * 2]; };
+    auto lat = [&](int i) { return ring_lonlat[idx[i] * 2 + 1]; };
+
+    int guard = 0;
+    while (idx.size() > 3 && guard++ < n * n) {
+        bool clipped = false;
+        int m = (int)idx.size();
+        for (int i = 0; i < m; ++i) {
+            int i0 = (i + m - 1) % m;
+            int i1 = i;
+            int i2 = (i + 1) % m;
+            float ax = lon(i0), ay = lat(i0);
+            float bx = lon(i1), by = lat(i1);
+            float cx = lon(i2), cy = lat(i2);
+            // Ear if convex
+            if (cross2(bx - ax, by - ay, cx - bx, cy - by) <= 0)
+                continue;
+            bool any_inside = false;
+            for (int j = 0; j < m; ++j) {
+                if (j == i0 || j == i1 || j == i2) continue;
+                if (point_in_tri(lon(j), lat(j), ax, ay, bx, by, cx, cy)) {
+                    any_inside = true;
+                    break;
+                }
+            }
+            if (any_inside)
+                continue;
+            // Emit triangle
+            float x, y, z;
+            lonlat_to_xyz(ax, ay, radius, x, y, z);
+            out_xyz_rgb.push_back(x); out_xyz_rgb.push_back(y); out_xyz_rgb.push_back(z);
+            out_xyz_rgb.push_back(r); out_xyz_rgb.push_back(g); out_xyz_rgb.push_back(b);
+            lonlat_to_xyz(bx, by, radius, x, y, z);
+            out_xyz_rgb.push_back(x); out_xyz_rgb.push_back(y); out_xyz_rgb.push_back(z);
+            out_xyz_rgb.push_back(r); out_xyz_rgb.push_back(g); out_xyz_rgb.push_back(b);
+            lonlat_to_xyz(cx, cy, radius, x, y, z);
+            out_xyz_rgb.push_back(x); out_xyz_rgb.push_back(y); out_xyz_rgb.push_back(z);
+            out_xyz_rgb.push_back(r); out_xyz_rgb.push_back(g); out_xyz_rgb.push_back(b);
+            idx.erase(idx.begin() + i1);
+            clipped = true;
+            break;
+        }
+        if (!clipped)
+            break;
+    }
+    if (idx.size() == 3) {
+        float x, y, z;
+        for (int k = 0; k < 3; ++k) {
+            lonlat_to_xyz(lon(k), lat(k), radius, x, y, z);
+            out_xyz_rgb.push_back(x); out_xyz_rgb.push_back(y); out_xyz_rgb.push_back(z);
+            out_xyz_rgb.push_back(r); out_xyz_rgb.push_back(g); out_xyz_rgb.push_back(b);
+        }
+    }
+}
+
+// Extract rings + MAPCOLOR7 per feature from Natural Earth GeoJSON
+static bool parse_features(const std::string& text,
+                           std::vector<float>& border_verts,
+                           std::vector<Countries::Range>& strips,
+                           std::vector<float>& fill_xyz_rgb) {
     const char* p = text.c_str();
     const char* end = p + text.size();
 
     auto skip_ws = [&]() {
-        while (p < end && (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t'))
-            ++p;
-    };
-    auto match = [&](const char* s) -> bool {
-        skip_ws();
-        size_t n = strlen(s);
-        if ((size_t)(end - p) < n || strncmp(p, s, n) != 0)
-            return false;
-        p += n;
-        return true;
+        while (p < end && (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t')) ++p;
     };
     auto parse_number = [&](float& out) -> bool {
         skip_ws();
         char* e = nullptr;
         out = strtof(p, &e);
-        if (e == p)
-            return false;
+        if (e == p) return false;
         p = e;
         return true;
     };
+    auto try_read_position = [&](float& lon, float& lat) -> bool {
+        skip_ws();
+        if (*p != '[') return false;
+        const char* save = p;
+        ++p;
+        if (!parse_number(lon)) { p = save; return false; }
+        skip_ws();
+        if (*p != ',') { p = save; return false; }
+        ++p;
+        if (!parse_number(lat)) { p = save; return false; }
+        skip_ws();
+        if (*p == ',') { ++p; float alt; parse_number(alt); }
+        skip_ws();
+        if (*p != ']') { p = save; return false; }
+        ++p;
+        return true;
+    };
 
-    // Scan for "coordinates" keys and walk the following array structure.
-    while (p < end) {
-        const char* key = strstr(p, "\"coordinates\"");
-        if (!key)
+    // Split on features roughly: find each "MAPCOLOR7" then following "coordinates"
+    const char* cursor = p;
+    while (cursor < end) {
+        const char* mc_key = strstr(cursor, "\"MAPCOLOR7\"");
+        const char* coord_key = strstr(cursor, "\"coordinates\"");
+        if (!coord_key)
             break;
-        p = key + 14;
-        skip_ws();
-        if (!match(":"))
-            continue;
-        skip_ws();
-        if (*p != '[')
-            continue;
-        ++p; // enter coordinates value
 
-        // coordinates is either:
-        //   Polygon:      [ ring, ring, ... ]  ring = [ [lon,lat], ... ]
-        //   MultiPolygon: [ polygon, ... ]
-        // We detect depth of nested arrays until we see numbers.
-
-        std::vector<int> array_depth_stack;
-        // Heuristic: walk and collect rings of [lon,lat] pairs.
-        // A ring starts when we see [[number
-        auto try_read_position = [&](float& lon, float& lat) -> bool {
-            skip_ws();
-            if (*p != '[')
-                return false;
-            const char* save = p;
-            ++p;
-            if (!parse_number(lon)) { p = save; return false; }
-            skip_ws();
-            if (*p != ',') { p = save; return false; }
-            ++p;
-            if (!parse_number(lat)) { p = save; return false; }
-            skip_ws();
-            // optional altitude
-            if (*p == ',') {
-                ++p;
-                float alt;
-                parse_number(alt);
+        int mapcolor = 0;
+        if (mc_key && mc_key < coord_key) {
+            const char* q = mc_key + 11;
+            while (q < end && *q != ':' && *q != ',') ++q;
+            if (*q == ':') {
+                ++q;
+                mapcolor = (int)strtol(q, nullptr, 10);
             }
+        }
+
+        float cr, cg, cb;
+        mapcolor_rgb(mapcolor, cr, cg, cb);
+
+        p = coord_key + 14;
+        skip_ws();
+        if (*p == ':') ++p;
+        skip_ws();
+
+        // Walk coordinates arrays; first ring of each polygon = exterior → fill + border
+        std::function<void(bool)> walk;
+        walk = [&](bool may_be_ring) {
             skip_ws();
-            if (*p != ']') { p = save; return false; }
+            if (p >= end || *p != '[') return;
             ++p;
-            return true;
-        };
-
-        // Recursive-ish ring collector using bracket counting
-        std::function<void(int)> walk;
-        walk = [&](int depth) {
             skip_ws();
-            if (p >= end || *p != '[')
-                return;
-            ++p; // consume '['
-
-            skip_ws();
-            // Peek: is first element a number-bearing position or another array?
             if (*p == '[') {
-                // Could be ring of positions or nested polygons
-                // Try position first
                 float lon, lat;
                 const char* save = p;
                 if (try_read_position(lon, lat)) {
-                    // This is a ring: first point already read
-                    GLint first = (GLint)(verts.size() / 3);
+                    std::vector<float> ring;
+                    ring.push_back(lon); ring.push_back(lat);
+                    GLint first = (GLint)(border_verts.size() / 3);
                     float x, y, z;
-                    // Slightly above unit sphere to avoid z-fight
                     lonlat_to_xyz(lon, lat, 1.004f, x, y, z);
-                    verts.push_back(x); verts.push_back(y); verts.push_back(z);
+                    border_verts.push_back(x); border_verts.push_back(y); border_verts.push_back(z);
                     while (true) {
                         skip_ws();
                         if (*p == ',') {
                             ++p;
-                            if (!try_read_position(lon, lat))
-                                break;
+                            if (!try_read_position(lon, lat)) break;
+                            ring.push_back(lon); ring.push_back(lat);
                             lonlat_to_xyz(lon, lat, 1.004f, x, y, z);
-                            verts.push_back(x); verts.push_back(y); verts.push_back(z);
-                        } else {
-                            break;
-                        }
+                            border_verts.push_back(x); border_verts.push_back(y); border_verts.push_back(z);
+                        } else break;
                     }
-                    GLsizei count = (GLsizei)(verts.size() / 3 - first);
+                    GLsizei count = (GLsizei)(border_verts.size() / 3 - first);
                     if (count >= 2)
                         strips.push_back({ first, count });
+                    // Fill from exterior rings (caller treats every ring; holes get same color — ok at 110m)
+                    if (ring.size() >= 6)
+                        ear_clip(ring, fill_xyz_rgb, cr, cg, cb, 1.001f);
                     skip_ws();
-                    if (*p == ']')
-                        ++p;
+                    if (*p == ']') ++p;
                 } else {
                     p = save;
-                    // Nested arrays (MultiPolygon)
                     while (true) {
                         skip_ws();
-                        if (*p == '[')
-                            walk(depth + 1);
+                        if (*p == '[') walk(true);
                         skip_ws();
-                        if (*p == ',') {
-                            ++p;
-                            continue;
-                        }
+                        if (*p == ',') { ++p; continue; }
                         break;
                     }
                     skip_ws();
-                    if (*p == ']')
-                        ++p;
+                    if (*p == ']') ++p;
                 }
             } else {
-                // Unexpected
-                int depth2 = 1;
-                while (p < end && depth2 > 0) {
-                    if (*p == '[') ++depth2;
-                    else if (*p == ']') --depth2;
+                int depth = 1;
+                while (p < end && depth > 0) {
+                    if (*p == '[') ++depth;
+                    else if (*p == ']') --depth;
                     ++p;
                 }
             }
-
-            skip_ws();
-            // If parent expects more sibling arrays after this one, caller handles commas
         };
 
-        // Top-level coordinates array content
         skip_ws();
         while (p < end) {
             skip_ws();
-            if (*p == '[')
-                walk(0);
+            if (*p == '[') walk(true);
             skip_ws();
-            if (*p == ',') {
-                ++p;
-                continue;
-            }
-            if (*p == ']') {
-                ++p;
-                break;
-            }
-            // skip junk
-            if (p < end)
-                ++p;
-            else
-                break;
+            if (*p == ',') { ++p; continue; }
+            if (*p == ']') { ++p; break; }
+            if (p < end) ++p; else break;
         }
+
+        cursor = p;
     }
 
     return !strips.empty();
@@ -196,88 +273,110 @@ static bool parse_geojson_rings(const std::string& text, std::vector<float>& ver
 bool countries_init(Countries& c, const char* geojson_path) {
     std::vector<std::string> candidates;
     if (geojson_path && geojson_path[0])
-        candidates.push_back(geojson_path);
-    candidates.push_back("assets/countries.geojson");
+        candidates.emplace_back(geojson_path);
+    candidates.emplace_back("assets/countries.geojson");
     if (const char* ad = std::getenv("GLOBE_ASSET_DIR")) {
         candidates.push_back(std::string(ad) + "/assets/countries.geojson");
         candidates.push_back(std::string(ad) + "/countries.geojson");
     }
 
-    std::string text;
-    std::string used;
+    std::string text, used;
     for (const auto& path : candidates) {
         std::ifstream in(path, std::ios::binary);
-        if (!in)
-            continue;
+        if (!in) continue;
         std::ostringstream ss;
         ss << in.rdbuf();
         text = ss.str();
-        if (!text.empty()) {
-            used = path;
-            break;
-        }
+        if (!text.empty()) { used = path; break; }
     }
     if (text.empty()) {
-        fprintf(stderr, "countries: no GeoJSON found (tried assets/countries.geojson)\n");
+        fprintf(stderr, "countries: no GeoJSON found\n");
         return false;
     }
 
-    std::vector<float> verts;
-    if (!parse_geojson_rings(text, verts, c.strips)) {
-        fprintf(stderr, "countries: failed to parse rings from %s\n", used.c_str());
+    std::vector<float> border_verts;
+    std::vector<float> fill_verts;
+    if (!parse_features(text, border_verts, c.strips, fill_verts)) {
+        fprintf(stderr, "countries: parse failed (%s)\n", used.c_str());
         return false;
     }
-    c.total_verts = (GLsizei)(verts.size() / 3);
 
-    glGenBuffers(1, &c.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, c.vbo);
-    glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+    glGenBuffers(1, &c.border_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, c.border_vbo);
+    glBufferData(GL_ARRAY_BUFFER, border_verts.size() * sizeof(float), border_verts.data(), GL_STATIC_DRAW);
 
-    c.shader = load_shader("shaders/borders.vert", "shaders/borders.frag");
-    if (!c.shader.program) {
+    c.fill_count = (GLsizei)(fill_verts.size() / 6);
+    if (c.fill_count > 0) {
+        glGenBuffers(1, &c.fill_vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, c.fill_vbo);
+        glBufferData(GL_ARRAY_BUFFER, fill_verts.size() * sizeof(float), fill_verts.data(), GL_STATIC_DRAW);
+    }
+
+    c.border_shader = load_shader("shaders/borders.vert", "shaders/borders.frag");
+    c.fill_shader = load_shader("shaders/fill.vert", "shaders/fill.frag");
+    if (!c.border_shader.program) {
         fprintf(stderr, "countries: border shader failed\n");
         return false;
     }
 
-    fprintf(stderr, "countries: %s — %d strips, %d verts\n",
-            used.c_str(), (int)c.strips.size(), (int)c.total_verts);
-    c.visible = true;
+    fprintf(stderr, "countries: %s — %d border strips, %d fill verts\n",
+            used.c_str(), (int)c.strips.size(), (int)c.fill_count);
     return true;
 }
 
 void countries_shutdown(Countries& c) {
-    if (c.vbo)
-        glDeleteBuffers(1, &c.vbo);
-    destroy_shader(c.shader);
+    if (c.border_vbo) glDeleteBuffers(1, &c.border_vbo);
+    if (c.fill_vbo) glDeleteBuffers(1, &c.fill_vbo);
+    destroy_shader(c.border_shader);
+    destroy_shader(c.fill_shader);
     c = {};
 }
 
 void countries_draw(const Countries& c, const Camera& cam, float aspect) {
-    if (!c.visible || !c.vbo || !c.shader.program)
-        return;
-
     Mat4 proj = cam.proj_matrix(aspect);
     Mat4 view = cam.view_matrix();
     Mat4 mvp = Mat4::multiply(proj, view);
 
-    use_shader(c.shader);
-    GLint u_mvp = glGetUniformLocation(c.shader.program, "u_mvp");
-    GLint u_color = glGetUniformLocation(c.shader.program, "u_color");
-    glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
-    glUniform4f(u_color, 0.95f, 0.92f, 0.75f, 1.f); // warm border line
+    // Fill under borders
+    if (c.fill_visible && c.fill_vbo && c.fill_shader.program && c.fill_count > 0) {
+        use_shader(c.fill_shader);
+        GLint u_mvp = glGetUniformLocation(c.fill_shader.program, "u_mvp");
+        glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-    // GLES2 often has no wide lines; 1.0 is portable
-    glLineWidth(1.f);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.f, 1.f);
 
-    glBindBuffer(GL_ARRAY_BUFFER, c.vbo);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glBindBuffer(GL_ARRAY_BUFFER, c.fill_vbo);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+        glDrawArrays(GL_TRIANGLES, 0, c.fill_count);
+        glDisableVertexAttribArray(0);
+        glDisableVertexAttribArray(1);
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        glDepthFunc(GL_LESS);
+    }
 
-    for (const auto& r : c.strips)
-        glDrawArrays(GL_LINE_STRIP, r.first, r.count);
+    if (c.borders_visible && c.border_vbo && c.border_shader.program) {
+        use_shader(c.border_shader);
+        GLint u_mvp = glGetUniformLocation(c.border_shader.program, "u_mvp");
+        GLint u_color = glGetUniformLocation(c.border_shader.program, "u_color");
+        glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
+        glUniform4f(u_color, 0.15f, 0.12f, 0.10f, 1.f);
 
-    glDisableVertexAttribArray(0);
-    glDepthFunc(GL_LESS);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glLineWidth(1.f);
+
+        glBindBuffer(GL_ARRAY_BUFFER, c.border_vbo);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        for (const auto& r : c.strips)
+            glDrawArrays(GL_LINE_STRIP, r.first, r.count);
+        glDisableVertexAttribArray(0);
+        glDepthFunc(GL_LESS);
+    }
 }
