@@ -1,6 +1,6 @@
 precision mediump float;
 
-varying float v_bright;
+varying mediump float v_bright;
 
 void main() {
     // Soft circular point

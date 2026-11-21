@@ -13,6 +13,7 @@
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Match GLES2 vertex/fragment precision on map morph uniforms and all varyings; regression-test linked interfaces
 - [x] Document coordinate system (docs/COORDINATES.md)
 - [x] Align sphere texture UVs with lon/lat, including the actual mesh seam
 - [x] Political fill from MAPCOLOR7 with proper geometry, not centroid fans

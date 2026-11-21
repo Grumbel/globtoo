@@ -1,8 +1,8 @@
 attribute vec3 a_pos;
 attribute vec3 a_color;
 attribute vec2 a_lonlat;
-varying vec3 v_color;
-varying vec3 v_normal;
+varying mediump vec3 v_color;
+varying mediump vec3 v_normal;
 #include "projection.glsl"
 void main() {
     v_color = a_color;

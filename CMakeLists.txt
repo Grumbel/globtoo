@@ -99,6 +99,13 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+  # ES 2.0 precision is part of the shader interface: mismatched vertex/
+  # fragment defaults can compile separately yet fail at program link time.
+  add_executable(shader_interface_test tests/shader_interface_test.cpp)
+  target_compile_definitions(shader_interface_test PRIVATE
+    GLOBTOO_SHADER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+  add_test(NAME shader_interface COMMAND shader_interface_test)
+
   add_executable(country_geometry_test
     tests/country_geometry_test.cpp src/country_geometry.cpp)
   target_include_directories(country_geometry_test PRIVATE src ${GEOS_INCLUDE_DIR})

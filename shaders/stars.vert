@@ -3,7 +3,7 @@ attribute float a_bright;
 
 uniform mat4 u_mvp;
 
-varying float v_bright;
+varying mediump float v_bright;
 
 void main() {
     v_bright = a_bright;

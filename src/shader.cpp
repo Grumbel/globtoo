@@ -78,7 +78,8 @@ Shader load_shader(const char* vert_path, const char* frag_path) {
     if (!ok) {
         char log[512];
         glGetProgramInfoLog(s.program, sizeof(log), nullptr, log);
-        fprintf(stderr, "Shader link error:\n%s\n", log);
+        fprintf(stderr, "Shader link error (%s + %s):\n%s\n",
+                vert_path, frag_path, log);
         glDeleteProgram(s.program);
         s.program = 0;
     } else {

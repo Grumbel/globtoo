@@ -1,8 +1,8 @@
 attribute vec3 a_pos;
 attribute vec2 a_uv;
 uniform mat4 u_model;
-varying vec2 v_uv;
-varying vec3 v_normal;
+varying mediump vec2 v_uv;
+varying mediump vec3 v_normal;
 #include "projection.glsl"
 void main() {
     v_uv = a_uv;

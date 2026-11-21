@@ -2,7 +2,8 @@
 // Imported into the three geometry vertex shaders by shader.cpp.
 uniform mat4 u_view;
 uniform mat4 u_projection;
-uniform float u_morph;
+// Shared with fragment shaders: GLES2 requires matching uniform precision.
+uniform mediump float u_morph;
 uniform float u_projection_from;
 uniform float u_projection_to;
 uniform float u_projection_blend;
@@ -11,7 +12,8 @@ uniform float u_center_lat;
 uniform float u_map_zoom;
 uniform float u_map_distance;
 uniform float u_wrap;
-varying float v_map_lon;
+// Cross-stage varyings must also have identical precision qualifiers.
+varying mediump float v_map_lon;
 
 const float geo_pi = 3.141592653589793;
 vec2 project_map(float kind, float lon, float lat) {

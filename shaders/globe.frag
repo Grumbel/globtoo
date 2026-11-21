@@ -1,15 +1,15 @@
 precision mediump float;
 
-varying vec2 v_uv;
-varying vec3 v_normal;
+varying mediump vec2 v_uv;
+varying mediump vec3 v_normal;
 
 uniform sampler2D u_tex;
 uniform float u_shading; // 0 = flat, 1 = lit
 uniform vec3 u_light_dir;
 uniform float u_textured; // 1 = sample texture, 0 = solid ocean
 
-varying float v_map_lon;
-uniform float u_morph;
+varying mediump float v_map_lon;
+uniform mediump float u_morph;
 void main() {
     if (u_morph > 0.999 && abs(v_map_lon) > 3.141593) discard;
     vec3 albedo;
