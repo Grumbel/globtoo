@@ -2,6 +2,7 @@
 #include <SDL3/SDL.h>
 #include "camera.hpp"
 #include "globe.hpp"
+#include "countries.hpp"
 
 struct InputState {
     bool  dragging = false;
@@ -18,5 +19,5 @@ struct InputState {
     SDL_Window* window = nullptr;
 };
 
-void input_handle_event(InputState& in, Camera& cam, Globe& globe, const SDL_Event& e);
+void input_handle_event(InputState& in, Camera& cam, Globe& globe, Countries& countries, const SDL_Event& e);
 void input_set_trackball(InputState& in, bool on);

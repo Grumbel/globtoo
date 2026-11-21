@@ -9,6 +9,7 @@
 #include "camera.hpp"
 #include "input.hpp"
 #include "stars.hpp"
+#include "countries.hpp"
 
 static SDL_Window*   window  = nullptr;
 static SDL_GLContext glctx   = nullptr;
@@ -72,7 +73,11 @@ int main(int argc, char** argv) {
     if (!stars_init(stars))
         fprintf(stderr, "Warning: stars failed to init\n");
 
-    fprintf(stderr, "Controls: drag=spin, wheel=zoom, Tab=Grab/Arcball, T=trackball, Shift=roll, Space=shading, Esc=quit\n");
+    Countries countries{};
+    if (!countries_init(countries, nullptr))
+        fprintf(stderr, "Warning: countries failed to init\n");
+
+    fprintf(stderr, "Controls: drag=spin, wheel=zoom, Tab=Grab/Arcball, T=trackball, Shift=roll, Space=shading, B=borders, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
@@ -91,7 +96,7 @@ int main(int argc, char** argv) {
 
         SDL_Event e;
         while (SDL_PollEvent(&e))
-            input_handle_event(input, cam, globe, e);
+            input_handle_event(input, cam, globe, countries, e);
 
         camera_update(cam, dt);
 
@@ -102,10 +107,12 @@ int main(int argc, char** argv) {
         float aspect = (float)input.viewport_w / (float)input.viewport_h;
         stars_draw(stars, cam, aspect);
         globe_draw(globe, cam, aspect);
+        countries_draw(countries, cam, aspect);
 
         SDL_GL_SwapWindow(window);
     }
 
+    countries_shutdown(countries);
     stars_shutdown(stars);
     globe_shutdown(globe);
     SDL_GL_DestroyContext(glctx);

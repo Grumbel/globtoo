@@ -18,7 +18,7 @@ void input_set_trackball(InputState& in, bool on) {
     fprintf(stderr, "Trackball: %s\n", on ? "on (mouse grabbed)" : "off");
 }
 
-void input_handle_event(InputState& in, Camera& cam, Globe& globe, const SDL_Event& e) {
+void input_handle_event(InputState& in, Camera& cam, Globe& globe, Countries& countries, const SDL_Event& e) {
     switch (e.type) {
     case SDL_EVENT_QUIT:
         in.quit = true;
@@ -52,6 +52,9 @@ void input_handle_event(InputState& in, Camera& cam, Globe& globe, const SDL_Eve
         } else if (e.key.key == SDLK_SPACE) {
             globe.shading = !globe.shading;
             fprintf(stderr, "Shading: %s\n", globe.shading ? "on" : "off");
+        } else if (e.key.key == SDLK_B) {
+            countries.visible = !countries.visible;
+            fprintf(stderr, "Borders: %s\n", countries.visible ? "on" : "off");
         }
         break;
 

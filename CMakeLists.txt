@@ -20,6 +20,7 @@ add_executable(globtoo
   src/shader.cpp
   src/texture.cpp
   src/stars.cpp
+  src/countries.cpp
   src/math.cpp
 )
 
