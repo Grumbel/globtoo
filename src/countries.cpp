@@ -341,7 +341,13 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
     if (c.fill_visible && c.fill_vbo && c.fill_shader.program && c.fill_count > 0) {
         use_shader(c.fill_shader);
         GLint u_mvp = glGetUniformLocation(c.fill_shader.program, "u_mvp");
+        GLint u_light = glGetUniformLocation(c.fill_shader.program, "u_light_dir");
+        GLint u_sh = glGetUniformLocation(c.fill_shader.program, "u_shading");
         glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
+        if (u_light >= 0)
+            glUniform3f(u_light, -0.4f, 0.35f, 0.85f);
+        if (u_sh >= 0)
+            glUniform1f(u_sh, 1.f);
 
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);

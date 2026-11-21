@@ -22,10 +22,10 @@ void globe_shutdown(Globe& g) {
     destroy_texture(g.texture);
 }
 
-void globe_draw(const Globe& g, const Camera& cam, float aspect) {
+void globe_draw(const Globe& g, const Camera& cam, float aspect, bool textured) {
     Mat4 proj  = cam.proj_matrix(aspect);
     Mat4 view  = cam.view_matrix();
-    Mat4 model = Mat4::identity(); // Earth fixed in world; camera orbits
+    Mat4 model = Mat4::identity();
     Mat4 mvp   = Mat4::multiply(proj, Mat4::multiply(view, model));
 
     use_shader(g.shader);
@@ -34,12 +34,14 @@ void globe_draw(const Globe& g, const Camera& cam, float aspect) {
         glUniformMatrix4fv(g.shader.u_model, 1, GL_FALSE, model.m);
     if (g.shader.u_shading >= 0)
         glUniform1f(g.shader.u_shading, g.shading ? 1.f : 0.f);
-    if (g.shader.u_light_dir >= 0) {
-        // Light fixed in world (sun-like); moves across surface as camera orbits
+    if (g.shader.u_light_dir >= 0)
         glUniform3f(g.shader.u_light_dir, -0.4f, 0.35f, 0.85f);
-    }
 
-    if (g.texture.id) {
+    GLint u_textured = glGetUniformLocation(g.shader.program, "u_textured");
+    if (u_textured >= 0)
+        glUniform1f(u_textured, textured ? 1.f : 0.f);
+
+    if (textured && g.texture.id) {
         bind_texture(g.texture, 0);
         glUniform1i(g.shader.u_tex, 0);
     }

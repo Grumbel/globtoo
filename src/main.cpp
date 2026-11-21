@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
 
         float aspect = (float)input.viewport_w / (float)input.viewport_h;
         stars_draw(stars, cam, aspect);
-        globe_draw(globe, cam, aspect);
+        globe_draw(globe, cam, aspect, !countries.fill_visible);
         countries_draw(countries, cam, aspect);
 
         SDL_GL_SwapWindow(window);

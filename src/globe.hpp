@@ -13,4 +13,5 @@ struct Globe {
 
 bool globe_init(Globe& g, const char* texture_path);
 void globe_shutdown(Globe& g);
-void globe_draw(const Globe& g, const Camera& cam, float aspect);
+// textured=false → solid ocean (political desk-globe base)
+void globe_draw(const Globe& g, const Camera& cam, float aspect, bool textured = true);

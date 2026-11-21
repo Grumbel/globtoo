@@ -1,14 +1,15 @@
 # TODO.md — globtoo
 
 ## Current tip
-- Political country fills (ear-clip + MAPCOLOR7) + borders
+- Political mode: solid ocean + MAPCOLOR fills (classic desk globe)
+- Satellite texture when political fill is off
 
 ## Done
-- [x] GeoJSON borders
-- [x] Triangulated fills with Natural Earth MAPCOLOR7 palette
-- [x] B borders, P political fill
+- [x] Borders, political fills, ocean base when P on
+- [x] B / P toggles
 
 ## Next
-- [ ] Optional: hide satellite when fill on / blend modes
-- [ ] 50m data when zoomed
-- [ ] Atmosphere / day-night / VR
+- [ ] Optional 50m borders when zoomed
+- [ ] Atmosphere rim
+- [ ] Day/night terminator
+- [ ] VR later
