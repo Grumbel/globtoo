@@ -1,19 +1,13 @@
 # TODO.md — globtoo
 
 ## Current tip
-- T toggles trackball mode (relative mouse / grabbed cursor)
-- Prior: Shift+roll, stars, camera orbit, grab/arcball, shading
+- Fixed grab-mode feedback (stable surface drag)
+- Prior: trackball, shift-roll, stars, camera orbit
 
-## Controls
-- Drag — Grab or Arcball (Tab)
-- T — trackball (mouse grabbed; move to orbit; Esc exits)
-- Shift+drag — roll around view axis
-- Space — shading
-- Wheel — zoom
-- Esc — exit trackball, else quit
+## Grab math
+- grab_prev is the fixed world hit from mouse-down for the whole drag
+- Each move: rotate camera by conjugate of (a→b) so Earth appears to follow
+- Per-frame angle clamped; soft inertia (no angle/dt)
 
 ## Open / next
-- [ ] Optional: denser star catalog
-- [ ] Optional: country borders / political overlay
-- [ ] Optional: atmosphere, day/night
-- [ ] VR later
+- [ ] Optional: denser stars, borders, atmosphere, VR

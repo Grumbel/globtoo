@@ -112,34 +112,40 @@ bool camera_grab_move(Camera& cam, float ndc_x, float ndc_y, float aspect, float
     if (!ray_sphere(cam, ndc_x, ndc_y, aspect, hit))
         return false;
 
+    // grab_prev is the fixed world-space point on the Earth that was pressed.
+    // Do not update it during the drag — that caused a feedback loop.
     Vec3 a = cam.grab_prev;
     Vec3 b = hit;
+
     float d = std::clamp(Mat4::dot(a, b), -1.f, 1.f);
     float angle = acosf(d);
-    if (angle < 1e-6f) {
-        cam.grab_prev = hit;
+    if (angle < 1e-5f)
         return true;
-    }
 
-    // Camera rotates so the previous hit stays under the cursor:
-    // rotate camera by the rotation that takes B back toward A.
-    Vec3 axis = Mat4::normalize(Mat4::cross(b, a));
+    // Clamp per-frame rotation so a tiny mouse move cannot explode
+    const float max_step = 0.12f; // ~7 degrees
+    if (angle > max_step)
+        angle = max_step;
+
+    Vec3 axis = Mat4::cross(a, b);
+    float alen = sqrtf(Mat4::dot(axis, axis));
+    if (alen < 1e-8f)
+        return true;
+    axis = { axis.x / alen, axis.y / alen, axis.z / alen };
+
+    // Rotation that takes a → b on the fixed sphere. Apply the conjugate to
+    // the camera so the world (Earth) appears to rotate by that amount and
+    // the grabbed point stays under the cursor.
     Quat delta = Quat::from_axis_angle(axis, angle);
-    cam.orientation = Quat::normalize(Quat::multiply(delta, cam.orientation));
+    Quat conj = { -delta.x, -delta.y, -delta.z, delta.w };
+    cam.orientation = Quat::normalize(Quat::multiply(conj, cam.orientation));
 
-    if (dt > 1e-6f) {
-        float w = angle / dt;
-        cam.ang_vel.x = axis.x * w;
-        cam.ang_vel.y = axis.y * w;
-        cam.ang_vel.z = axis.z * w;
-    }
-
-    // Re-hit after camera move so next frame is stable
-    Vec3 new_hit{};
-    if (ray_sphere(cam, ndc_x, ndc_y, aspect, new_hit))
-        cam.grab_prev = new_hit;
-    else
-        cam.grab_prev = a;
+    // Soft inertia from this step (not angle/dt — that spikes on small dt)
+    (void)dt;
+    const float vel_scale = 12.f;
+    cam.ang_vel.x = axis.x * (-angle) * vel_scale;
+    cam.ang_vel.y = axis.y * (-angle) * vel_scale;
+    cam.ang_vel.z = axis.z * (-angle) * vel_scale;
     return true;
 }
 
