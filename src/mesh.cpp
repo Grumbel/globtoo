@@ -6,28 +6,33 @@ Mesh create_sphere(int slices, int stacks) {
     std::vector<float> verts; // pos.xyz + uv.st
     std::vector<unsigned short> indices;
 
-    // UV sphere, radius 1.
-    // Stacks: north (v=0) -> south (v=1).
-    // Slices: around Y (u=0..1).
-    // Winding is CCW when viewed from outside so GL_CULL_FACE + GL_BACK
-    // shows the exterior (default GL front face is CCW).
+    // Coordinate system (right-handed, Y-up):
+    //   lon=0°, lat=0° → +X
+    //   lon=90°E       → +Z
+    //   lon=90°W       → -Z
+    //   lat=90°N       → +Y
+    // Equirectangular texture: u=0 at 180°W, u=0.5 at 0°, u=1 at 180°E
+    //   v=0 at north pole, v=1 at south (matches stbi without vertical flip)
     for (int i = 0; i <= stacks; ++i) {
         float v = (float)i / stacks;
-        float phi = v * 3.14159265f;          // 0 = north pole
+        float phi = v * 3.14159265f; // 0 = north
         float y = cosf(phi);
         float r = sinf(phi);
 
         for (int j = 0; j <= slices; ++j) {
-            float u = (float)j / slices;
-            float theta = u * 2.f * 3.14159265f;
+            float t = (float)j / slices;       // 0..1
+            float theta = t * 2.f * 3.14159265f; // lon radians, 0 = +X
             float x = r * cosf(theta);
             float z = r * sinf(theta);
+
+            // u = (lon + 180) / 360 = t + 0.5 (wrapped)
+            float u = t + 0.5f;
+            if (u >= 1.f) u -= 1.f;
 
             verts.push_back(x);
             verts.push_back(y);
             verts.push_back(z);
-            // 1-u: equirectangular is east-positive; our +theta was mirroring the map
-            verts.push_back(1.f - u);
+            verts.push_back(u);
             verts.push_back(v);
         }
     }
@@ -36,15 +41,10 @@ Mesh create_sphere(int slices, int stacks) {
         for (int j = 0; j < slices; ++j) {
             int a = i * (slices + 1) + j;
             int b = a + slices + 1;
-
-            // CCW from outside:
-            //   a -- a+1
-            //   |  /  |
-            //   b -- b+1
+            // CCW from outside
             indices.push_back((unsigned short)a);
             indices.push_back((unsigned short)(a + 1));
             indices.push_back((unsigned short)b);
-
             indices.push_back((unsigned short)(a + 1));
             indices.push_back((unsigned short)(b + 1));
             indices.push_back((unsigned short)b);

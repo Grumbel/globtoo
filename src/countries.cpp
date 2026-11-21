@@ -11,6 +11,8 @@
 #include <functional>
 #include <algorithm>
 
+// Same frame as create_sphere / texture UVs (see docs/COORDINATES.md):
+//   lon=0 → +X, lon=90E → +Z, lat=90N → +Y
 static void lonlat_to_xyz(float lon_deg, float lat_deg, float radius, float& x, float& y, float& z) {
     float lon = lon_deg * (3.14159265f / 180.f);
     float lat = lat_deg * (3.14159265f / 180.f);
@@ -36,101 +38,50 @@ static void mapcolor_rgb(int mc, float& r, float& g, float& b) {
     r = pal[mc][0]; g = pal[mc][1]; b = pal[mc][2];
 }
 
-// --- Ear clipping in lon/lat plane (good enough at 110m) ---
-static float cross2(float ax, float ay, float bx, float by) {
-    return ax * by - ay * bx;
-}
-
-static bool point_in_tri(float px, float py,
-                         float ax, float ay, float bx, float by, float cx, float cy) {
-    float c1 = cross2(bx - ax, by - ay, px - ax, py - ay);
-    float c2 = cross2(cx - bx, cy - by, px - bx, py - by);
-    float c3 = cross2(ax - cx, ay - cy, px - cx, py - cy);
-    bool has_neg = (c1 < 0) || (c2 < 0) || (c3 < 0);
-    bool has_pos = (c1 > 0) || (c2 > 0) || (c3 > 0);
-    return !(has_neg && has_pos);
-}
-
-static void ear_clip(const std::vector<float>& ring_lonlat, // lon,lat pairs
-                     std::vector<float>& out_xyz_rgb, // x y z r g b per vertex
-                     float r, float g, float b, float radius) {
+// Fan triangulation from 3D centroid on the sphere (robust for 110m countries).
+static void fan_fill(const std::vector<float>& ring_lonlat,
+                     std::vector<float>& out_xyz_rgb,
+                     float cr, float cg, float cb, float radius) {
     int n = (int)(ring_lonlat.size() / 2);
     if (n < 3)
         return;
-
-    // Drop closing duplicate if present
     if (n > 1 &&
-        fabsf(ring_lonlat[0] - ring_lonlat[(n - 1) * 2]) < 1e-6f &&
-        fabsf(ring_lonlat[1] - ring_lonlat[(n - 1) * 2 + 1]) < 1e-6f)
+        fabsf(ring_lonlat[0] - ring_lonlat[(n - 1) * 2]) < 1e-5f &&
+        fabsf(ring_lonlat[1] - ring_lonlat[(n - 1) * 2 + 1]) < 1e-5f)
         --n;
     if (n < 3)
         return;
 
-    std::vector<int> idx(n);
-    for (int i = 0; i < n; ++i) idx[i] = i;
+    // Average unit positions → centroid direction
+    float cx = 0, cy = 0, cz = 0;
+    std::vector<float> pts(n * 3);
+    for (int i = 0; i < n; ++i) {
+        float x, y, z;
+        lonlat_to_xyz(ring_lonlat[i * 2], ring_lonlat[i * 2 + 1], 1.f, x, y, z);
+        pts[i * 3 + 0] = x; pts[i * 3 + 1] = y; pts[i * 3 + 2] = z;
+        cx += x; cy += y; cz += z;
+    }
+    float len = sqrtf(cx * cx + cy * cy + cz * cz);
+    if (len < 1e-6f)
+        return;
+    cx = cx / len * radius;
+    cy = cy / len * radius;
+    cz = cz / len * radius;
 
-    // Ensure CCW in lon/lat for consistent ears (approximate)
-    double area = 0;
+    auto emit = [&](float x, float y, float z) {
+        out_xyz_rgb.push_back(x);
+        out_xyz_rgb.push_back(y);
+        out_xyz_rgb.push_back(z);
+        out_xyz_rgb.push_back(cr);
+        out_xyz_rgb.push_back(cg);
+        out_xyz_rgb.push_back(cb);
+    };
+
     for (int i = 0; i < n; ++i) {
         int j = (i + 1) % n;
-        area += (double)ring_lonlat[i * 2] * ring_lonlat[j * 2 + 1];
-        area -= (double)ring_lonlat[j * 2] * ring_lonlat[i * 2 + 1];
-    }
-    if (area < 0)
-        std::reverse(idx.begin(), idx.end());
-
-    auto lon = [&](int i) { return ring_lonlat[idx[i] * 2]; };
-    auto lat = [&](int i) { return ring_lonlat[idx[i] * 2 + 1]; };
-
-    int guard = 0;
-    while (idx.size() > 3 && guard++ < n * n) {
-        bool clipped = false;
-        int m = (int)idx.size();
-        for (int i = 0; i < m; ++i) {
-            int i0 = (i + m - 1) % m;
-            int i1 = i;
-            int i2 = (i + 1) % m;
-            float ax = lon(i0), ay = lat(i0);
-            float bx = lon(i1), by = lat(i1);
-            float cx = lon(i2), cy = lat(i2);
-            // Ear if convex
-            if (cross2(bx - ax, by - ay, cx - bx, cy - by) <= 0)
-                continue;
-            bool any_inside = false;
-            for (int j = 0; j < m; ++j) {
-                if (j == i0 || j == i1 || j == i2) continue;
-                if (point_in_tri(lon(j), lat(j), ax, ay, bx, by, cx, cy)) {
-                    any_inside = true;
-                    break;
-                }
-            }
-            if (any_inside)
-                continue;
-            // Emit triangle
-            float x, y, z;
-            lonlat_to_xyz(ax, ay, radius, x, y, z);
-            out_xyz_rgb.push_back(x); out_xyz_rgb.push_back(y); out_xyz_rgb.push_back(z);
-            out_xyz_rgb.push_back(r); out_xyz_rgb.push_back(g); out_xyz_rgb.push_back(b);
-            lonlat_to_xyz(bx, by, radius, x, y, z);
-            out_xyz_rgb.push_back(x); out_xyz_rgb.push_back(y); out_xyz_rgb.push_back(z);
-            out_xyz_rgb.push_back(r); out_xyz_rgb.push_back(g); out_xyz_rgb.push_back(b);
-            lonlat_to_xyz(cx, cy, radius, x, y, z);
-            out_xyz_rgb.push_back(x); out_xyz_rgb.push_back(y); out_xyz_rgb.push_back(z);
-            out_xyz_rgb.push_back(r); out_xyz_rgb.push_back(g); out_xyz_rgb.push_back(b);
-            idx.erase(idx.begin() + i1);
-            clipped = true;
-            break;
-        }
-        if (!clipped)
-            break;
-    }
-    if (idx.size() == 3) {
-        float x, y, z;
-        for (int k = 0; k < 3; ++k) {
-            lonlat_to_xyz(lon(k), lat(k), radius, x, y, z);
-            out_xyz_rgb.push_back(x); out_xyz_rgb.push_back(y); out_xyz_rgb.push_back(z);
-            out_xyz_rgb.push_back(r); out_xyz_rgb.push_back(g); out_xyz_rgb.push_back(b);
-        }
+        emit(cx, cy, cz);
+        emit(pts[i * 3] * radius, pts[i * 3 + 1] * radius, pts[i * 3 + 2] * radius);
+        emit(pts[j * 3] * radius, pts[j * 3 + 1] * radius, pts[j * 3 + 2] * radius);
     }
 }
 
@@ -229,7 +180,7 @@ static bool parse_features(const std::string& text,
                         strips.push_back({ first, count });
                     // Fill from exterior rings (caller treats every ring; holes get same color — ok at 110m)
                     if (ring.size() >= 6)
-                        ear_clip(ring, fill_xyz_rgb, cr, cg, cb, 1.001f);
+                        fan_fill(ring, fill_xyz_rgb, cr, cg, cb, 1.002f);
                     skip_ws();
                     if (*p == ']') ++p;
                 } else {
@@ -316,6 +267,10 @@ bool countries_init(Countries& c, const char* geojson_path) {
     c.fill_shader = load_shader("shaders/fill.vert", "shaders/fill.frag");
     if (!c.border_shader.program) {
         fprintf(stderr, "countries: border shader failed\n");
+        return false;
+    }
+    if (!c.fill_shader.program) {
+        fprintf(stderr, "countries: fill shader failed\n");
         return false;
     }
 

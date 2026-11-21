@@ -1,15 +1,13 @@
 # TODO.md — globtoo
 
 ## Current tip
-- Political mode: solid ocean + MAPCOLOR fills (classic desk globe)
-- Satellite texture when political fill is off
+- Fixed sphere UV vs lon/lat alignment; robust fan fills for political mode
 
 ## Done
-- [x] Borders, political fills, ocean base when P on
-- [x] B / P toggles
+- [x] Document coordinate system (docs/COORDINATES.md)
+- [x] UV: u = fract(t + 0.5) so lon 0 → texture center
+- [x] Political fills via 3D centroid fans (visible on ocean base)
 
 ## Next
-- [ ] Optional 50m borders when zoomed
-- [ ] Atmosphere rim
-- [ ] Day/night terminator
-- [ ] VR later
+- [ ] Atmosphere rim / day-night / VR
+- [ ] Optional 50m data when zoomed
