@@ -6,7 +6,7 @@ Tactile free-spinning Earth globe for Linux.
 - Data-oriented / ECS-ish (plain structs + free functions, no class hierarchies)
 - Inertia-based spin that feels like turning a real globe
 - Smooth zoom down to individual small countries
-- Starts with a public-domain NASA Blue Marble style texture
+- Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
 
 ## Build (Nix)
 
@@ -15,26 +15,31 @@ nix build
 ./result/bin/globe
 ```
 
-Or enter a development shell:
+Or development shell:
 
 ```bash
 nix develop
 mkdir build && cd build
 cmake ..
 make -j
+# optional: drop a real texture next to the binary
+curl -L -o assets/earth.jpg \
+  https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg
 ./globe
 ```
 
 ## Texture
 
-Place an equirectangular Earth texture at `assets/earth.jpg`.
+The flake fetches a public-domain equirectangular Earth map at build time.
 
-Recommended free sources (public domain / NASA):
+To switch to the full NASA Blue Marble Next Generation (5400×2700, topography + bathymetry):
 
-- Blue Marble Next Generation (NASA) – various resolutions
-- Solar System Scope Earth day map (CC-BY, NASA derived)
+1. Open `flake.nix`
+2. Comment out the current `earthTexture` and uncomment the NASA one
+3. `nix build` once – it will print the correct `sha256`
+4. Paste the hash and rebuild
 
-A 2k–4k JPEG works well. Higher resolution improves the close-up experience.
+NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
 
 ## Controls
 

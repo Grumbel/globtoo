@@ -1,3 +1,5 @@
+#include <cstdlib>
+#include <string>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengles2.h>
 #include <cstdio>
@@ -45,10 +47,17 @@ int main(int argc, char** argv) {
     if (!init_sdl(width, height))
         return 1;
 
-    // Prefer a texture next to the binary; fall back to a solid color if missing
+    // Texture resolution order:
+    // 1. command-line argument
+    // 2. GLOBE_ASSET_DIR/assets/earth.jpg (set by Nix wrapper)
+    // 3. ./assets/earth.jpg (local / dev)
     const char* tex_path = "assets/earth.jpg";
-    if (argc > 1)
+    if (argc > 1) {
         tex_path = argv[1];
+    } else if (const char* asset_dir = std::getenv("GLOBE_ASSET_DIR")) {
+        static std::string path = std::string(asset_dir) + "/assets/earth.jpg";
+        tex_path = path.c_str();
+    }
 
     Globe globe{};
     if (!globe_init(globe, tex_path)) {
