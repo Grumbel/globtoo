@@ -27,13 +27,20 @@
           name = "earth.jpg";
         };
 
-        # Natural Earth 1:50m Admin-0 countries (public domain).
-        # Lon/lat polygons for borders + country fill. ~3 MB GeoJSON.
-        # For more detail when zoomed: ne_50m_admin_0_countries.geojson
-        countriesGeojson = pkgs.fetchurl {
+        # Natural Earth Admin-0 countries (public domain). The 50m mesh is
+        # used at a distance; 10m is switched in when zooming closer. Both
+        # are triangulated into binary meshes at build time, not on launch.
+        countries50m = pkgs.fetchurl {
           url = "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_admin_0_countries.geojson";
           sha256 = "sha256-PkWPwDatCmZBHywebKxJxde/uByxEjvFE7IlEaK3/es=";
           name = "ne_50m_admin_0_countries.geojson";
+        };
+
+        # Natural Earth 5.1.2, fixed to the upstream commit and hash.
+        countries10m = pkgs.fetchurl {
+          url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_admin_0_countries.geojson";
+          sha256 = "sha256-I57sV6wX8QChHiU2z/xWdSwxi1CudlsJGP96q0zo8lU=";
+          name = "ne_10m_admin_0_countries.geojson";
         };
 
       in
@@ -62,7 +69,8 @@
           postPatch = ''
             mkdir -p assets
             cp ${earthTexture} assets/earth.jpg
-            cp ${countriesGeojson} assets/countries.geojson
+            cp ${countries50m} assets/countries_50m.geojson
+            cp ${countries10m} assets/countries_10m.geojson
           '';
 
           installPhase = ''
@@ -70,7 +78,8 @@
             mkdir -p $out/bin $out/share/globtoo/{assets,shaders}
             cp globtoo $out/bin/globtoo-bin
             cp assets/earth.jpg $out/share/globtoo/assets/
-            cp ${countriesGeojson} $out/share/globtoo/assets/countries.geojson
+            cp generated-assets/countries_50m.gmesh $out/share/globtoo/assets/
+            cp generated-assets/countries_10m.gmesh $out/share/globtoo/assets/
             cp -r ${./shaders}/* $out/share/globtoo/shaders/ 2>/dev/null || true
 
             # Thin wrapper so the binary finds its assets

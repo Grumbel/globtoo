@@ -1,1 +1,6 @@
 assets/countries.geojson
+
+# Large map sources are fetched by Nix / supplied by the developer.
+assets/countries_50m.geojson
+assets/countries_10m.geojson
+assets/*.gmesh

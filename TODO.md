@@ -5,6 +5,8 @@
 - Country overlay tests the globe depth without writing it and uses globe silhouette stencil
 - Adaptive globe depth range when zoomed; stars use independent sky projection
 - Third-party stb_image moved into external/
+- Add 10m Natural Earth close-up country mesh with build-time preprocessing
+- Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
 - [x] Document coordinate system (docs/COORDINATES.md)
@@ -15,7 +17,10 @@
 - [x] Fix east/west mirroring and verify world/screen orientation
 - [x] Prevent political overlay depth/stencil artifacts at globe silhouette
 - [x] Move third-party headers to external/
+- [x] Compile Natural Earth 50m and 10m GeoJSON to binary meshes at build time
+- [x] Automatically select detailed borders at close zoom with LOD hysteresis
+- [x] Test binary mesh serialization and geometry-only CMake build
 
 ## Next
 - [ ] Atmosphere rim / day-night / VR
-- [ ] Optional 10m boundaries when zoomed in
+- [ ] Optional finer-than-10m country-by-country boundaries (e.g. geoBoundaries)

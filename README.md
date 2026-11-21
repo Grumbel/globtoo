@@ -25,7 +25,9 @@ make -j
 # optional: drop a real texture next to the binary
 curl -L -o assets/earth.jpg \
   https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg
-# Also provide assets/countries.geojson (download source in flake.nix)
+# Optional: provide assets/countries_50m.geojson and/or
+# assets/countries_10m.geojson, then re-run cmake to precompile their meshes.
+# Legacy assets/countries.geojson is still supported as runtime fallback.
 ./globtoo
 ```
 
@@ -65,9 +67,19 @@ Ready for later expansion (country borders, VR, etc.).
 
 ## Country data
 
-Natural Earth 1:50m Admin-0 countries (public domain) is fetched at build time
-as GeoJSON for borders and political coloring. GEOS (>= 3.10) triangulates
-country polygons, including holes; a depth-tested spherical overlay hides the
-far hemisphere. See `docs/COUNTRIES.md`.
+Natural Earth Admin-0 **1:50m and 1:10m** countries (public domain) are
+fetched and converted into binary GPU-ready meshes at build time. The viewer
+switches to 10m for close zoom, with hysteresis to avoid LOD flicker. No
+GeoJSON parsing or triangulation is needed at launch in the Nix package.
+GEOS (>= 3.10) triangulates polygons, including holes; a depth-tested
+spherical overlay hides the far hemisphere. See `docs/COUNTRIES.md`.
+
+To work on the geometry without SDL3/GLES installed:
+
+```bash
+cmake -S . -B build-geometry -DGLOBTOO_BUILD_APP=OFF
+cmake --build build-geometry -j
+ctest --test-dir build-geometry --output-on-failure
+```
 
 Run the geometry tests using `ctest --test-dir build --output-on-failure`.

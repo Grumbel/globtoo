@@ -1,5 +1,7 @@
 #include "countries.hpp"
 #include "country_geometry.hpp"
+#include "country_lod.hpp"
+#include "country_mesh_io.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -8,93 +10,135 @@
 #include <string>
 #include <vector>
 
-bool countries_init(Countries& c, const char* geojson_path) {
-    std::vector<std::string> candidates;
-    if (geojson_path && geojson_path[0]) candidates.emplace_back(geojson_path);
-    candidates.emplace_back("assets/countries.geojson");
-    if (const char* ad = std::getenv("GLOBE_ASSET_DIR")) {
-        candidates.emplace_back(std::string(ad) + "/assets/countries.geojson");
-        candidates.emplace_back(std::string(ad) + "/countries.geojson");
+namespace {
+std::vector<std::string> asset_paths(const char* asset_name) {
+    std::vector<std::string> paths;
+    if (const char* dir = std::getenv("GLOBE_ASSET_DIR")) {
+        paths.emplace_back(std::string(dir) + "/assets/" + asset_name);
+        paths.emplace_back(std::string(dir) + "/" + asset_name);
     }
+    paths.emplace_back(std::string("assets/") + asset_name);
+    return paths;
+}
 
-    std::string text, used;
-    for (const auto& path : candidates) {
-        std::ifstream in(path, std::ios::binary);
-        if (!in) continue;
-        std::ostringstream ss;
-        ss << in.rdbuf();
-        text = ss.str();
-        if (!text.empty()) { used = path; break; }
-    }
-    if (text.empty()) {
-        fprintf(stderr, "countries: no GeoJSON found\n");
-        return false;
-    }
-
-    CountryGeometry geom;
+bool read_geojson(const std::string& path, CountryGeometry& geometry) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return false;
+    std::ostringstream text;
+    text << file.rdbuf();
     std::string error;
-    if (!build_country_geometry(text, geom, &error)) {
-        fprintf(stderr, "countries: %s (%s)\n", error.c_str(), used.c_str());
+    if (!build_country_geometry(text.str(), geometry, &error)) {
+        fprintf(stderr, "countries: %s (%s)\n", error.c_str(), path.c_str());
         return false;
     }
+    return true;
+}
 
-    c.strips.reserve(geom.border_strips.size());
-    for (const auto& strip : geom.border_strips)
-        c.strips.push_back({strip.first, strip.count});
+bool upload(CountryMeshGPU& gpu, const CountryGeometry& geo, const char* label) {
+    if (geo.border_xyz.empty() || geo.fill_xyz_rgb.empty()) return false;
+    gpu.strips.reserve(geo.border_strips.size());
+    for (const auto& strip : geo.border_strips)
+        gpu.strips.push_back({strip.first, strip.count});
 
-    if (!geom.border_xyz.empty()) {
-        glGenBuffers(1, &c.border_vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, c.border_vbo);
-        glBufferData(GL_ARRAY_BUFFER, geom.border_xyz.size() * sizeof(float),
-                     geom.border_xyz.data(), GL_STATIC_DRAW);
+    glGenBuffers(1, &gpu.border_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, gpu.border_vbo);
+    glBufferData(GL_ARRAY_BUFFER, geo.border_xyz.size() * sizeof(float),
+                 geo.border_xyz.data(), GL_STATIC_DRAW);
+    gpu.fill_count = static_cast<GLsizei>(geo.fill_xyz_rgb.size() / 6);
+    glGenBuffers(1, &gpu.fill_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, gpu.fill_vbo);
+    glBufferData(GL_ARRAY_BUFFER, geo.fill_xyz_rgb.size() * sizeof(float),
+                 geo.fill_xyz_rgb.data(), GL_STATIC_DRAW);
+    fprintf(stderr, "countries %s: %zu features, %zu polygons, %zu rings, %d fill vertices, %zu failures\n",
+            label, geo.feature_count, geo.polygon_count, geo.border_strips.size(),
+            static_cast<int>(gpu.fill_count), geo.triangulation_failures);
+    return gpu.available();
+}
+
+void destroy(CountryMeshGPU& gpu) {
+    if (gpu.border_vbo) glDeleteBuffers(1, &gpu.border_vbo);
+    if (gpu.fill_vbo) glDeleteBuffers(1, &gpu.fill_vbo);
+    gpu = {};
+}
+
+bool load_compiled(CountryMeshGPU& gpu, const char* asset_name, const char* label) {
+    for (const auto& path : asset_paths(asset_name)) {
+        std::ifstream file(path, std::ios::binary);
+        if (!file) continue;
+        file.close();
+        CountryGeometry geometry;
+        std::string error;
+        if (!read_country_mesh(path, geometry, &error)) {
+            fprintf(stderr, "countries: %s (%s)\n", error.c_str(), path.c_str());
+            return false;
+        }
+        return upload(gpu, geometry, label);
     }
+    return false;
+}
+} // namespace
 
-    c.fill_count = static_cast<GLsizei>(geom.fill_xyz_rgb.size() / 6);
-    if (c.fill_count > 0) {
-        glGenBuffers(1, &c.fill_vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, c.fill_vbo);
-        glBufferData(GL_ARRAY_BUFFER, geom.fill_xyz_rgb.size() * sizeof(float),
-                     geom.fill_xyz_rgb.data(), GL_STATIC_DRAW);
+bool countries_init(Countries& c, const char* geojson_path) {
+    if (geojson_path && *geojson_path) {
+        CountryGeometry geometry;
+        if (!read_geojson(geojson_path, geometry) ||
+            !upload(c.low, geometry, "custom")) return false;
+    } else {
+        load_compiled(c.low, "countries_50m.gmesh", "50m");
+        load_compiled(c.high, "countries_10m.gmesh", "10m");
+        // Backwards compatibility: local development can still provide just
+        // assets/countries.geojson, without running the mesh compiler.
+        if (!c.low.available() && !c.high.available()) {
+            for (const auto& path : asset_paths("countries.geojson")) {
+                CountryGeometry geometry;
+                if (read_geojson(path, geometry)) {
+                    if (upload(c.low, geometry, "GeoJSON")) break;
+                }
+            }
+        }
     }
-
+    if (!c.low.available() && !c.high.available()) {
+        fprintf(stderr, "countries: no valid country meshes found\n");
+        return false;
+    }
     c.border_shader = load_shader("shaders/borders.vert", "shaders/borders.frag");
     c.fill_shader = load_shader("shaders/fill.vert", "shaders/fill.frag");
     if (!c.border_shader.program || !c.fill_shader.program) {
         fprintf(stderr, "countries: shader failed\n");
+        countries_shutdown(c);
         return false;
     }
-
-    fprintf(stderr, "countries: %s — %zu features, %zu polygons, %zu rings, %d fill vertices, %zu triangulation failures\n",
-            used.c_str(), geom.feature_count, geom.polygon_count, c.strips.size(),
-            static_cast<int>(c.fill_count), geom.triangulation_failures);
     return true;
 }
 
 void countries_shutdown(Countries& c) {
-    if (c.border_vbo) glDeleteBuffers(1, &c.border_vbo);
-    if (c.fill_vbo) glDeleteBuffers(1, &c.fill_vbo);
+    destroy(c.low);
+    destroy(c.high);
     destroy_shader(c.border_shader);
     destroy_shader(c.fill_shader);
     c = {};
 }
 
-void countries_draw(const Countries& c, const Camera& cam, float aspect) {
+void countries_draw(Countries& c, const Camera& cam, float aspect) {
+    c.using_high = country_use_high_detail(cam.distance, c.using_high,
+                                           c.high.available(), c.low.available());
+    const CountryMeshGPU& gpu = c.using_high ? c.high : c.low;
+    if (!gpu.available()) {
+        glDisable(GL_STENCIL_TEST);
+        return;
+    }
     Mat4 mvp = Mat4::multiply(cam.proj_matrix(aspect), cam.view_matrix());
 
-    // Preserve the globe's depth buffer: front hemisphere overlays pass, but
-    // both fills and *lines* on the far hemisphere fail against the globe.
-    // GL_CULL_FACE has no effect on GL_LINE_STRIP, so depth testing is vital.
+    // Political triangles and outlines test against the base globe only.
+    // Never write their depth or change the stencil silhouette mask.
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    // Compare against the globe depth only. Do not let fill triangles (nor
-    // their former positive polygon offset) hide the border or cut into the
-    // visible surface as precision changes near the horizon.
     glDepthMask(GL_FALSE);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
-    if (c.fill_visible && c.fill_vbo && c.fill_shader.program && c.fill_count > 0) {
+    if (c.fill_visible && c.fill_shader.program) {
         use_shader(c.fill_shader);
         glUniformMatrix4fv(c.fill_shader.u_mvp, 1, GL_FALSE, mvp.m);
         const GLint u_light = glGetUniformLocation(c.fill_shader.program, "u_light_dir");
@@ -105,30 +149,28 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         }
         if (u_shading >= 0) glUniform1f(u_shading, 1.f);
 
-        glBindBuffer(GL_ARRAY_BUFFER, c.fill_vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, gpu.fill_vbo);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
                               (void*)(3 * sizeof(float)));
-        glDrawArrays(GL_TRIANGLES, 0, c.fill_count);
+        glDrawArrays(GL_TRIANGLES, 0, gpu.fill_count);
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
     }
 
-    if (c.borders_visible && c.border_vbo && c.border_shader.program) {
+    if (c.borders_visible && c.border_shader.program) {
         use_shader(c.border_shader);
         glUniformMatrix4fv(c.border_shader.u_mvp, 1, GL_FALSE, mvp.m);
         const GLint u_color = glGetUniformLocation(c.border_shader.program, "u_color");
         if (u_color >= 0) glUniform4f(u_color, 0.12f, 0.10f, 0.08f, 1.f);
 
-        // Draw last so border is always on top of the fills. No depth write,
-        // radial lift or polygon offset between these two overlay meshes.
         glLineWidth(1.f);
-        glBindBuffer(GL_ARRAY_BUFFER, c.border_vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, gpu.border_vbo);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-        for (const auto& strip : c.strips)
+        for (const auto& strip : gpu.strips)
             glDrawArrays(GL_LINE_STRIP, strip.first, strip.count);
         glDisableVertexAttribArray(0);
     }

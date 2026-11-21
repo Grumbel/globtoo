@@ -1,8 +1,21 @@
 # Country borders and political coloring
 
-Natural Earth Admin-0 countries (public-domain GeoJSON), fetched at build time
-by the Nix flake. The default dataset is **1:50m**, including offshore islands
-and interior rings. See `flake.nix` for the pinned asset URL and hash.
+Natural Earth Admin-0 country polygons (public domain), fetched at build time
+by the Nix flake in **1:50m** and **1:10m** resolutions. The 10m source is
+pinned to Natural Earth v5.1.2 in `flake.nix`; both source GeoJSON files are
+converted by `country_mesh_compiler` during the CMake build. The Nix package
+ships only versioned `.gmesh` outputs, not the large GeoJSON files. The 50m
+mesh renders when the globe is distant, switching to 10m for close-up views.
+
+`src/country_mesh_io.cpp` reads/writes the exact pretriangulated float vertices
+and border strips (little-endian binary format `GLOBGM01`), with length and
+strip-range validation. No expensive geometry processing occurs at application
+startup when the compiled assets are available. The LOD transition has
+hysteresis: enters 10m under camera distance 1.85, returns to 50m above 2.15
+(radius of Earth is 1). Drawing both fills and outlines from the *same* LOD
+prevents seams from mismatched detail levels. If the 10m asset is unavailable,
+the 50m asset is used throughout; a legacy `assets/countries.geojson` still
+works for local development.
 
 ## Geometry
 
@@ -59,9 +72,12 @@ eye, so colors aren't confined to the shader's ambient term.
 
 ## Verification
 
-Run `ctest --test-dir build --output-on-failure`. Unit coverage includes
+Run `ctest --test-dir build --output-on-failure`. The CPU build and tests can
+also run without SDL3/GLES by configuring with `-DGLOBTOO_BUILD_APP=OFF`.
+Unit coverage includes
 concave polygons, holes, antimeridian crossings, winding, sphere radius,
 per-country colors, self-intersection repair, exact line/triangle boundary
-correspondence (including holes), and malformed input. A real Natural Earth
+correspondence (including holes), and malformed input, binary mesh round-trips/truncation, and LOD switching.
+A real Natural Earth
 GeoJSON dataset can also be supplied to a geometry-only integration test
 without an SDL window.
