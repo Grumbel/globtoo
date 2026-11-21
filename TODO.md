@@ -1,17 +1,22 @@
 # TODO.md — globtoo
 
 ## Current tip
-- Slower arcball, fixed mirrored UVs, seamless 4k texture (no Wikipedia border)
-- Prior: Mat4/Quat order, arcball, texture RGBA, sphere winding
+- Grab control mode (surface under cursor) + Arcball via Tab
+- Optional Lambert shading toggle with Space
+- Prior: speed/mirror/texture, Mat4 order, arcball, RGBA, winding
 
 ## Open / next
-- [ ] Confirm mirror fix and speed feel right
-- [ ] Optional: true NASA BMNG 5400² via eoimages (hash at first build)
+- [ ] Confirm grab feels locked to the surface at different zoom levels
+- [ ] Optional: NASA BMNG higher res
 - [ ] Optional: country borders / political overlay
 - [ ] Optional: atmosphere rim, day/night, clouds
 - [ ] VR later
 
+## Controls
+- Tab — Grab ↔ Arcball
+- Space — shading on/off
+- Drag / wheel / Esc as before
+
 ## Notes
-- UV: `1-u` on the sphere so longitude matches the map (was mirrored).
-- Texture: turban/webgl-earth `2_no_clouds_4k.jpg` — seamless, no white frame.
-- Drag sensitivity 0.004 rad/px, inertia vel_scale 40.
+- Grab uses ray–sphere hits; rotation axis = cross(prev, curr).
+- Default mode is Grab; shading defaults on.

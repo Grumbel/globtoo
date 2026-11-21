@@ -12,6 +12,7 @@ bool globe_init(Globe& g, const char* texture_path) {
     if (!g.texture.id) {
         fprintf(stderr, "Failed to load earth texture – using solid color fallback\n");
     }
+    g.shading = true;
     return true;
 }
 
@@ -29,6 +30,14 @@ void globe_draw(const Globe& g, const Camera& cam, float aspect) {
 
     use_shader(g.shader);
     glUniformMatrix4fv(g.shader.u_mvp, 1, GL_FALSE, mvp.m);
+    if (g.shader.u_model >= 0)
+        glUniformMatrix4fv(g.shader.u_model, 1, GL_FALSE, model.m);
+    if (g.shader.u_shading >= 0)
+        glUniform1f(g.shader.u_shading, g.shading ? 1.f : 0.f);
+    if (g.shader.u_light_dir >= 0) {
+        // Soft key light from upper-left of the view
+        glUniform3f(g.shader.u_light_dir, -0.4f, 0.5f, 0.7f);
+    }
 
     if (g.texture.id) {
         bind_texture(g.texture, 0);

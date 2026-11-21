@@ -45,7 +45,12 @@ NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
 
 - Left-drag : spin the globe (with inertia)
 - Mouse wheel : zoom in / out
+- Tab : switch Grab ↔ Arcball
+- Space : toggle shading
 - Esc : quit
+
+**Grab** (default): the surface under the cursor stays under the cursor.
+**Arcball**: free view-space rotation, no pole lock.
 
 ## Architecture notes
 

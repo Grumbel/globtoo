@@ -65,7 +65,10 @@ Shader load_shader(const char* vert_path, const char* frag_path) {
         s.program = 0;
     } else {
         s.u_mvp = glGetUniformLocation(s.program, "u_mvp");
+        s.u_model = glGetUniformLocation(s.program, "u_model");
         s.u_tex = glGetUniformLocation(s.program, "u_tex");
+        s.u_shading = glGetUniformLocation(s.program, "u_shading");
+        s.u_light_dir = glGetUniformLocation(s.program, "u_light_dir");
     }
 
     glDeleteShader(vs);

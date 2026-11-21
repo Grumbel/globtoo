@@ -36,7 +36,7 @@ static bool init_sdl(int w, int h) {
         return false;
     }
 
-    SDL_GL_SetSwapInterval(1); // vsync
+    SDL_GL_SetSwapInterval(1);
     return true;
 }
 
@@ -47,10 +47,6 @@ int main(int argc, char** argv) {
     if (!init_sdl(width, height))
         return 1;
 
-    // Texture resolution order:
-    // 1. command-line argument
-    // 2. GLOBE_ASSET_DIR/assets/earth.jpg (set by Nix wrapper)
-    // 3. ./assets/earth.jpg (local / dev)
     const char* tex_path = "assets/earth.jpg";
     if (argc > 1) {
         tex_path = argv[1];
@@ -67,29 +63,37 @@ int main(int argc, char** argv) {
 
     Camera cam{};
     InputState input{};
+    input.viewport_w = width;
+    input.viewport_h = height;
+
+    fprintf(stderr, "Controls: drag=spin, wheel=zoom, Tab=mode, Space=shading, Esc=quit\n");
+    fprintf(stderr, "Control mode: Grab (surface under cursor)\n");
 
     auto last = std::chrono::steady_clock::now();
 
     while (!input.quit) {
-        SDL_Event e;
-        while (SDL_PollEvent(&e))
-            input_handle_event(input, cam, e);
+        int w, h;
+        SDL_GetWindowSizeInPixels(window, &w, &h);
+        input.viewport_w = w > 0 ? w : 1;
+        input.viewport_h = h > 0 ? h : 1;
 
         auto now = std::chrono::steady_clock::now();
         float dt = std::chrono::duration<float>(now - last).count();
         last = now;
-        if (dt > 0.05f) dt = 0.05f; // clamp spikes
+        if (dt > 0.05f) dt = 0.05f;
+        input.dt = dt;
+
+        SDL_Event e;
+        while (SDL_PollEvent(&e))
+            input_handle_event(input, cam, globe, e);
 
         camera_update(cam, dt);
 
-        int w, h;
-        SDL_GetWindowSizeInPixels(window, &w, &h);
-        glViewport(0, 0, w, h);
-
+        glViewport(0, 0, input.viewport_w, input.viewport_h);
         glClearColor(0.02f, 0.02f, 0.05f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        float aspect = (h > 0) ? (float)w / (float)h : 1.f;
+        float aspect = (float)input.viewport_w / (float)input.viewport_h;
         globe_draw(globe, cam, aspect);
 
         SDL_GL_SwapWindow(window);

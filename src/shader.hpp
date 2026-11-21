@@ -5,7 +5,10 @@
 struct Shader {
     GLuint program = 0;
     GLint  u_mvp = -1;
+    GLint  u_model = -1;
     GLint  u_tex = -1;
+    GLint  u_shading = -1;
+    GLint  u_light_dir = -1;
 };
 
 Shader load_shader(const char* vert_path, const char* frag_path);

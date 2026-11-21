@@ -8,6 +8,7 @@ struct Globe {
     Mesh    mesh;
     Shader  shader;
     Texture texture;
+    bool    shading = true;
 };
 
 bool globe_init(Globe& g, const char* texture_path);
