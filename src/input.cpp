@@ -2,7 +2,6 @@
 #include <cstdio>
 
 static void mouse_to_ndc(const InputState& in, float mx, float my, float& ndc_x, float& ndc_y) {
-    // SDL: origin top-left, Y down. NDC: origin center, Y up.
     ndc_x = (mx / (float)in.viewport_w) * 2.f - 1.f;
     ndc_y = 1.f - (my / (float)in.viewport_h) * 2.f;
 }
@@ -13,57 +12,11 @@ void input_handle_event(InputState& in, Camera& cam, Globe& globe, const SDL_Eve
         in.quit = true;
         break;
 
-    case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        if (e.button.button == SDL_BUTTON_LEFT) {
-            in.dragging = true;
-            in.last_x = e.button.x;
-            in.last_y = e.button.y;
-            camera_grab_kill_inertia(cam);
-
-            if (cam.mode == ControlMode::Grab) {
-                float nx, ny;
-                mouse_to_ndc(in, e.button.x, e.button.y, nx, ny);
-                float aspect = (float)in.viewport_w / (float)in.viewport_h;
-                if (!camera_grab_begin(cam, nx, ny, aspect)) {
-                    // Missed the sphere — treat as no drag
-                    in.dragging = false;
-                }
-            }
-        }
-        break;
-
-    case SDL_EVENT_MOUSE_BUTTON_UP:
-        if (e.button.button == SDL_BUTTON_LEFT) {
-            in.dragging = false;
-            if (cam.mode == ControlMode::Grab)
-                camera_grab_end(cam);
-        }
-        break;
-
-    case SDL_EVENT_MOUSE_MOTION:
-        if (in.dragging) {
-            float aspect = (float)in.viewport_w / (float)(in.viewport_h > 0 ? in.viewport_h : 1);
-            if (cam.mode == ControlMode::Grab) {
-                float nx, ny;
-                mouse_to_ndc(in, e.motion.x, e.motion.y, nx, ny);
-                camera_grab_move(cam, nx, ny, aspect, in.dt);
-            } else {
-                float dx = e.motion.x - in.last_x;
-                float dy = e.motion.y - in.last_y;
-                camera_apply_drag_arcball(cam, dx, dy, 0.004f);
-            }
-            in.last_x = e.motion.x;
-            in.last_y = e.motion.y;
-        }
-        break;
-
-    case SDL_EVENT_MOUSE_WHEEL:
-        camera_apply_zoom(cam, e.wheel.y);
-        break;
-
     case SDL_EVENT_KEY_DOWN:
         if (e.key.key == SDLK_ESCAPE) {
             in.quit = true;
+        } else if (e.key.key == SDLK_LSHIFT || e.key.key == SDLK_RSHIFT) {
+            in.shift_down = true;
         } else if (e.key.key == SDLK_TAB) {
             if (cam.mode == ControlMode::Arcball) {
                 cam.mode = ControlMode::Grab;
@@ -79,6 +32,66 @@ void input_handle_event(InputState& in, Camera& cam, Globe& globe, const SDL_Eve
             globe.shading = !globe.shading;
             fprintf(stderr, "Shading: %s\n", globe.shading ? "on" : "off");
         }
+        break;
+
+    case SDL_EVENT_KEY_UP:
+        if (e.key.key == SDLK_LSHIFT || e.key.key == SDLK_RSHIFT)
+            in.shift_down = false;
+        break;
+
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        if (e.button.button == SDL_BUTTON_LEFT) {
+            in.dragging = true;
+            in.last_x = e.button.x;
+            in.last_y = e.button.y;
+            camera_grab_kill_inertia(cam);
+
+            // Shift+click: roll mode — no surface grab needed
+            if (in.shift_down)
+                break;
+
+            if (cam.mode == ControlMode::Grab) {
+                float nx, ny;
+                mouse_to_ndc(in, e.button.x, e.button.y, nx, ny);
+                float aspect = (float)in.viewport_w / (float)(in.viewport_h > 0 ? in.viewport_h : 1);
+                if (!camera_grab_begin(cam, nx, ny, aspect))
+                    in.dragging = false;
+            }
+        }
+        break;
+
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        if (e.button.button == SDL_BUTTON_LEFT) {
+            in.dragging = false;
+            if (cam.mode == ControlMode::Grab)
+                camera_grab_end(cam);
+        }
+        break;
+
+    case SDL_EVENT_MOUSE_MOTION:
+        if (in.dragging) {
+            float dx = e.motion.x - in.last_x;
+            float dy = e.motion.y - in.last_y;
+            float aspect = (float)in.viewport_w / (float)(in.viewport_h > 0 ? in.viewport_h : 1);
+
+            if (in.shift_down) {
+                // Roll around view axis (unreachable with pure surface drag)
+                // Horizontal drag feels natural for twist
+                camera_apply_roll(cam, dx, 0.005f);
+            } else if (cam.mode == ControlMode::Grab) {
+                float nx, ny;
+                mouse_to_ndc(in, e.motion.x, e.motion.y, nx, ny);
+                camera_grab_move(cam, nx, ny, aspect, in.dt);
+            } else {
+                camera_apply_drag_arcball(cam, dx, dy, 0.004f);
+            }
+            in.last_x = e.motion.x;
+            in.last_y = e.motion.y;
+        }
+        break;
+
+    case SDL_EVENT_MOUSE_WHEEL:
+        camera_apply_zoom(cam, e.wheel.y);
         break;
 
     default:

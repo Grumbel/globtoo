@@ -5,6 +5,7 @@
 
 struct InputState {
     bool  dragging = false;
+    bool  shift_down = false;
     float last_x = 0.f;
     float last_y = 0.f;
     bool  quit = false;

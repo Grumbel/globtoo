@@ -1,17 +1,18 @@
 # TODO.md — globtoo
 
 ## Current tip
-- Camera orbits fixed Earth; stars fixed in world (real bright-star positions)
-- Prior: Grab/Arcball, shading, texture/winding/arcball fixes
+- Shift+drag rolls around the view axis (camera → Earth)
+- Prior: camera orbit, stars, grab/arcball, shading, texture fixes
 
-## Model
-- Earth is fixed in world space (identity model).
-- Camera orientation quaternion places the eye; controls orbit the camera.
-- Stars: ~50–60 brightest catalog stars as points; view translation stripped so they sit at infinity. Rotate with the camera orbit (not with a spinning Earth).
+## Controls
+- Drag — Grab (default) or Arcball (Tab)
+- Shift+drag — roll around view axis
+- Space — shading
+- Wheel — zoom
+- Esc — quit
 
 ## Open / next
-- [ ] Confirm grab still feels right after camera-orbit switch
-- [ ] Optional: denser catalog or milky-way band
+- [ ] Optional: denser star catalog
 - [ ] Optional: country borders / political overlay
 - [ ] Optional: atmosphere, day/night
 - [ ] VR later

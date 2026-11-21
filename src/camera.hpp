@@ -31,6 +31,8 @@ bool camera_grab_move(Camera& cam, float ndc_x, float ndc_y, float aspect, float
 void camera_grab_end(Camera& cam);
 void camera_apply_zoom(Camera& cam, float delta);
 void camera_grab_kill_inertia(Camera& cam);
+// Roll around view axis (camera → origin). dx pixels, sensitivity rad/px.
+void camera_apply_roll(Camera& cam, float dx, float sensitivity);
 
 // Rotate a view-space vector into world using camera orientation
 Vec3 camera_view_to_world(const Camera& cam, Vec3 v);

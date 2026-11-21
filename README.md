@@ -46,6 +46,7 @@ NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
 - Left-drag : spin the globe (with inertia)
 - Mouse wheel : zoom in / out
 - Tab : switch Grab ↔ Arcball
+- Shift+drag : roll around the view axis
 - Space : toggle shading
 - Esc : quit
 

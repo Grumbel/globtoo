@@ -156,3 +156,25 @@ void camera_apply_zoom(Camera& cam, float delta) {
 void camera_grab_kill_inertia(Camera& cam) {
     cam.ang_vel = {0, 0, 0};
 }
+
+void camera_apply_roll(Camera& cam, float dx, float sensitivity) {
+    // View axis: from eye toward origin = -eye direction in world
+    // eye = R * (0,0,distance) → axis = normalize(-eye) = R * (0,0,-1)
+    static auto quat_rotate = [](Quat q, Vec3 v) {
+        Quat p = { v.x, v.y, v.z, 0.f };
+        Quat qi = { -q.x, -q.y, -q.z, q.w };
+        Quat r = Quat::multiply(Quat::multiply(q, p), qi);
+        return Vec3{ r.x, r.y, r.z };
+    };
+    float angle = dx * sensitivity;
+    if (fabsf(angle) < 1e-8f)
+        return;
+    Vec3 axis = quat_rotate(cam.orientation, {0.f, 0.f, -1.f});
+    Quat delta = Quat::from_axis_angle(axis, angle);
+    cam.orientation = Quat::normalize(Quat::multiply(delta, cam.orientation));
+
+    const float vel_scale = 40.f;
+    cam.ang_vel.x = axis.x * angle * vel_scale;
+    cam.ang_vel.y = axis.y * angle * vel_scale;
+    cam.ang_vel.z = axis.z * angle * vel_scale;
+}
