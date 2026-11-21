@@ -13,7 +13,10 @@ static std::string read_file(const char* path) {
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     std::string data(size, '\0');
-    fread(data.data(), 1, size, f);
+    if (fread(data.data(), 1, size, f) != (size_t)size) {
+        fclose(f);
+        return {};
+    }
     fclose(f);
     return data;
 }

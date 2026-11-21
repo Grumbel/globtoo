@@ -199,7 +199,7 @@ static bool parse_features(const std::string& text,
 
         // Walk coordinates arrays; first ring of each polygon = exterior → fill + border
         std::function<void(bool)> walk;
-        walk = [&](bool may_be_ring) {
+        walk = [&](bool /*may_be_ring*/) {
             skip_ws();
             if (p >= end || *p != '[') return;
             ++p;
