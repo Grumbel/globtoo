@@ -23,14 +23,14 @@ Natural Earth and borders/fills use this via `lonlat_to_xyz`.
 
 Standard plate carrée (NASA / Natural Earth style):
 
-- **u = 0** at 180°W, **u = 0.5** at lon 0°, **u = 1** at 180°E  
-- **v = 0** at north pole, **v = 1** at south pole  
+- **u = 0** at 180°W, **u = 0.5** at lon 0°, **u = 1** at 180°E
+- **v = 0** at north pole, **v = 1** at south pole
 
 Sphere mesh sets:
 
 ```
-theta = t * 2π          // t = 0..1, theta = lon with 0 at +X
-u = fract(t + 0.5)      // so +X (lon 0) → u = 0.5
+theta = (t - 0.5) * 2π // t = 0..1, longitudes -180..+180
+u = t                   // +X (lon 0) → u = 0.5; texture seam is a mesh seam
 v = stack / stacks      // 0 at north
 ```
 
@@ -42,6 +42,6 @@ Earth is fixed in world space. The camera orientation quaternion orbits the eye 
 
 ## Checklist if borders look mirrored vs texture
 
-1. Confirm texture is true equirectangular (not a weird crop).  
-2. Mesh UVs must use `fract(t + 0.5)`, **not** `1 - t`.  
-3. `lonlat_to_xyz` must match the table above (do not negate lon).  
+1. Confirm texture is true equirectangular (not a weird crop).
+2. Mesh UVs must use `t` with `theta = (t - 0.5) * 2π` to put the seam at 180°.
+3. `lonlat_to_xyz` must match the table above (do not negate lon).

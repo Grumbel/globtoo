@@ -1,59 +1,43 @@
-# Country borders & coloring
+# Country borders and political coloring
 
-## Data (public domain)
+Natural Earth Admin-0 countries (public-domain GeoJSON), fetched at build time
+by the Nix flake. The default dataset is **1:50m**, including offshore islands
+and interior rings. See `flake.nix` for the pinned asset URL and hash.
 
-**Natural Earth** Admin-0 countries — free for any use, no attribution required
-(attribution appreciated).
+## Geometry
 
-| Scale | Use | Approx size | Source |
-|-------|-----|-------------|--------|
-| **1:110m** | Default / overview | ~820 KB GeoJSON | [ne_110m_admin_0_countries.geojson](https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_countries.geojson) |
-| **1:50m** | Medium zoom | larger | same repo `ne_50m_…` |
-| **1:10m** | Close-up | multi-MB | same repo / official zip |
+The independent CPU geometry builder (`src/country_geometry.cpp`) parses
+`FeatureCollection`/`Polygon`/`MultiPolygon` geometry and `MAPCOLOR7`. For each
+polygon, its outer ring and all interior holes are passed to **GEOS constrained
+Delaunay triangulation**. This replaces the incorrect centroid triangle fan,
+which covered concavities, lakes, the opposite hemisphere, and sometimes entire
+oceans. Requires GEOS >= 3.10 (`geos_c`); Nix supplies it automatically.
 
-Official site: https://www.naturalearthdata.com/downloads/110m-cultural-vectors/
+Triangles are subdivided in *unwrapped longitude/latitude* to at most 2.5° per
+edge, then projected onto the Y-up unit sphere. This makes even large inland
+triangles follow the sphere instead of intersecting it as planar chords.
+All triangle windings are made CCW when viewed from outside the globe, and
+triangles are lifted 0.15% above the ocean sphere. Borders use the same
+coordinates, with 1° subdivision and a 0.25% lift. Polygon holes remain ocean.
 
-S3 zip (shapefile): `https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip`
+Dateline-crossing polygons are unwrapped locally; +180°/-180° polar cut edges
+are retained so the Antarctic cap doesn't become a 360° closing chord. This is
+independent of the globe's *texture* seam at +/-180°.
 
-The flake fetches **110m GeoJSON** at build time into
-`share/globtoo/assets/countries.geojson` (and `assets/` for local builds).
+## Visibility
 
-### Geometry
+The globe is rendered first and its **depth buffer is preserved**. Countries
+and borders use depth testing, so their far-side geometry is hidden by the
+solid globe. Face culling alone is insufficient, as `GL_LINE_STRIP` is not
+culled. Do not clear depth between drawing the globe and the countries.
 
-- CRS: WGS84 lon/lat (CRS84): coordinates `[lon, lat]` in degrees.
-- Features: `Polygon` or `MultiPolygon`.
-- Useful properties: `NAME`, `ADM0_A3` / `ISO_A3`, `MAPCOLOR7`/`MAPCOLOR13`
-  (Natural Earth’s cartographic palette indices).
+The seven-color palette uses Natural Earth's `MAPCOLOR7` (1..7), with a stable
+name-based fallback if missing. The camera light vector points *toward* the
+eye, so colors aren't confined to the shader's ambient term.
 
-## Projection onto the unit sphere
+## Verification
 
-```
-lon_rad = lon * π/180
-lat_rad = lat * π/180
-x = cos(lat) * cos(lon)
-y = sin(lat)
-z = cos(lat) * sin(lon)
-```
-
-Match existing mesh UVs (`1-u` for longitude if needed for texture alignment).
-
-## Rendering plan
-
-1. **Borders** — line strips from ring coordinates, lifted slightly
-   (`position *= 1.002`) to avoid z-fighting; GLES2 line or thin triangle strips.
-2. **Country fill / political colors** — either:
-   - **A.** Ear-clip / constrained triangulation of each polygon → colored meshes
-     with a flat color from `MAPCOLOR7` or a hash of `ADM0_A3`; or
-   - **B.** Offline bake a political equirectangular texture from the same
-     GeoJSON (simpler GPU path, less crisp at extreme zoom).
-3. Toggle political layer vs satellite texture (e.g. key `P`).
-
-Prefer **A** for the classic multi-colored desk globe look at moderate
-detail (110m); switch to 50m when zoomed if needed.
-
-## Parser notes
-
-- Minimal GeoJSON: scan for `"coordinates"` arrays; no full JSON library
-  required if we keep a tiny hand parser or use nlohmann/json via Nix.
-- Skip antimeridian-split artifacts carefully; Natural Earth already splits
-  most problematic polygons.
+Run `ctest --test-dir build --output-on-failure`. Unit coverage includes
+concave polygons, holes, antimeridian crossings, winding, sphere radius,
+per-country colors, and malformed input. A real Natural Earth dataset can
+also be supplied to a geometry-only integration test without an SDL window.

@@ -186,6 +186,7 @@ void camera_apply_roll(Camera& cam, float dx, float sensitivity) {
 }
 
 Vec3 camera_headlight_dir(const Camera& cam) {
-    // Eye is R*(0,0,distance); light comes from the eye toward the globe.
-    return quat_rotate(cam.orientation, {0.f, 0.f, -1.f});
+    // Lambert shading expects the direction FROM the surface TO the light.
+    // The camera-mounted light is at the eye, not behind the Earth.
+    return quat_rotate(cam.orientation, {0.f, 0.f, 1.f});
 }

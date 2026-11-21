@@ -50,6 +50,7 @@
 
           buildInputs = with pkgs; [
             sdl3
+            geos
             libGL
             libglvnd
             mesa
@@ -92,7 +93,7 @@
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            cmake pkg-config sdl3 libGL libglvnd mesa
+            cmake pkg-config sdl3 geos libGL libglvnd mesa
             gdb clang-tools curl
           ];
           shellHook = ''

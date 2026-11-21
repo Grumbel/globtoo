@@ -21,13 +21,14 @@ Mesh create_sphere(int slices, int stacks) {
 
         for (int j = 0; j <= slices; ++j) {
             float t = (float)j / slices;       // 0..1
-            float theta = t * 2.f * 3.14159265f; // lon radians, 0 = +X
+            // Place the mesh seam at +/-180, exactly where the image seam is.
+            // Longitude 0 is halfway through the mesh (u=0.5).
+            float theta = (t - 0.5f) * 2.f * 3.14159265f;
             float x = r * cosf(theta);
             float z = r * sinf(theta);
 
-            // u = (lon + 180) / 360 = t + 0.5 (wrapped)
-            float u = t + 0.5f;
-            if (u >= 1.f) u -= 1.f;
+            // Avoid interpolating u=0 to u=1 inside any face.
+            float u = t;
 
             verts.push_back(x);
             verts.push_back(y);
