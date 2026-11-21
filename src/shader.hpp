@@ -1,0 +1,13 @@
+#pragma once
+#include <GLES2/gl2.h>
+#include <string>
+
+struct Shader {
+    GLuint program = 0;
+    GLint  u_mvp = -1;
+    GLint  u_tex = -1;
+};
+
+Shader load_shader(const char* vert_path, const char* frag_path);
+void   destroy_shader(Shader& s);
+void   use_shader(const Shader& s);
