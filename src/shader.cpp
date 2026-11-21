@@ -21,6 +21,18 @@ static std::string read_file(const char* path) {
     return data;
 }
 
+static bool expand_includes(std::string& source, const std::string& shader_path) {
+    const std::string marker = "#include \"projection.glsl\"";
+    auto at = source.find(marker);
+    if (at == std::string::npos) return true;
+    auto slash = shader_path.find_last_of("/\\");
+    std::string inc = (slash == std::string::npos ? "" : shader_path.substr(0,slash+1)) + "projection.glsl";
+    const std::string contents = read_file(inc.c_str());
+    if (contents.empty()) return false;
+    source.replace(at, marker.size(), contents);
+    return true;
+}
+
 static GLuint compile(GLenum type, const char* src) {
     GLuint sh = glCreateShader(type);
     glShaderSource(sh, 1, &src, nullptr);
@@ -41,7 +53,7 @@ Shader load_shader(const char* vert_path, const char* frag_path) {
     Shader s{};
     std::string vsrc = read_file(vert_path);
     std::string fsrc = read_file(frag_path);
-    if (vsrc.empty() || fsrc.empty()) return s;
+    if (vsrc.empty() || fsrc.empty() || !expand_includes(vsrc, vert_path)) return s;
 
     GLuint vs = compile(GL_VERTEX_SHADER, vsrc.c_str());
     GLuint fs = compile(GL_FRAGMENT_SHADER, fsrc.c_str());
@@ -58,6 +70,7 @@ Shader load_shader(const char* vert_path, const char* frag_path) {
     glBindAttribLocation(s.program, 1, "a_uv");
     glBindAttribLocation(s.program, 1, "a_bright"); // stars; same slot
     glBindAttribLocation(s.program, 1, "a_color");  // country fill
+    glBindAttribLocation(s.program, 2, "a_lonlat");
     glLinkProgram(s.program);
 
     GLint ok = 0;

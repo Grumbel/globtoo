@@ -18,7 +18,8 @@ void input_set_trackball(InputState& in, bool on) {
     fprintf(stderr, "Trackball: %s\n", on ? "on (mouse grabbed)" : "off");
 }
 
-void input_handle_event(InputState& in, Camera& cam, Globe& globe, Countries& countries, const SDL_Event& e) {
+void input_handle_event(InputState& in, Camera& cam, MapView& map,
+                        Globe& globe, Countries& countries, const SDL_Event& e) {
     switch (e.type) {
     case SDL_EVENT_QUIT:
         in.quit = true;
@@ -34,7 +35,24 @@ void input_handle_event(InputState& in, Camera& cam, Globe& globe, Countries& co
             }
         } else if (e.key.key == SDLK_LSHIFT || e.key.key == SDLK_RSHIFT) {
             in.shift_down = true;
-        } else if (e.key.key == SDLK_T) {
+        } else if (e.key.key == SDLK_1) {
+            input_set_trackball(in,false);
+            map_select(map,MapProjection::Globe,cam);
+        } else if (e.key.key == SDLK_2) {
+            input_set_trackball(in,false);
+            map_select(map,MapProjection::Equirectangular,cam);
+        } else if (e.key.key == SDLK_3) {
+            input_set_trackball(in,false);
+            map_select(map,MapProjection::Mercator,cam);
+        } else if (e.key.key == SDLK_4) {
+            input_set_trackball(in,false);
+            map_select(map,MapProjection::Mollweide,cam);
+        } else if (e.key.key == SDLK_5) {
+            input_set_trackball(in,false);
+            map_select(map,MapProjection::Hammer,cam);
+        } else if (e.key.key == SDLK_N) {
+            countries.names_visible = !countries.names_visible;
+        } else if (e.key.key == SDLK_T && map.flat_goal < .5f) {
             input_set_trackball(in, !in.trackball);
             camera_grab_kill_inertia(cam);
             camera_grab_end(cam);
@@ -67,15 +85,19 @@ void input_handle_event(InputState& in, Camera& cam, Globe& globe, Countries& co
         break;
 
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        if (in.trackball)
-            break; // motion-only in trackball
+        if (in.trackball && map.flat_goal < .5f) {
+            // Exit relative mode with a click so the GUI is reachable without
+            // having to remember Esc or T.
+            if (e.button.button == SDL_BUTTON_LEFT) input_set_trackball(in, false);
+            break;
+        }
         if (e.button.button == SDL_BUTTON_LEFT) {
             in.dragging = true;
             in.last_x = e.button.x;
             in.last_y = e.button.y;
             camera_grab_kill_inertia(cam);
 
-            if (in.shift_down)
+            if (map.flat_goal > .5f || in.shift_down)
                 break;
 
             if (cam.mode == ControlMode::Grab) {
@@ -111,7 +133,9 @@ void input_handle_event(InputState& in, Camera& cam, Globe& globe, Countries& co
             break;
         }
 
-        if (in.shift_down) {
+        if (map.flat_goal > .5f) {
+            if (in.dragging) map_pan(map,dx,dy,in.viewport_h);
+        } else if (in.shift_down) {
             camera_apply_roll(cam, dx, 0.005f);
         } else if (in.trackball) {
             // Continuous arcball-style orbit while mouse is grabbed
@@ -128,7 +152,8 @@ void input_handle_event(InputState& in, Camera& cam, Globe& globe, Countries& co
     }
 
     case SDL_EVENT_MOUSE_WHEEL:
-        camera_apply_zoom(cam, e.wheel.y);
+        if (map.flat_goal > .5f) map_zoom(map,e.wheel.y);
+        else camera_apply_zoom(cam, e.wheel.y);
         break;
 
     default:

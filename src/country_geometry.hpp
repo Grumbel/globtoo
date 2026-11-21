@@ -9,6 +9,11 @@
 // globe mesh; triangles are CCW as seen from outside the Earth.
 struct CountryGeometry {
     struct Strip { int first = 0; int count = 0; };
+    struct Label { std::string name; float longitude = 0, latitude = 0; };
+    // Separate lon/lat attributes preserve unwrapped antimeridian geometry.
+    std::vector<float> border_lonlat;
+    std::vector<float> fill_lonlat;
+    std::vector<Label> labels;
     std::vector<float> border_xyz;
     std::vector<Strip> border_strips;
     std::vector<float> fill_xyz_rgb;

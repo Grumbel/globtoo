@@ -10,6 +10,8 @@
 #include "input.hpp"
 #include "stars.hpp"
 #include "countries.hpp"
+#include "ui.hpp"
+#include "map_view.hpp"
 
 static SDL_Window*   window  = nullptr;
 static SDL_GLContext glctx   = nullptr;
@@ -65,6 +67,11 @@ int main(int argc, char** argv) {
     }
 
     Camera cam{};
+    const auto home = timezone_center();
+    camera_center_on(cam,home[0],home[1]);
+    fprintf(stderr, "Startup center from timezone: %.2f E, %.2f N (or UTC-offset fallback)\n",
+            home[0],home[1]);
+    MapView map{};
     InputState input{};
     input.viewport_w = width;
     input.viewport_h = height;
@@ -78,7 +85,10 @@ int main(int argc, char** argv) {
     if (!countries_init(countries, nullptr))
         fprintf(stderr, "Warning: countries failed to init\n");
 
-    fprintf(stderr, "Controls: drag=spin, wheel=zoom, Tab=Grab/Arcball, T=trackball, Shift=roll, Space=shading, B=borders, P=political, Esc=quit\n");
+    Ui ui{};
+    if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
+
+    fprintf(stderr, "Controls: on-screen buttons, drag=spin/pan, wheel=zoom, 1..5=views, Tab=Grab/Arcball, Space=shading, B=borders, N=names, P=political, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
@@ -95,11 +105,16 @@ int main(int argc, char** argv) {
         if (dt > 0.05f) dt = 0.05f;
         input.dt = dt;
 
+        ui.viewport_w = input.viewport_w;
+        ui.viewport_h = input.viewport_h;
         SDL_Event e;
-        while (SDL_PollEvent(&e))
-            input_handle_event(input, cam, globe, countries, e);
+        while (SDL_PollEvent(&e)) {
+            if (!ui_event(ui,e,cam,map,globe,countries,input))
+                input_handle_event(input, cam, map, globe, countries, e);
+        }
 
-        camera_update(cam, dt);
+        if (map.flat_goal < .5f) camera_update(cam, dt);
+        map_update(map,dt);
 
         glViewport(0, 0, input.viewport_w, input.viewport_h);
         glClearColor(0.02f, 0.02f, 0.05f, 1.f);
@@ -111,13 +126,17 @@ int main(int argc, char** argv) {
 
         float aspect = (float)input.viewport_w / (float)input.viewport_h;
         stars_draw(stars, cam, aspect);
-        globe_draw(globe, cam, aspect, !countries.fill_visible);
+        globe_draw(globe, cam, aspect, map, !countries.fill_visible);
         // Preserve globe depth: it occludes political geometry behind the horizon.
-        countries_draw(countries, cam, aspect);
+        countries_draw(countries, cam, aspect, map, globe.shading);
+        ui_draw_country_names(ui,countries,cam,map,aspect);
+        ui_draw(ui,cam,map,globe,countries);
+        ui_flush(ui);
 
         SDL_GL_SwapWindow(window);
     }
 
+    ui_shutdown(ui);
     countries_shutdown(countries);
     stars_shutdown(stars);
     globe_shutdown(globe);

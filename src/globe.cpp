@@ -1,4 +1,6 @@
 #include "globe.hpp"
+#include "scene.hpp"
+#include "geocoordinates.hpp"
 #include <cstdio>
 
 bool globe_init(Globe& g, const char* texture_path) {
@@ -22,14 +24,12 @@ void globe_shutdown(Globe& g) {
     destroy_texture(g.texture);
 }
 
-void globe_draw(const Globe& g, const Camera& cam, float aspect, bool textured) {
-    Mat4 proj  = cam.proj_matrix(aspect);
-    Mat4 view  = cam.view_matrix();
+void globe_draw(const Globe& g, const Camera& cam, float aspect,
+                const MapView& map, bool textured) {
     Mat4 model = Mat4::identity();
-    Mat4 mvp   = Mat4::multiply(proj, Mat4::multiply(view, model));
 
     use_shader(g.shader);
-    glUniformMatrix4fv(g.shader.u_mvp, 1, GL_FALSE, mvp.m);
+    scene_uniforms(g.shader, cam, aspect, map);
     if (g.shader.u_model >= 0)
         glUniformMatrix4fv(g.shader.u_model, 1, GL_FALSE, model.m);
     if (g.shader.u_shading >= 0)
@@ -49,21 +49,38 @@ void globe_draw(const Globe& g, const Camera& cam, float aspect, bool textured) 
         glUniform1i(g.shader.u_tex, 0);
     }
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glDepthMask(GL_TRUE);
-    glEnable(GL_STENCIL_TEST);
-    glStencilMask(0xff);
-    glStencilFunc(GL_ALWAYS, 1, 0xff);
-    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-
-    draw_mesh(g.mesh);
+    const bool sphere = map.globe_to_flat < .001f;
+    const bool flat = map.globe_to_flat > .999f;
+    if (flat) glDisable(GL_DEPTH_TEST);
+    else { glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); }
+    glDepthMask(flat ? GL_FALSE : GL_TRUE);
+    if (sphere) {
+        glEnable(GL_STENCIL_TEST);
+        glStencilMask(0xff);
+        glStencilFunc(GL_ALWAYS, 1, 0xff);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+    } else {
+        glDisable(GL_STENCIL_TEST);
+        glDisable(GL_CULL_FACE);
+    }
+    // Tiled copies ensure countries and textures render at both map edges.
+    // Copies are drawn only once the map is fully flat, avoiding ghost spheres
+    // during the physical sphere-to-plane morph.
+    const float wraps[] = {-static_cast<float>(2*geo::pi), 0.f, static_cast<float>(2*geo::pi)};
+    const int repeats = flat && scene_map_seam_visible(map, aspect) ? 3 : 1;
+    for (int i=0;i<repeats;i++) {
+        scene_uniforms(g.shader, cam, aspect, map, repeats==3 ? wraps[i] : 0.f);
+        draw_mesh(g.mesh);
+    }
     // Keep the stencil test enabled for political geometry. It limits the
     // overlay to the globe's visible silhouette, even where its slight radial
     // lift would otherwise make islands peek beyond the horizon.
-    glStencilMask(0x00);
-    glStencilFunc(GL_EQUAL, 1, 0xff);
-    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+    if (sphere) {
+        glStencilMask(0x00);
+        glStencilFunc(GL_EQUAL, 1, 0xff);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+    }
+    glDepthMask(GL_TRUE);
 }

@@ -183,7 +183,7 @@ bool read_coordinates(std::string_view json, const std::string& type, MultiPolyg
     return j.end();
 }
 
-bool parse_properties(Json& j, int& mapcolor, std::string& name) {
+bool parse_properties(Json& j, int& mapcolor, std::string& name, std::string& english) {
     if (!j.take('{')) return false;
     if (j.take('}')) return true;
     do {
@@ -195,6 +195,8 @@ bool parse_properties(Json& j, int& mapcolor, std::string& name) {
             else if (!j.skip()) return false;
         } else if (key == "NAME") {
             if (!j.string(name) && !j.skip()) return false;
+        } else if (key == "NAME_EN") {
+            if (!j.string(english) && !j.skip()) return false;
         } else if (!j.skip()) return false;
     } while (j.take(','));
     return j.take('}');
@@ -317,10 +319,16 @@ void emit_fill_triangle(CountryGeometry& dst, Point a, Point b, Point c,
     const double outward = nx * (p[0] + q[0] + r[0]) +
                            ny * (p[1] + q[1] + r[1]) + nz * (p[2] + q[2] + r[2]);
     if (std::abs(outward) < 1e-12) return;
-    if (outward < 0) std::swap(q, r);
-    for (auto& point : {p, q, r}) {
+    if (outward < 0) { std::swap(q, r); std::swap(b, c); }
+    const Point geo_points[3] = {a,b,c};
+    const auto points = {p, q, r};
+    std::size_t i = 0;
+    for (const auto& point : points) {
         for (double x : point) dst.fill_xyz_rgb.push_back(static_cast<float>(x));
         for (float channel : color) dst.fill_xyz_rgb.push_back(channel);
+        dst.fill_lonlat.push_back(static_cast<float>(geo_points[i].x));
+        dst.fill_lonlat.push_back(static_cast<float>(geo_points[i].y));
+        ++i;
     }
 }
 
@@ -332,6 +340,8 @@ void emit_border(CountryGeometry& dst, const Ring& ring) {
     for (std::size_t i = 0; i <= ring.size(); ++i) {
         const auto v = sphere(ring[i % ring.size()], political_radius);
         for (auto x : v) dst.border_xyz.push_back(static_cast<float>(x));
+        dst.border_lonlat.push_back(static_cast<float>(ring[i % ring.size()].x));
+        dst.border_lonlat.push_back(static_cast<float>(ring[i % ring.size()].y));
     }
     dst.border_strips.push_back({first, static_cast<int>(ring.size() + 1)});
 }
@@ -473,6 +483,9 @@ void process_feature(GEOSContextHandle_t ctx, MultiPolygon& polygons, int mapcol
                      const std::string& name, CountryGeometry& output) {
     ++output.feature_count;
     const auto color = country_color(mapcolor, name);
+    double largest_area = -1.0;
+    CountryGeometry::Label label{};
+    label.name = name;
     for (auto& poly : polygons) {
         if (poly.empty()) continue;
         unwrap(poly[0], 0, true);
@@ -483,29 +496,53 @@ void process_feature(GEOSContextHandle_t ctx, MultiPolygon& polygons, int mapcol
         for (std::size_t i = 1; i < poly.size(); ++i) unwrap(poly[i], reference, false);
         ++output.polygon_count;
         GEOSGeometry* shape = make_polygon(ctx, poly);
+        if (shape && !name.empty()) {
+            GEOSGeometry* valid = GEOSisValid_r(ctx, shape) == 1 ?
+                GEOSGeom_clone_r(ctx, shape) : GEOSMakeValid_r(ctx, shape);
+            if (valid) {
+                double area = 0.0;
+                if (GEOSArea_r(ctx, valid, &area) && area > largest_area) {
+                    GEOSGeometry* anchor = GEOSPointOnSurface_r(ctx, valid);
+                    if (anchor) {
+                        const GEOSCoordSequence* coords = GEOSGeom_getCoordSeq_r(ctx, anchor);
+                        double x = 0, y = 0;
+                        if (coords && GEOSCoordSeq_getX_r(ctx, coords, 0, &x) &&
+                            GEOSCoordSeq_getY_r(ctx, coords, 0, &y)) {
+                            largest_area = area;
+                            label.longitude = static_cast<float>(std::remainder(x, 360.0));
+                            label.latitude = static_cast<float>(y);
+                        }
+                        GEOSGeom_destroy_r(ctx, anchor);
+                    }
+                }
+                GEOSGeom_destroy_r(ctx, valid);
+            }
+        }
         triangulate_polygon(ctx, shape, output, color);
         if (shape) GEOSGeom_destroy_r(ctx, shape);
     }
+    if (largest_area >= 0) output.labels.push_back(std::move(label));
 }
 
 bool parse_feature(Json& j, GEOSContextHandle_t ctx, CountryGeometry& output) {
     if (!j.take('{')) return false;
     int mapcolor = 0;
-    std::string name;
+    std::string name, english;
     MultiPolygon polygons;
     if (!j.take('}')) {
         do {
             std::string key;
             if (!j.string(key) || !j.take(':')) return false;
             if (key == "properties") {
-                if (!parse_properties(j, mapcolor, name)) return false;
+                if (!parse_properties(j, mapcolor, name, english)) return false;
             } else if (key == "geometry") {
                 if (!parse_geometry(j, polygons)) return false;
             } else if (!j.skip()) return false;
         } while (j.take(','));
         if (!j.take('}')) return false;
     }
-    process_feature(ctx, polygons, mapcolor, name, output);
+    process_feature(ctx, polygons, mapcolor,
+                    !english.empty() && english != "-99" ? english : name, output);
     return true;
 }
 

@@ -1,5 +1,6 @@
 attribute vec3 a_pos;
-uniform mat4 u_mvp;
+attribute vec2 a_lonlat;
+#include "projection.glsl"
 void main() {
-    gl_Position = u_mvp * vec4(a_pos, 1.0);
+    gl_Position = scene_position(a_pos, a_lonlat);
 }

@@ -28,6 +28,9 @@ add_executable(globtoo
   src/country_geometry.cpp
   src/country_mesh_io.cpp
   src/math.cpp
+  src/map_view.cpp
+  src/scene.cpp
+  src/ui.cpp
 )
 
 target_include_directories(globtoo PRIVATE
@@ -111,6 +114,10 @@ if(BUILD_TESTING)
   add_test(NAME country_mesh_io COMMAND country_mesh_io_test)
 
   add_executable(coordinates_test tests/coordinates_test.cpp src/camera.cpp)
+  add_executable(map_view_test tests/map_view_test.cpp src/map_view.cpp src/camera.cpp)
+  target_include_directories(map_view_test PRIVATE src)
+  target_compile_options(map_view_test PRIVATE -Wall -Wextra -UNDEBUG)
+  add_test(NAME map_view COMMAND map_view_test)
   target_include_directories(coordinates_test PRIVATE src)
   target_compile_options(coordinates_test PRIVATE -Wall -Wextra -UNDEBUG)
   add_test(NAME coordinates COMMAND coordinates_test)

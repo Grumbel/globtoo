@@ -1,10 +1,11 @@
 attribute vec3 a_pos;
 attribute vec3 a_color;
-uniform mat4 u_mvp;
+attribute vec2 a_lonlat;
 varying vec3 v_color;
 varying vec3 v_normal;
+#include "projection.glsl"
 void main() {
     v_color = a_color;
-    v_normal = normalize(a_pos); // unit sphere
-    gl_Position = u_mvp * vec4(a_pos, 1.0);
+    v_normal = normalize(a_pos);
+    gl_Position = scene_position(a_pos, a_lonlat);
 }

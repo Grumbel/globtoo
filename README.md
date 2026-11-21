@@ -46,17 +46,39 @@ NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
 
 ## Controls
 
-- Left-drag : spin the globe (with inertia)
-- Mouse wheel : zoom in / out
-- Tab : switch Grab ↔ Arcball
-- Shift+drag : roll around the view axis
-- T : trackball mode (mouse grabbed, move to orbit)
-- Space : toggle shading
-- Esc : leave trackball, or quit
-- Esc : quit
+Globtoo now has a small on-screen toolbar; keyboard shortcuts remain optional.
 
-**Grab** (default): the surface under the cursor stays under the cursor.
-**Arcball**: free view-space rotation, no pole lock.
+- **3D Globe**: classic tactile, inertia-based sphere.
+- **Plate**: equirectangular geographic map.
+- **Mercator**: cylindrical conformal projection (latitude clipped at 85°).
+- **Mollweide**: equal-area ellipse.
+- **Hammer**: equal-area oval.
+- **− / +**: zoom out / in.
+- **Shading**: toggle directional shading (flat maps automatically fade to unlit).
+- **Countries**: toggle political color overlays.
+- **Borders**: toggle national boundary outlines.
+- **Names**: toggle English country names; labels are omitted when overlapping.
+- **Texture**: switch to textured Earth instead of political country fills.
+- **Grab mode**: switch between Grab and Arcball in globe mode.
+- **Reset**: restore timezone-relative viewpoint and zoom.
+
+Mouse: drag to spin the globe or pan the flat map; wheel to zoom.
+In globe mode, Shift+drag rolls around the view axis.
+Optional shortcuts: `1..5` select projection, `Space` shading, `B` borders,
+`N` names, `P` political coloring, `Tab` Grab/Arcball, `T` trackball,
+`Esc` quit (or release trackball).
+
+The default view is centered on the **representative city of the system's IANA
+TZ zone** (from the installed `zone1970.tab`/`zone.tab`). For example,
+`TZ=Europe/Berlin globtoo` centers on Berlin's zone reference coordinates.
+If the timezone has no geographical entry, the app uses the UTC offset as an
+approximate longitude and latitude 0°. A timezone alone is not a precise
+geolocation.
+
+The **globe↔map transitions animate the same geometry** between a sphere and
+flattened projected coordinates. Projection-to-projection changes are smoothly
+interpolated too; this is not a crossfade between static images. See
+`docs/MAP_VIEW.md` for design details and current limitations.
 
 ## Architecture notes
 
@@ -69,8 +91,9 @@ Ready for later expansion (country borders, VR, etc.).
 
 Natural Earth Admin-0 **1:50m and 1:10m** countries (public domain) are
 fetched and converted into binary GPU-ready meshes at build time. The viewer
-switches to 10m for close zoom, with hysteresis to avoid LOD flicker. No
-GeoJSON parsing or triangulation is needed at launch in the Nix package.
+switches to 10m for close zoom, with hysteresis to avoid LOD flicker. Each generated mesh now stores English `NAME_EN` country labels, interior
+label anchors, and geographic coordinates alongside the shared border/fill
+vertices. No GeoJSON parsing or triangulation is needed at launch in the Nix package.
 GEOS (>= 3.10) triangulates polygons, including holes; a depth-tested
 spherical overlay hides the far hemisphere. See `docs/COUNTRIES.md`.
 

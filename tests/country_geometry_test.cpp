@@ -156,6 +156,13 @@ int main() {
         for (std::size_t k = 0; k < 3; ++k)
             assert(std::abs(geo.border_xyz[first + k] - geo.border_xyz[last + k]) < 1e-5f);
     }
+    assert(geo.border_lonlat.size() == geo.border_xyz.size()/3*2);
+    assert(geo.fill_lonlat.size() == geo.fill_xyz_rgb.size()/6*2);
+    // Unwrapped antimeridian ring is near 180 degrees, never a 357 degree
+    // chord that stretches across the unfolded map.
+    const auto& seam = geo.border_strips[3];
+    for (int i=seam.first+1;i<seam.first+seam.count;i++)
+        assert(std::abs(geo.border_lonlat[2*i]-geo.border_lonlat[2*(i-1)]) <= 0.51f);
     verify_triangles(geo);
     verify_border_matches_fill(geo, 0.93f, 0, 2); // shell + hole
     verify_border_matches_fill(geo, 0.45f, 2, 1); // concave polygon
