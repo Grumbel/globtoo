@@ -2,20 +2,23 @@
 #include "math.hpp"
 
 struct Camera {
-    float yaw   = 0.f;      // radians, around Y
-    float pitch = 0.2f;     // slight tilt
-    float distance = 3.2f;  // from center
+    // Globe orientation (model rotation). Identity shows equator upright.
+    Quat orientation = Quat::identity();
 
-    float yaw_vel   = 0.f;
-    float pitch_vel = 0.f;
+    // Angular velocity in view space (radians / second) for inertia
+    Vec3 ang_vel = {0, 0, 0};
 
-    float min_dist = 1.15f; // close enough to see small countries
+    float distance = 3.2f;
+    float min_dist = 1.15f;
     float max_dist = 8.0f;
 
     Mat4 view_matrix() const;
+    Mat4 model_matrix() const;
     Mat4 proj_matrix(float aspect) const;
 };
 
 void camera_update(Camera& cam, float dt);
+// Screen-space drag in pixels; sensitivity in radians per pixel
 void camera_apply_drag(Camera& cam, float dx, float dy, float sensitivity);
 void camera_apply_zoom(Camera& cam, float delta);
+void camera_grab(Camera& cam); // kill inertia on press

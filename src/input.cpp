@@ -11,9 +11,7 @@ void input_handle_event(InputState& in, Camera& cam, const SDL_Event& e) {
             in.dragging = true;
             in.last_x = e.button.x;
             in.last_y = e.button.y;
-            // kill residual velocity on grab – feels like catching a spinning globe
-            cam.yaw_vel = 0.f;
-            cam.pitch_vel = 0.f;
+            camera_grab(cam);
         }
         break;
 
@@ -26,8 +24,8 @@ void input_handle_event(InputState& in, Camera& cam, const SDL_Event& e) {
         if (in.dragging) {
             float dx = e.motion.x - in.last_x;
             float dy = e.motion.y - in.last_y;
-            // sensitivity tuned for tactile feel
-            camera_apply_drag(cam, dx, dy, 0.0045f);
+            // radians per pixel – responsive, not sluggish
+            camera_apply_drag(cam, dx, dy, 0.008f);
             in.last_x = e.motion.x;
             in.last_y = e.motion.y;
         }

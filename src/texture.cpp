@@ -6,9 +6,11 @@
 Texture load_texture(const char* path) {
     Texture t{};
     int channels = 0;
-    // Equirectangular maps are top-down in most sources; flip so our V
-    // (0 at north pole in mesh) lines up with the image after load.
-    stbi_set_flip_vertically_on_load(1);
+    // Do NOT flip: equirectangular has north at the top of the image.
+    // Our sphere uses v=0 at the north pole. glTexImage2D puts the first
+    // memory row at v=0, and stbi loads the top of the file first, so
+    // north lands on the north pole without a flip.
+    stbi_set_flip_vertically_on_load(0);
 
     // Always request 4 channels. JPEG is typically 3; uploading RGB with
     // default GL_UNPACK_ALIGNMENT=4 skews the image whenever width*3 is
