@@ -128,9 +128,22 @@ static void fan_fill(const std::vector<float>& ring_lonlat,
             float t = (float)s / (float)segs;
             float qx, qy, qz;
             slerp_unit(ax, ay, az, bx, by, bz, t, qx, qy, qz);
+            // Ensure CCW from outside: (p-c)×(q-c) · c > 0
+            float rx = py * qz - pz * qy;
+            float ry = pz * qx - px * qz;
+            float rz = px * qy - py * qx;
+            // p,q are unit; c is unit; (p-c)×(q-c) = p×q - c×q - p×c + c×c = p×q - c×q - p×c
+            // Simpler: (p × q) · c
+            float outward = (py * qz - pz * qy) * cx + (pz * qx - px * qz) * cy + (px * qy - py * qx) * cz;
             emit(cx, cy, cz);
-            emit(px, py, pz);
-            emit(qx, qy, qz);
+            if (outward >= 0.f) {
+                emit(px, py, pz);
+                emit(qx, qy, qz);
+            } else {
+                emit(qx, qy, qz);
+                emit(px, py, pz);
+            }
+            (void)rx; (void)ry; (void)rz;
             px = qx; py = qy; pz = qz;
         }
     }
@@ -382,7 +395,12 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         if (u_sh >= 0)
             glUniform1f(u_sh, 1.f);
 
+        // No depth vs globe (cleared in main), but cull back faces so the
+        // far side of the Earth is not drawn (not see-through).
         glDisable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
 
         glBindBuffer(GL_ARRAY_BUFFER, c.fill_vbo);
         glEnableVertexAttribArray(0);
@@ -402,6 +420,8 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         glUniform4f(u_color, 0.12f, 0.10f, 0.08f, 1.f);
 
         glDisable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
         glLineWidth(1.f);
 
         glBindBuffer(GL_ARRAY_BUFFER, c.border_vbo);
@@ -413,4 +433,6 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
     }
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 }
