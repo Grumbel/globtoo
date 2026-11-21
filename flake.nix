@@ -27,13 +27,13 @@
           name = "earth.jpg";
         };
 
-        # Natural Earth 1:110m Admin-0 countries (public domain).
-        # Lon/lat polygons for borders + country fill. ~820 KB GeoJSON.
+        # Natural Earth 1:50m Admin-0 countries (public domain).
+        # Lon/lat polygons for borders + country fill. ~3 MB GeoJSON.
         # For more detail when zoomed: ne_50m_admin_0_countries.geojson
         countriesGeojson = pkgs.fetchurl {
-          url = "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_countries.geojson";
-          sha256 = "sha256-aGbId9Ocupw1diCHiDmzNtVp+MZi08+rTLHb4tOcl38=";
-          name = "ne_110m_admin_0_countries.geojson";
+          url = "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_admin_0_countries.geojson";
+          sha256 = "sha256-PkWPwDatCmZBHywebKxJxde/uByxEjvFE7IlEaK3/es=";
+          name = "ne_50m_admin_0_countries.geojson";
         };
 
       in

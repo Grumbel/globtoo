@@ -22,20 +22,34 @@ static void lonlat_to_xyz(float lon_deg, float lat_deg, float radius, float& x, 
     z = cl * sinf(lon) * radius;
 }
 
-// Classic atlas-ish palette (MAPCOLOR7 is 1..7)
-static void mapcolor_rgb(int mc, float& r, float& g, float& b) {
+// Distinct desk-globe colors. MAPCOLOR7 (1..7) or hash of NAME.
+static unsigned hash_str(const char* s, size_t n) {
+    unsigned h = 2166136261u;
+    for (size_t i = 0; i < n; ++i) {
+        h ^= (unsigned char)s[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void mapcolor_rgb(int mc, unsigned name_hash, float& r, float& g, float& b) {
     static const float pal[][3] = {
-        {0.75f, 0.75f, 0.72f}, // 0 fallback
-        {0.91f, 0.56f, 0.56f}, // 1 red-ish
-        {0.55f, 0.78f, 0.55f}, // 2 green
-        {0.55f, 0.65f, 0.90f}, // 3 blue
-        {0.95f, 0.85f, 0.45f}, // 4 yellow
-        {0.85f, 0.65f, 0.90f}, // 5 purple
-        {0.55f, 0.85f, 0.85f}, // 6 cyan
-        {0.95f, 0.70f, 0.45f}, // 7 orange
+        {0.93f, 0.55f, 0.52f},
+        {0.45f, 0.72f, 0.48f},
+        {0.95f, 0.82f, 0.40f},
+        {0.55f, 0.62f, 0.88f},
+        {0.90f, 0.58f, 0.78f},
+        {0.40f, 0.78f, 0.78f},
+        {0.95f, 0.68f, 0.38f},
+        {0.70f, 0.55f, 0.85f},
+        {0.60f, 0.80f, 0.45f},
+        {0.85f, 0.50f, 0.45f},
+        {0.50f, 0.70f, 0.90f},
+        {0.88f, 0.75f, 0.55f},
     };
-    if (mc < 0 || mc > 7) mc = 0;
-    r = pal[mc][0]; g = pal[mc][1]; b = pal[mc][2];
+    const int np = 12;
+    int idx = (mc >= 1 && mc <= 7) ? (mc - 1) % np : (int)(name_hash % (unsigned)np);
+    r = pal[idx][0]; g = pal[idx][1]; b = pal[idx][2];
 }
 
 // Fan triangulation from 3D centroid on the sphere (robust for 110m countries).
@@ -131,17 +145,41 @@ static bool parse_features(const std::string& text,
             break;
 
         int mapcolor = 0;
+        unsigned name_hash = 0;
         if (mc_key && mc_key < coord_key) {
-            const char* q = mc_key + 11;
-            while (q < end && *q != ':' && *q != ',') ++q;
-            if (*q == ':') {
-                ++q;
-                mapcolor = (int)strtol(q, nullptr, 10);
+            const char* q = strchr(mc_key + 11, ':');
+            if (q && q < coord_key)
+                mapcolor = (int)strtol(q + 1, nullptr, 10);
+        }
+        {
+            const char* s = cursor;
+            while (s < coord_key) {
+                const char* f = strstr(s, "\"NAME\"");
+                if (!f || f >= coord_key)
+                    break;
+                // Match "NAME" not NAME_LONG: after NAME comes "
+                if (f[5] == 'E' && f[6] == '"') {
+                    const char* q = strchr(f + 6, ':');
+                    if (q && q < coord_key) {
+                        ++q;
+                        while (q < coord_key && (*q == ' ' || *q == '\t'))
+                            ++q;
+                        if (*q == '"') {
+                            ++q;
+                            const char* e = q;
+                            while (e < coord_key && *e != '"')
+                                ++e;
+                            name_hash = hash_str(q, (size_t)(e - q));
+                        }
+                    }
+                    break;
+                }
+                s = f + 6;
             }
         }
 
         float cr, cg, cb;
-        mapcolor_rgb(mapcolor, cr, cg, cb);
+        mapcolor_rgb(mapcolor, name_hash, cr, cg, cb);
 
         p = coord_key + 14;
         skip_ws();
@@ -163,7 +201,7 @@ static bool parse_features(const std::string& text,
                     ring.push_back(lon); ring.push_back(lat);
                     GLint first = (GLint)(border_verts.size() / 3);
                     float x, y, z;
-                    lonlat_to_xyz(lon, lat, 1.004f, x, y, z);
+                    lonlat_to_xyz(lon, lat, 1.012f, x, y, z);
                     border_verts.push_back(x); border_verts.push_back(y); border_verts.push_back(z);
                     while (true) {
                         skip_ws();
@@ -171,7 +209,7 @@ static bool parse_features(const std::string& text,
                             ++p;
                             if (!try_read_position(lon, lat)) break;
                             ring.push_back(lon); ring.push_back(lat);
-                            lonlat_to_xyz(lon, lat, 1.004f, x, y, z);
+                            lonlat_to_xyz(lon, lat, 1.012f, x, y, z);
                             border_verts.push_back(x); border_verts.push_back(y); border_verts.push_back(z);
                         } else break;
                     }
@@ -180,7 +218,7 @@ static bool parse_features(const std::string& text,
                         strips.push_back({ first, count });
                     // Fill from exterior rings (caller treats every ring; holes get same color — ok at 110m)
                     if (ring.size() >= 6)
-                        fan_fill(ring, fill_xyz_rgb, cr, cg, cb, 1.002f);
+                        fan_fill(ring, fill_xyz_rgb, cr, cg, cb, 1.008f);
                     skip_ws();
                     if (*p == ']') ++p;
                 } else {
@@ -309,7 +347,7 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(1.f, 1.f);
+        glPolygonOffset(-2.f, -2.f);
 
         glBindBuffer(GL_ARRAY_BUFFER, c.fill_vbo);
         glEnableVertexAttribArray(0);
@@ -328,10 +366,11 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         GLint u_mvp = glGetUniformLocation(c.border_shader.program, "u_mvp");
         GLint u_color = glGetUniformLocation(c.border_shader.program, "u_color");
         glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
-        glUniform4f(u_color, 0.15f, 0.12f, 0.10f, 1.f);
+        glUniform4f(u_color, 0.12f, 0.10f, 0.08f, 1.f);
 
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
+        glDepthMask(GL_FALSE); // don't fight fill depth
         glLineWidth(1.f);
 
         glBindBuffer(GL_ARRAY_BUFFER, c.border_vbo);
@@ -340,6 +379,7 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         for (const auto& r : c.strips)
             glDrawArrays(GL_LINE_STRIP, r.first, r.count);
         glDisableVertexAttribArray(0);
+        glDepthMask(GL_TRUE);
         glDepthFunc(GL_LESS);
     }
 }
