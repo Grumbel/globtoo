@@ -184,3 +184,8 @@ void camera_apply_roll(Camera& cam, float dx, float sensitivity) {
     cam.ang_vel.y = axis.y * angle * vel_scale;
     cam.ang_vel.z = axis.z * angle * vel_scale;
 }
+
+Vec3 camera_headlight_dir(const Camera& cam) {
+    // Eye is R*(0,0,distance); light comes from the eye toward the globe.
+    return quat_rotate(cam.orientation, {0.f, 0.f, -1.f});
+}

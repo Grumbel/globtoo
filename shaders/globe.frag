@@ -17,8 +17,8 @@ void main() {
         albedo = vec3(0.25, 0.42, 0.62);
     }
     float ndotl = max(dot(normalize(v_normal), normalize(u_light_dir)), 0.0);
-    float ambient = 0.32;
-    float diffuse = 0.68 * ndotl;
+    float ambient = 0.45;
+    float diffuse = 0.55 * ndotl;
     float lit = ambient + diffuse;
     vec3 color = mix(albedo, albedo * lit, u_shading);
     gl_FragColor = vec4(color, 1.0);

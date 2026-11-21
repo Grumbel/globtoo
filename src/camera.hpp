@@ -36,3 +36,5 @@ void camera_apply_roll(Camera& cam, float dx, float sensitivity);
 
 // Rotate a view-space vector into world using camera orientation
 Vec3 camera_view_to_world(const Camera& cam, Vec3 v);
+// World-space direction from eye toward origin (headlight); rotates with camera.
+Vec3 camera_headlight_dir(const Camera& cam);

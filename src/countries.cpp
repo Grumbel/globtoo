@@ -299,8 +299,10 @@ void countries_draw(const Countries& c, const Camera& cam, float aspect) {
         GLint u_light = glGetUniformLocation(c.fill_shader.program, "u_light_dir");
         GLint u_sh = glGetUniformLocation(c.fill_shader.program, "u_shading");
         glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
-        if (u_light >= 0)
-            glUniform3f(u_light, -0.4f, 0.35f, 0.85f);
+        if (u_light >= 0) {
+            Vec3 L = camera_headlight_dir(cam);
+            glUniform3f(u_light, L.x, L.y, L.z);
+        }
         if (u_sh >= 0)
             glUniform1f(u_sh, 1.f);
 

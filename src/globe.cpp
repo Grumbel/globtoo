@@ -34,8 +34,11 @@ void globe_draw(const Globe& g, const Camera& cam, float aspect, bool textured) 
         glUniformMatrix4fv(g.shader.u_model, 1, GL_FALSE, model.m);
     if (g.shader.u_shading >= 0)
         glUniform1f(g.shader.u_shading, g.shading ? 1.f : 0.f);
-    if (g.shader.u_light_dir >= 0)
-        glUniform3f(g.shader.u_light_dir, -0.4f, 0.35f, 0.85f);
+    if (g.shader.u_light_dir >= 0) {
+        // Headlight: rotates with the camera so the facing hemisphere stays lit
+        Vec3 L = camera_headlight_dir(cam);
+        glUniform3f(g.shader.u_light_dir, L.x, L.y, L.z);
+    }
 
     GLint u_textured = glGetUniformLocation(g.shader.program, "u_textured");
     if (u_textured >= 0)
