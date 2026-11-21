@@ -37,6 +37,13 @@ double map_sheet_y(MapProjection projection, double unwrapped_lat);
 std::array<double, 2> map_geographic_center(const MapView& map); // lon, lat in radians
 std::vector<int> map_visible_bands(const MapView& map, float aspect);
 void map_apply_roll(MapView& map, float dx_pixels, float sensitivity = .005f);
+// Clockwise screen bearing of geographic north at the viewport center, in
+// radians (zero means north points up). In polar-reflected map bands north
+// points down until the map is turned 180 degrees.
+double map_north_heading(const MapView& map, const Camera& cam);
+// Straighten the current view without changing its geographic center or zoom.
+void map_align_north(MapView& map, Camera& cam);
+
 void camera_center_on(Camera& cam, double longitude_degrees, double latitude_degrees);
 // Approximate a location from the actual system timezone entry (zone.tab);
 // fallback: UTC offset determines longitude, latitude remains equatorial.

@@ -99,14 +99,75 @@ int main() {
     // and preserves the projected rotation as a globe roll.
     polar.center_lat = 100*geo::to_rad;
     polar.center_lon = .1;
+    const double original_north = map_north_heading(polar,cam);
     map_select(polar,MapProjection::Globe,cam);
+    assert(near(std::remainder(map_north_heading(polar,cam)-original_north,
+                               2*geo::pi),0.,.02));
     facing = camera_view_to_world(cam,{0,0,1});
     const auto globe_center = geo::xyz_to_lonlat(facing.x,facing.y,facing.z);
     assert(near(globe_center[0]*geo::to_rad,
                 std::remainder(.1+geo::pi,2*geo::pi),.01));
     assert(near(globe_center[1],80,.01));
     map_select(polar,MapProjection::Equirectangular,cam);
-    assert(near(polar.roll,.5,.02));
+    // On a reflected polar sheet the saved roll changes by 180 degrees,
+    // but geographic North must *not* jump during the fold/unfold.
+    assert(near(std::remainder(map_north_heading(polar,cam)-original_north,
+                               2*geo::pi),0.,.02));
+
+    // The compass must show geographic, not screen-space or sheet-space,
+    // North. All rotations must be reversible without affecting location.
+    for (double latitude : {-89.,-55.,0.,42.,88.}) {
+        Camera globe_cam{};
+        MapView globe_map{};
+        camera_center_on(globe_cam, 124.,latitude);
+        globe_cam.distance=1.16f;
+        assert(near(map_north_heading(globe_map,globe_cam),0.,.001));
+        const Vec3 before=camera_view_to_world(globe_cam,{0,0,1});
+        camera_apply_roll(globe_cam,127.f,.01f);
+        assert(near(map_north_heading(globe_map,globe_cam),-1.27,.002));
+        map_align_north(globe_map,globe_cam);
+        assert(near(map_north_heading(globe_map,globe_cam),0.,.002));
+        const Vec3 after=camera_view_to_world(globe_cam,{0,0,1});
+        assert(near(before.x,after.x,.0001) &&
+               near(before.y,after.y,.0001) &&
+               near(before.z,after.z,.0001));
+        assert(near(globe_cam.distance,1.16));
+        assert(near(globe_cam.ang_vel.x,0) &&
+               near(globe_cam.ang_vel.y,0) &&
+               near(globe_cam.ang_vel.z,0));
+    }
+    for (auto kind : {MapProjection::Equirectangular, MapProjection::Mercator,
+                      MapProjection::Mollweide, MapProjection::Hammer}) {
+        for (double sheet_lat : {40.,100.,-100.,220.}) {
+            MapView flat{};
+            flat.selected=flat.from=flat.to=kind;
+            flat.flat_goal=flat.globe_to_flat=1.f;
+            flat.center_lat=sheet_lat*geo::to_rad;
+            flat.center_lon=-.6;
+            flat.zoom=20.f;
+            flat.roll=.73;
+            const auto center=map_geographic_center(flat);
+            const double heading=(map_lat_band(flat.center_lat)%2 ? geo::pi : 0.)-.73;
+            assert(near(map_north_heading(flat,cam),
+                        std::remainder(heading,2*geo::pi),.001));
+            map_align_north(flat,cam);
+            assert(near(map_north_heading(flat,cam),0.,.001));
+            assert(near(flat.center_lon,-.6) &&
+                   near(flat.center_lat,sheet_lat*geo::to_rad) &&
+                   near(flat.zoom,20.));
+            auto aligned_center=map_geographic_center(flat);
+            assert(near(center[0],aligned_center[0]) &&
+                   near(center[1],aligned_center[1]));
+            // Folding to the globe keeps geographic North at the top even
+            // after crossing a pole, and unfolding does not invert it.
+            Camera folded{};
+            map_select(flat,MapProjection::Globe,folded);
+            assert(near(map_north_heading(flat,folded),0.,.002));
+            map_select(flat,kind,folded);
+            assert(near(map_north_heading(flat,folded),0.,.002));
+        }
+    }
+
 
     // TZ database coordinate lookup, when available, supersedes coarse UTC.
     setenv("TZ", "Europe/Berlin", 1);

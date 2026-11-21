@@ -61,6 +61,30 @@ applies the inverse roll before updating the map's geographic center,
 allowing panning in any rotated orientation. Globe↔map mode switches preserve
 this roll and the true geographic center even after crossing the poles.
 
+## Compass, North-up and Reset
+
+The upper-right compass rotates its N/E/S/W markings and north-pointing
+needle to show **geographic north at the center of the view**. In the 3D
+sphere, direction comes from the latitude-increasing tangent in the globe's
+right-handed geographic frame projected into camera-right and camera-up
+coordinates; in flat maps it follows the map's roll and the sign of the
+current pole-reflected band. The bearing is clockwise from screen-up, so
+`N 000 DEG` indicates North-up. Near the geographic poles, the compass uses
+the current meridian as a reference because true north is undefined exactly
+at a pole.
+
+Click **NORTH UP** (or the compass rose) to straighten the current map or
+globe without moving the center or changing zoom. On an odd reflected band,
+North-up means 180 degrees of map-sheet roll. Returning to the globe
+compensates for this reflection, keeping the compass direction continuous
+through the fold. **RESET**, now below the compass instead of in the toolbar,
+restores the timezone-derived center, default zoom, and North-up orientation
+without changing the chosen projection.
+
+The compass repositions below the main toolbar on small windows. UI hit
+testing uses the same bounds as drawing, so compass clicks cannot initiate a
+map drag, and map labels are kept out of both control panels.
+
 In spherical mode, depth is written only by the base globe and a stencil mask
 prevents visible political geometry outside the globe limb. During flattening
 we disable the silhouette mask, and in completed flat mode depth occlusion is

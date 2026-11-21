@@ -13,6 +13,7 @@
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Interactive geographic compass, North-up alignment, and relocated full Reset (including roll)
 - [x] North/south flat-map pole crossing with reflected latitude and 180-degree longitude shift
 - [x] Shift+drag rotation for flat maps and preservation through globe folding
 - [x] Flat-map seam detection across pole-reflected bands and zoom-aware mesh LOD

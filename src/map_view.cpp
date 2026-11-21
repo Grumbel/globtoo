@@ -167,6 +167,42 @@ void map_apply_roll(MapView& m, float dx_pixels, float sensitivity) {
     m.roll = std::remainder(m.roll + dx_pixels*sensitivity, 2*pi);
 }
 
+double map_north_heading(const MapView& m, const Camera& cam) {
+    if (m.flat_goal > .5f) {
+        // The screen-space sheet's +Y direction is geographic south in
+        // every odd (pole-reflected) band. A positive roll rotates the sheet
+        // CCW, thus geographic north has clockwise bearing -roll.
+        return std::remainder((map_lat_band(m.center_lat) % 2 ? pi : 0.) - m.roll,
+                              2*pi);
+    }
+    const Vec3 facing = camera_view_to_world(cam, {0,0,1});
+    const auto center = geo::xyz_to_lonlat(facing.x, facing.y, facing.z);
+    const double lon = center[0]*geo::to_rad;
+    const double lat = center[1]*geo::to_rad;
+    // Unit tangent of increasing latitude in the shared right-handed frame.
+    // This also provides a stable meridian reference at the polar singularity.
+    const Vec3 north{static_cast<float>(-std::sin(lat)*std::cos(lon)),
+                     static_cast<float>( std::cos(lat)),
+                     static_cast<float>( std::sin(lat)*std::sin(lon))};
+    const Vec3 right = camera_view_to_world(cam, {1,0,0});
+    const Vec3 up = camera_view_to_world(cam, {0,1,0});
+    return std::atan2(static_cast<double>(Mat4::dot(north,right)),
+                      static_cast<double>(Mat4::dot(north,up)));
+}
+
+void map_align_north(MapView& m, Camera& cam) {
+    if (m.flat_goal > .5f) {
+        m.roll = map_lat_band(m.center_lat) % 2 ? pi : 0.;
+    } else {
+        // Camera roll changes the world-to-view bearing by the *negative*
+        // of the applied angle. Applying the current bearing straightens N.
+        camera_grab_end(cam);
+        camera_grab_kill_inertia(cam);
+        camera_apply_roll(cam, static_cast<float>(map_north_heading(m,cam)), 1.f);
+        camera_grab_kill_inertia(cam); // roll should not continue spinning
+    }
+}
+
 void camera_center_on(Camera& cam, double lon, double lat) {
     const Quat yaw = Quat::from_axis_angle({0.f,1.f,0.f},
                                            static_cast<float>((90.0+lon)*geo::to_rad));
@@ -186,7 +222,11 @@ void map_select(MapView& m, MapProjection selected, Camera& cam) {
         const auto center = map_geographic_center(m);
         camera_center_on(cam, center[0] * geo::to_deg, center[1] * geo::to_deg);
         // Preserve Shift+drag map roll when folding back into the globe.
-        camera_apply_roll(cam, static_cast<float>(m.roll), 1.f);
+        // An odd polar sheet has geographic north pointing toward -Y;
+        // compensate its half-turn when moving back onto the sphere.
+        const double physical_roll = m.roll +
+            (map_lat_band(m.center_lat) % 2 ? pi : 0.);
+        camera_apply_roll(cam, static_cast<float>(physical_roll), 1.f);
         camera_grab_kill_inertia(cam);
         m.flat_goal = 0.f;
     } else {

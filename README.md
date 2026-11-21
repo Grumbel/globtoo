@@ -60,7 +60,9 @@ Globtoo now has a small on-screen toolbar; keyboard shortcuts remain optional.
 - **Names**: toggle English country names; labels are omitted when overlapping.
 - **Texture**: switch to textured Earth instead of political country fills.
 - **Grab mode**: switch between Grab and Arcball in globe mode.
-- **Reset**: restore timezone-relative viewpoint and zoom.
+- **Compass (upper-right)**: live geographic N/E/S/W heading for the globe and every 2D projection.
+- **North Up**: click the button or compass rose to straighten the view without panning or changing zoom (also works after a polar crossing).
+- **Reset**: below the compass; restore the timezone-relative viewpoint, North-up orientation, and default zoom without changing the selected projection.
 
 Mouse: drag to spin the globe or pan the flat map; wheel to zoom.
 **Shift+drag** rotates the 2D map around the viewport center, just as it
