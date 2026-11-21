@@ -16,25 +16,16 @@
         # ---------------------------------------------------------------
         # Default: public-domain equirectangular (Wikimedia)
         # Good enough for development and still looks decent when zoomed.
+        # Seamless equirectangular day map (no clouds, no white border).
+        # NASA Blue Marble–derived 4k used by turban/webgl-earth.
+        # For full NASA BMNG 5400x2700 (public domain), swap URL to e.g.
+        #   https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg
+        # and update sha256 from the first failed build.
         earthTexture = pkgs.fetchurl {
-          url = "https://upload.wikimedia.org/wikipedia/commons/8/83/Equirectangular_projection_SW.jpg";
-	  sha256 = "sha256-rzU8MSiP8PCIkH0tXJJZrFBBc7SCFiBPlsxJTJgEi+k=";
+          url = "https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg";
+          sha256 = "sha256-Yc09J0idgO0CXXlUU5ptkLUNRDO73Sfowa+KbxX3HoY=";
           name = "earth.jpg";
         };
-
-        # Higher-quality option (NASA Blue Marble Next Generation, public domain)
-        # Uncomment and replace the earthTexture above when you want the real thing.
-        # First build will fail with a hash mismatch; copy the suggested hash.
-        #
-        # earthTexture = pkgs.fetchurl {
-        #   url = "https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg";
-        #   sha256 = "sha256-............................................";  # fill from error
-        #   name = "earth.jpg";
-        # };
-        #
-        # Other good NASA months (same resolution):
-        #   world.topo.bathy.200408.3x5400x2700.jpg  (August)
-        #   world.topo.bathy.200406.3x5400x2700.jpg  (June)
       in
       {
         packages.default = pkgs.stdenv.mkDerivation {

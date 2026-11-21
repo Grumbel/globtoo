@@ -26,7 +26,8 @@ Mesh create_sphere(int slices, int stacks) {
             verts.push_back(x);
             verts.push_back(y);
             verts.push_back(z);
-            verts.push_back(u);
+            // 1-u: equirectangular is east-positive; our +theta was mirroring the map
+            verts.push_back(1.f - u);
             verts.push_back(v);
         }
     }

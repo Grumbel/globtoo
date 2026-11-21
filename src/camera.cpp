@@ -50,7 +50,7 @@ void camera_apply_drag(Camera& cam, float dx, float dy, float sensitivity) {
 
     // Inertia: last motion becomes angular velocity (rad/s). Scale so a
     // normal flick keeps the globe spinning for a second or two.
-    const float vel_scale = 55.f;
+    const float vel_scale = 40.f;
     cam.ang_vel.x = ax * vel_scale;
     cam.ang_vel.y = ay * vel_scale;
     cam.ang_vel.z = 0.f;

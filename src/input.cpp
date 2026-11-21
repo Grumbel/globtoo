@@ -25,7 +25,7 @@ void input_handle_event(InputState& in, Camera& cam, const SDL_Event& e) {
             float dx = e.motion.x - in.last_x;
             float dy = e.motion.y - in.last_y;
             // radians per pixel – responsive, not sluggish
-            camera_apply_drag(cam, dx, dy, 0.008f);
+            camera_apply_drag(cam, dx, dy, 0.004f);
             in.last_x = e.motion.x;
             in.last_y = e.motion.y;
         }
