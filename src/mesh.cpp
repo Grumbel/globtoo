@@ -6,9 +6,14 @@ Mesh create_sphere(int slices, int stacks) {
     std::vector<float> verts; // pos.xyz + uv.st
     std::vector<unsigned short> indices;
 
+    // UV sphere, radius 1.
+    // Stacks: north (v=0) -> south (v=1).
+    // Slices: around Y (u=0..1).
+    // Winding is CCW when viewed from outside so GL_CULL_FACE + GL_BACK
+    // shows the exterior (default GL front face is CCW).
     for (int i = 0; i <= stacks; ++i) {
         float v = (float)i / stacks;
-        float phi = v * 3.14159265f;
+        float phi = v * 3.14159265f;          // 0 = north pole
         float y = cosf(phi);
         float r = sinf(phi);
 
@@ -30,12 +35,18 @@ Mesh create_sphere(int slices, int stacks) {
         for (int j = 0; j < slices; ++j) {
             int a = i * (slices + 1) + j;
             int b = a + slices + 1;
+
+            // CCW from outside:
+            //   a -- a+1
+            //   |  /  |
+            //   b -- b+1
             indices.push_back((unsigned short)a);
-            indices.push_back((unsigned short)b);
-            indices.push_back((unsigned short)(a + 1));
             indices.push_back((unsigned short)(a + 1));
             indices.push_back((unsigned short)b);
+
+            indices.push_back((unsigned short)(a + 1));
             indices.push_back((unsigned short)(b + 1));
+            indices.push_back((unsigned short)b);
         }
     }
 
@@ -46,7 +57,8 @@ Mesh create_sphere(int slices, int stacks) {
 
     glGenBuffers(1, &m.ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned short), indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned short),
+                 indices.data(), GL_STATIC_DRAW);
 
     m.index_count = (GLsizei)indices.size();
     return m;
