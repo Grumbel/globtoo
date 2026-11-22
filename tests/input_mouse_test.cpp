@@ -128,5 +128,13 @@ int main() {
     event.button.button=SDL_BUTTON_MIDDLE;
     input_handle_event(in,cam,map,globe,countries,event);
     assert(!in.dragging);
+
+    // Body cycling is a real input action, not a test-only stub. The default
+    // test globe has no GPU texture so this path needs no GL context.
+    event.type=SDL_EVENT_KEY_DOWN;
+    event.key.key=SDLK_M;
+    event.key.repeat=false;
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(globe.body==BodyId::Moon);
     return 0;
 }

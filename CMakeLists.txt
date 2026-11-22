@@ -215,6 +215,14 @@ pkg_check_modules(SDL3 REQUIRED sdl3)
 find_library(GLES2_LIB GLESv2 REQUIRED)
 find_library(EGL_LIB EGL REQUIRED)
 
+# Input/UI event tests exercise real body changes. Keep the body's texture
+# switching implementation separate from the full renderer so both tests and
+# the application can link it without pulling in mesh/shader/raster rendering.
+add_library(globtoo_body STATIC src/globe_body.cpp src/texture.cpp)
+target_include_directories(globtoo_body PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/external")
+target_link_libraries(globtoo_body PUBLIC ${GLES2_LIB})
+
 add_executable(globtoo
   src/main.cpp
   src/globe.cpp
@@ -222,7 +230,6 @@ add_executable(globtoo
   src/input.cpp
   src/mesh.cpp
   src/shader.cpp
-  src/texture.cpp
   src/stars.cpp
   src/countries.cpp
   src/country_geometry.cpp
@@ -249,6 +256,7 @@ target_include_directories(globtoo PRIVATE
 
 target_link_libraries(globtoo PRIVATE
   ${SDL3_LIBRARIES}
+  globtoo_body
   ${GEOS_C_LIB}
   ${GLES2_LIB}
   ${EGL_LIB}
@@ -619,14 +627,14 @@ if(BUILD_TESTING)
     add_executable(input_mouse_test
       tests/input_mouse_test.cpp src/input.cpp src/map_view.cpp src/camera.cpp)
     target_include_directories(input_mouse_test PRIVATE src ${SDL3_INCLUDE_DIRS})
-    target_link_libraries(input_mouse_test PRIVATE ${SDL3_LIBRARIES})
+    target_link_libraries(input_mouse_test PRIVATE globtoo_body ${SDL3_LIBRARIES})
     target_compile_options(input_mouse_test PRIVATE -Wall -Wextra -UNDEBUG)
     add_test(NAME input_mouse COMMAND input_mouse_test)
     add_executable(ui_event_test tests/ui_event_test.cpp
       src/ui.cpp src/input.cpp src/camera.cpp src/map_view.cpp src/scene.cpp
       src/shader.cpp src/resources.cpp src/geographic_features.cpp)
     target_include_directories(ui_event_test PRIVATE src ${SDL3_INCLUDE_DIRS})
-    target_link_libraries(ui_event_test PRIVATE ${SDL3_LIBRARIES} ${GLES2_LIB} m)
+    target_link_libraries(ui_event_test PRIVATE globtoo_body ${SDL3_LIBRARIES} ${GLES2_LIB} m)
     target_compile_options(ui_event_test PRIVATE -Wall -Wextra -UNDEBUG)
     add_test(NAME ui_event COMMAND ui_event_test)
   endif()

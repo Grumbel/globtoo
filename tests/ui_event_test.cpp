@@ -63,8 +63,24 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(cam.mode == ControlMode::Grab);
 
+    // Keyboard and compass-panel body switching must link the *real*
+    // globe_select_body implementation and update the selected body.
+    globe.surface=SurfaceLayer::Relief;
+    event.type=SDL_EVENT_KEY_DOWN;
+    event.key.key=SDLK_M;
+    event.key.repeat=false;
+    input_handle_event(input,cam,map,globe,countries,event);
+    assert(globe.body==BodyId::Moon);
+    assert(globe.surface==SurfaceLayer::Imagery);
+    event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button=SDL_BUTTON_LEFT;
+    event.button.x=1175.f;
+    event.button.y=238.f; // NEXT BODY, below NORTH LOCK
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.body==BodyId::Mars);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.body==BodyId::Io);
     // The non-Earth third row has a landmark toggle, not Earth cities.
-    globe.body=BodyId::Io;
     event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
     event.button.button=SDL_BUTTON_LEFT;
     event.button.x=40.f;
@@ -84,7 +100,7 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(std::abs(map.center_lon)<1e-6);
     assert(std::abs(map.center_lat)<1e-6);
-    globe.body=BodyId::Earth;
+    globe_select_body(globe,BodyId::Earth);
 
     // G is the keyboard alternative, while Tab only affects visibility.
     event.type = SDL_EVENT_KEY_DOWN;
