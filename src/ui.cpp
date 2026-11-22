@@ -32,7 +32,7 @@ Bounds toolbar_panel(const Ui& ui) {
 }
 Bounds compass_panel(const Ui& ui) {
     const float x = std::max(8.f, static_cast<float>(ui.viewport_w) - 128.f);
-    return {x,8.f,120.f,221.f};
+    return {x,8.f,120.f,249.f};
 }
 Bounds scale_panel(const Ui& ui) {
     // Put the ruler directly below the compass, right aligned to its edge.
@@ -226,7 +226,9 @@ void draw_compass(Ui& ui, const Camera& cam, const MapView& map) {
     const Button lock{map.north_locked ? "NORTH LOCK ON" : "NORTH LOCK OFF",
                       static_cast<int>(box.x+7),static_cast<int>(box.y+191),
                       106,24,16};
-    for (auto b : {north,reset,mode,lock}) {
+    const Button body{"NEXT BODY",static_cast<int>(box.x+7),
+                      static_cast<int>(box.y+219),106,24,23};
+    for (auto b : {north,reset,mode,lock,body}) {
         rect(ui,b.x,b.y,b.w,b.h,ui.hover==b.command ? hover :
              ((b.command==12 && cam.mode==ControlMode::Grab) ||
               (b.command==16 && map.north_locked) ? active : inactive));
@@ -288,6 +290,9 @@ void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState
     case 14:
         camera_grab_end(cam);
         map_align_north(m,cam);
+        break;
+    case 23:
+        globe_select_body(g,next_body(g.body));
         break;
     case 16:
         m.north_locked = !m.north_locked;
@@ -359,9 +364,11 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         const Bounds reset{cp.x+7,cp.y+135,106,24};
         const Bounds mode{cp.x+7,cp.y+163,106,24};
         const Bounds lock{cp.x+7,cp.y+191,106,24};
+        const Bounds body{cp.x+7,cp.y+219,106,24};
         // Clicking the compass rose itself is also a North-up shortcut.
         const bool rose=contains({cp.x+13,cp.y+4,94,94},x,y);
-        const int command=contains(reset,x,y) ? 13 :
+        const int command=contains(body,x,y) ? 23 :
+                          contains(reset,x,y) ? 13 :
                           contains(mode,x,y) ? 12 :
                           contains(lock,x,y) ? 16 :
                           (contains(north,x,y) || rose ? 14 : -1);
@@ -487,10 +494,10 @@ void draw_scale_bar(Ui& ui) {
 
 void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspect) {
     const auto scale=local_scale(ui,cam,map,aspect);
-    const double km_for_150px=150.*grid::earth_radius_km/scale.pixels_east;
+    const double km_for_150px=150.*ui.body_radius_km/scale.pixels_east;
     ui.scale_bar_km=grid::round_distance_km(km_for_150px);
     ui.scale_bar_pixels=static_cast<float>(ui.scale_bar_km /
-        grid::earth_radius_km*scale.pixels_east);
+        ui.body_radius_km*scale.pixels_east);
     const double coslat=std::abs(std::cos(scale.lat*geo::to_rad));
     ui.grid_lon_step=grid::angular_step(scale.pixels_east * coslat * geo::to_rad);
     ui.grid_lat_step=grid::angular_step(scale.pixels_north * geo::to_rad);
@@ -643,6 +650,7 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
         const int scale=2;
         draw_text(ui,b.x+(b.w-namewidth*scale)*.5f,b.y+8,b.label,scale,text);
     }
+    draw_text(ui,toolbar.x+420.f,toolbar.y+9.f,body_info(globe.body).name,1,muted);
     const char* mode = map.selected==MapProjection::Globe ? "SPHERE" : "FLAT MAP";
     draw_text(ui,toolbar.x+205.f,toolbar.y+9.f,mode,1,muted);
     if (globe.surface==SurfaceLayer::Relief && globe.relief.valid())

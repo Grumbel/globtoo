@@ -55,6 +55,8 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
         } else if (e.key.key == SDLK_5) {
             input_set_trackball(in,false);
             map_select(map,MapProjection::Hammer,cam);
+        } else if (e.key.key == SDLK_M && !e.key.repeat) {
+            globe_select_body(globe,next_body(globe.body));
         } else if (e.key.key == SDLK_N) {
             countries.names_visible = !countries.names_visible;
         } else if (e.key.key == SDLK_T && map.flat_goal < .5f) {

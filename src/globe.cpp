@@ -6,6 +6,7 @@
 #include "geocoordinates.hpp"
 #include "resources.hpp"
 #include <cstdio>
+#include <filesystem>
 
 
 bool globe_init(Globe& g, const char* texture_path,
@@ -22,7 +23,9 @@ bool globe_init(Globe& g, const char* texture_path,
         fprintf(stderr, "Failed to load shaders\n");
         return false;
     }
-    g.texture = load_texture(texture_path);
+    if (texture_path && g.body_textures[0].empty())
+        g.body_textures[0] = texture_path;
+    globe_select_body(g, g.body);
     raster_cache_init(g.imagery, imagery_manifest_path ? imagery_manifest_path :
                                          resource_path("imagery/manifest.txt"));
     raster_cache_init(g.relief, relief_manifest_path ? relief_manifest_path :
@@ -40,13 +43,28 @@ bool globe_init(Globe& g, const char* texture_path,
         fprintf(stderr,"Population layer missing valid measured-density legend; ignoring it.\n");
         raster_cache_shutdown(g.population);
     }
-    if (!g.texture.id) {
+    if (g.body == BodyId::Earth && !g.texture.id) {
         fprintf(stderr, "%s\n", g.imagery.valid()
                 ? "Base Earth texture unavailable; using imagery-tile preview"
                 : "Failed to load earth texture – using solid color fallback");
     }
     g.shading = true;
     return true;
+}
+
+void globe_select_body(Globe& g, BodyId body) {
+    if (g.body == body && g.texture.id != 0) return;
+    destroy_texture(g.texture);
+    g.body=body;
+    g.surface=SurfaceLayer::Imagery; // Earth-only thematic rasters
+    const std::string& path=g.body_textures[static_cast<std::size_t>(body)];
+    if (!path.empty() && std::filesystem::is_regular_file(path)) {
+        g.texture=load_texture(path.c_str());
+    } else if (body!=BodyId::Earth) {
+        std::fprintf(stderr,"%.*s: no surface map installed; showing untextured sphere.\n",
+                     static_cast<int>(body_info(body).name.size()),
+                     body_info(body).name.data());
+    }
 }
 
 void globe_shutdown(Globe& g) {
@@ -61,7 +79,8 @@ void globe_shutdown(Globe& g) {
 
 void globe_draw(Globe& g, const Camera& cam, float aspect,
                 const MapView& map) {
-    RasterCache* raster = g.surface==SurfaceLayer::Imagery ? &g.imagery :
+    RasterCache* raster = g.body!=BodyId::Earth ? nullptr :
+                          g.surface==SurfaceLayer::Imagery ? &g.imagery :
                          g.surface==SurfaceLayer::Relief ? &g.relief :
                          g.surface==SurfaceLayer::Elevation ? &g.elevation :
                          g.surface==SurfaceLayer::Population ? &g.population : nullptr;
@@ -76,6 +95,10 @@ void globe_draw(Globe& g, const Camera& cam, float aspect,
         glUniformMatrix4fv(g.shader.u_model, 1, GL_FALSE, model.m);
     if (g.shader.u_shading >= 0)
         glUniform1f(g.shader.u_shading, g.shading ? 1.f : 0.f);
+    if (g.shader.u_color >= 0) {
+        const auto& color=body_info(g.body).untextured_rgb;
+        glUniform3f(g.shader.u_color, color[0], color[1], color[2]);
+    }
     if (g.shader.u_light_dir >= 0) {
         // Headlight: rotates with the camera so the facing hemisphere stays lit
         Vec3 L = camera_headlight_dir(cam);

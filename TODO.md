@@ -163,3 +163,10 @@ silently download large maps or satellite data on an existing installation.
 - [ ] Live visual tests for GLES2, especially 10m datasets during map transitions
 - [ ] Atmosphere rim / day-night / VR
 - [ ] Optional finer-than-10m country-by-country boundaries (e.g. geoBoundaries)
+
+### Stage 4a — planetary body selection
+- [x] Select Earth, Moon, Mars, or Io by CLI (`--body`) and cycle using M or NEXT BODY.
+- [x] Optional per-body equirectangular texture (`--body-texture body=FILE`).
+- [x] Hide Earth country, city and river layers on non-Earth bodies; scale bar uses body radius.
+- [ ] Verify and package rights-cleared planetary raster maps, pole orientation and longitude direction per source.
+- [ ] Body-specific coordinate conventions and scientific landmarks.

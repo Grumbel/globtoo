@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "bodies.hpp"
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -24,6 +26,10 @@ enum class CommandAction { Run, Help, Version };
 struct CommandLine {
     CommandAction action = CommandAction::Run;
     std::string texture_path;
+    BodyId body = BodyId::Earth;
+    // Optional textures indexed by BodyId. The selected body's --texture
+    // overrides this table, without assigning Earth imagery to other bodies.
+    std::array<std::string,body_catalog.size()> body_textures{};
     std::string surface_layer = "imagery";
     std::string imagery_dir;
     std::string relief_dir;

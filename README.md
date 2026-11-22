@@ -287,3 +287,13 @@ and per-file SPDX declarations for details.
 
 Check license metadata using `reuse lint` (available in the Nix development shell
 with `nix develop -c reuse lint`).
+
+### Planetary bodies (experimental)
+
+`--body earth|moon|mars|io` selects a body at startup. `M` or the compass
+**NEXT BODY** button cycles bodies. Use `--body-texture mars=/path/to/map.jpg`
+(repeatable) to assign a north-up, east-positive equirectangular texture;
+`--texture FILE` sets the initial body's texture. Without one, non-Earth
+bodies appear as neutral-colored spheres. Earth political, city and river
+features are hidden on the others. Planet textures are **not bundled** yet;
+verify source coordinate conventions before importing planetary images.

@@ -99,10 +99,16 @@ int main(int argc, char** argv) {
     if (!init_sdl(width, height))
         return 1;
 
-    const std::string texture = options.texture_path.empty()
-        ? resource_path("assets/earth.jpg") : options.texture_path;
-
     Globe globe{};
+    globe.body=options.body;
+    globe.body_textures=options.body_textures;
+    // The default Earth image is never reused on another body.
+    if (!options.texture_path.empty()) {
+        globe.body_textures[static_cast<std::size_t>(options.body)]=options.texture_path;
+    } else if (globe.body_textures[0].empty()) {
+        globe.body_textures[0]=resource_path("assets/earth.jpg");
+    }
+    const std::string texture=globe.body_textures[0];
     const std::string imagery_manifest=options.imagery_dir.empty() ? "" :
         (std::filesystem::path(options.imagery_dir)/"manifest.txt").string();
     const std::string relief_manifest=options.relief_dir.empty() ? "" :
@@ -120,15 +126,15 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (options.surface_layer=="elevation") {
+    if (globe.body==BodyId::Earth && options.surface_layer=="elevation") {
         if (globe.elevation.valid()) globe.surface=SurfaceLayer::Elevation;
         else fprintf(stderr,"Elevation/bathymetry layer not installed; using imagery.\n");
     }
-    if (options.surface_layer=="population") {
+    if (globe.body==BodyId::Earth && options.surface_layer=="population") {
         if (globe.population.valid()) globe.surface=SurfaceLayer::Population;
         else fprintf(stderr,"Population density layer not installed; using imagery.\n");
     }
-    if (options.surface_layer=="relief") {
+    if (globe.body==BodyId::Earth && options.surface_layer=="relief") {
         if (globe.relief.valid()) globe.surface=SurfaceLayer::Relief;
         else fprintf(stderr,"Relief layer not installed; using imagery.\n");
     }
@@ -161,7 +167,7 @@ int main(int argc, char** argv) {
     Ui ui{};
     if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
 
-    fprintf(stderr, "Controls: on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
+    fprintf(stderr, "Controls: M=cycle Earth/Moon/Mars/Io, on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
@@ -202,20 +208,24 @@ int main(int argc, char** argv) {
         stars_draw(stars, cam, aspect);
         globe_draw(globe, cam, aspect, map);
         // Preserve globe depth: it occludes political geometry behind the horizon.
-        countries_draw(countries, cam, aspect, map, globe.shading,
+        if (globe.body==BodyId::Earth) countries_draw(countries, cam, aspect, map, globe.shading,
                        country_fill_opacity(globe.texture_visible,
                            (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) ||
                            (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid()) ||
                            (globe.surface==SurfaceLayer::Population && globe.population.valid()) ||
                            globe.texture.id != 0 || globe.imagery.valid()));
-        geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
-        ui.raster_legend_visible = globe.texture_visible &&
+        if (globe.body==BodyId::Earth)
+            geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
+        ui.raster_legend_visible = globe.body==BodyId::Earth && globe.texture_visible &&
             ((globe.surface==SurfaceLayer::Elevation && globe.elevation.valid() && globe.elevation.legend.valid()) ||
              (globe.surface==SurfaceLayer::Population && globe.population.valid() && globe.population.legend.valid()));
+        ui.body_radius_km=body_info(globe.body).mean_radius_km;
         ui.label_boxes.clear();
         ui_draw_graticule(ui,cam,map,aspect);
-        ui_draw_country_names(ui,countries,cam,map,aspect);
-        ui_draw_places(ui,geography.features,cam,map,aspect);
+        if (globe.body==BodyId::Earth) {
+            ui_draw_country_names(ui,countries,cam,map,aspect);
+            ui_draw_places(ui,geography.features,cam,map,aspect);
+        }
         ui_draw_markers(ui,options.markers,cam,map,aspect);
         ui_draw(ui,cam,map,globe,countries);
         ui_flush(ui);

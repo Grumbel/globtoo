@@ -405,6 +405,23 @@ bool parse_command_line(int argc, const char* const* argv,
             if (!parse_coordinates(*value,CoordinateOrder::LatitudeLongitude,lat,lon,error))
                 return false;
             output.center=std::make_pair(lon,lat);
+        } else if (!positional_done && key=="--body") {
+            const auto value=next();
+            if (!value) return false;
+            if (!parse_body(*value,output.body)) {
+                error="--body must be earth, moon, mars or io"; return false;
+            }
+        } else if (!positional_done && key=="--body-texture") {
+            const auto value=next();
+            if (!value) return false;
+            const auto sep=value->find('=');
+            BodyId id=BodyId::Earth;
+            if (sep==std::string_view::npos || sep==0 || sep+1==value->size() ||
+                !parse_body(value->substr(0,sep),id)) {
+                error="--body-texture expects earth|moon|mars|io=FILE"; return false;
+            }
+            output.body_textures[static_cast<std::size_t>(id)] =
+                std::string(value->substr(sep+1));
         } else if (!positional_done && key=="--layer") {
             const auto value=next();
             if (!value) return false;
@@ -456,8 +473,10 @@ std::string command_line_help(std::string_view program) {
     help += "      --marker-color HEX    #RRGGBB for subsequent markers (default #FFC54B)\n";
     help += "      --marker-size PX      Radius 2..32 for subsequent markers (default 7)\n";
     help += "      --center COORDS       Center initial view here (otherwise local timezone)\n";
-    help += "      --texture FILE        Earth texture (also accepts legacy positional path)\n";
-    help += "      --layer NAME          imagery, relief, elevation, population\n";
+    help += "      --body NAME           earth (default), moon, mars or io\n";
+    help += "      --body-texture B=FILE Set a body's equirectangular image (repeatable)\n";
+    help += "      --texture FILE        Texture of the initial body (or positional path)\n";
+    help += "      --layer NAME          imagery, relief, elevation, population (Earth only)\n";
     help += "      --imagery-dir DIR     High-resolution Earth imagery tiles\n";
     help += "      --relief-dir DIR      Directory with visual relief tile data\n";
     help += "      --elevation-dir DIR   Directory with measured elevation tiles/legend\n";
@@ -471,10 +490,13 @@ std::string command_line_help(std::string_view program) {
     help += "  51°30.5'N, 0°7.25'W      Degrees and decimal minutes\n";
     help += "  geo:52.52,13.405         RFC 5870 Geo URI (altitude ignored)\n";
     help += "  +52.52+013.405/          ISO 6709 signed coordinate pair\n\n";
+    help += "Planetary maps must use east-positive longitude, north at image top.\n";
+    help += "Non-Earth bodies have no bundled map yet; Earth layers are hidden.\n\n";
     help += "Examples:\n";
     help += "  globtoo --marker '52.5200,13.4050|Berlin'\n";
     help += "  globtoo --marker 'N40°41′21″, W74°02′40″' --label 'Liberty Island'\n";
     help += "  globtoo --marker-color '#ff5555' --marker-size 10 --marker 'geo:48.8583,2.2945'\n";
     help += "  globtoo --marker-file places.csv --center '48.8583,2.2945'\n";
+    help += "  globtoo --body mars --texture /maps/mars-east-positive.jpg\n";
     return help;
 }

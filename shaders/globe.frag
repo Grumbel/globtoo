@@ -9,7 +9,8 @@ varying mediump vec3 v_normal;
 uniform sampler2D u_tex;
 uniform float u_shading; // 0 = flat, 1 = lit
 uniform vec3 u_light_dir;
-uniform float u_textured; // 1 = sample texture, 0 = solid ocean
+uniform float u_textured; // 1 = sample texture, 0 = solid base
+uniform vec3 u_color; // body-specific fallback for absent imagery
 
 varying mediump float v_map_lon;
 uniform mediump float u_morph;
@@ -21,8 +22,7 @@ void main() {
     if (u_textured > 0.5) {
         albedo = texture2D(u_tex, v_uv).rgb;
     } else {
-        // Classic desk-globe ocean
-        albedo = vec3(0.25, 0.42, 0.62);
+        albedo = u_color;
     }
     float ndotl = max(dot(normalize(v_normal), normalize(u_light_dir)), 0.0);
     float ambient = 0.45;

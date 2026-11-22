@@ -59,6 +59,21 @@ int main() {
                          "51N 30 26E 0", "1,2junk", "geo:1,2,nope", "+5260+01324/"})
         reject(invalid);
 
+    {
+        CommandLine planetary;
+        std::string err;
+        const char* args[]={"globtoo","--body","MaRs","--body-texture",
+                            "mars=mars.jpg","--body-texture","moon=moon.jpg",
+                            "--texture","override.jpg"};
+        assert(parse_command_line(static_cast<int>(std::size(args)),args,planetary,err));
+        assert(planetary.body==BodyId::Mars);
+        assert(planetary.body_textures[static_cast<std::size_t>(BodyId::Moon)]=="moon.jpg");
+        assert(planetary.body_textures[static_cast<std::size_t>(BodyId::Mars)]=="mars.jpg");
+        assert(planetary.texture_path=="override.jpg");
+        const char* invalid[]={"globtoo","--body","venus"};
+        assert(!parse_command_line(static_cast<int>(std::size(invalid)),invalid,planetary,err));
+    }
+
     CommandLine parsed;
     std::string error;
     const char* argv[]={"globtoo", "--marker-color", "#1a2B3c", "--marker-size", "12",

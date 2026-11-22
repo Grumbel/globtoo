@@ -27,6 +27,7 @@ struct Ui {
     struct LabelBox { float x,y,w,h; };
     std::vector<LabelBox> label_boxes;
     double scale_bar_km = 0.;
+    double body_radius_km = 6371.;
     float scale_bar_pixels = 0.f;
     double grid_lon_step = 30., grid_lat_step = 30.;
     std::vector<UiVertex> triangles;
