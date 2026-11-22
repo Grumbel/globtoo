@@ -61,6 +61,15 @@ Globtoo now has a small on-screen toolbar; keyboard shortcuts remain optional.
 - **Texture**: toggle the Earth imagery independently of the country colors. When both
   are enabled (the default), translucent country colors mix with the texture
   so terrain remains visible beneath the colors. Either layer can be shown alone.
+- **Grid**: toggle the adaptive geographic latitude/longitude graticule in
+  all globe and map projections. Intervals get finer when zoomed in. Lines
+  follow the actual geographic meridians/parallels, including polar rotation;
+  these are angles and **not** equally spaced kilometer lines, particularly
+  near the geographic poles.
+- **Scale bar (lower-left)**: local great-circle distance measured at the
+  view center, automatically displayed in km or m. The graduated bar updates
+  with zoom, projection, and globe/map transitions. Its value applies at the
+  **center**; on projections, distortion increases away from the center.
 - **Grab mode**: switch between Grab and Arcball in globe mode.
 - **Compass (upper-right)**: live geographic N/E/S/W heading for the globe and every 2D projection.
 - **North Up**: click the button or compass rose to straighten the view without panning or changing zoom (also works after a polar crossing).

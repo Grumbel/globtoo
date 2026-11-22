@@ -15,6 +15,10 @@ struct Ui {
     GLuint vbo = 0;
     int viewport_w = 1280, viewport_h = 800;
     int hover = -1;
+    bool grid_visible = false;
+    double scale_bar_km = 0.;
+    float scale_bar_pixels = 0.f;
+    double grid_lon_step = 30., grid_lat_step = 30.;
     std::vector<UiVertex> triangles;
 };
 
@@ -25,6 +29,8 @@ bool ui_event(Ui& ui, const SDL_Event& event, Camera& cam, MapView& map,
               Globe& globe, Countries& countries, InputState& input);
 void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
              const Countries& countries);
+// Optional adaptive geographic graticule; also updates the on-screen local scale.
+void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspect);
 void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam,
                            const MapView& map, float aspect);
 void ui_flush(Ui& ui);

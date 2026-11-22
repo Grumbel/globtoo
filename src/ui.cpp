@@ -1,5 +1,7 @@
 #include "ui.hpp"
 #include "scene.hpp"
+#include "grid_metrics.hpp"
+#include "geocoordinates.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -21,11 +23,14 @@ constexpr Color needle_south{.43f,.67f,.86f,1.f};
 constexpr float pi = 3.14159265358979323846f;
 
 struct Bounds { float x,y,w,h; };
-constexpr Bounds toolbar{8,8,600,100};
+constexpr Bounds toolbar{8,8,675,100};
 Bounds compass_panel(const Ui& ui) {
     const float x = std::max(8.f, static_cast<float>(ui.viewport_w) - 128.f);
     // At narrow window widths, do not cover the main toolbar.
     return {x, x < toolbar.x+toolbar.w+8 ? 116.f : 8.f, 120.f, 165.f};
+}
+Bounds scale_panel(const Ui& ui) {
+    return {8.f,std::max(124.f,static_cast<float>(ui.viewport_h)-91.f),264.f,83.f};
 }
 bool contains(Bounds b, float x,float y) {
     return x>=b.x && x<b.x+b.w && y>=b.y && y<b.y+b.h;
@@ -42,12 +47,12 @@ std::vector<Button> buttons() {
     std::vector<Button> out;
     const char* top[] = {"3D GLOBE", "PLATE", "MERCATOR", "MOLLWEIDE", "HAMMER", "-", "+"};
     const int topw[] = {103,72,108,121,88,30,30};
-    const char* bottom[] = {"SHADING", "COUNTRIES", "BORDERS", "NAMES", "TEXTURE", "GRAB"};
-    const int botw[] = {93,116,94,73,94,68};
+    const char* bottom[] = {"SHADING", "COUNTRIES", "BORDERS", "NAMES", "TEXTURE", "GRAB", "GRID"};
+    const int botw[] = {93,116,94,73,94,68,72};
     int x = 14;
     for (int i=0;i<7;i++) { out.push_back({top[i],x,34,topw[i],30,i}); x += topw[i]+5; }
     x = 14;
-    for (int i=0;i<6;i++) { out.push_back({bottom[i],x,70,botw[i],30,i+7}); x += botw[i]+5; }
+    for (int i=0;i<7;i++) { out.push_back({bottom[i],x,70,botw[i],30,i==6 ? 15 : i+7}); x += botw[i]+5; }
     return out;
 }
 
@@ -204,6 +209,7 @@ bool command_active(int id, const Camera& cam, const MapView& m,
     case 10: return c.names_visible;
     case 11: return g.texture_visible;
     case 12: return cam.mode == ControlMode::Grab;
+    case 15: return false; // GRID uses the Ui state, handled by the caller
     }
     return false;
 }
@@ -276,14 +282,17 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
     const auto cp=compass_panel(ui);
     const bool on_toolbar=contains(toolbar,x,y);
     const bool on_compass=contains(cp,x,y);
+    const bool on_scale=contains(scale_panel(ui),x,y);
     ui.hover=-1;
-    if (!on_toolbar && !on_compass) return false;
+    if (!on_toolbar && !on_compass && !on_scale) return false;
     if (e.type==SDL_EVENT_MOUSE_BUTTON_UP && e.button.button==SDL_BUTTON_LEFT) {
         input.dragging=false;
         camera_grab_end(cam);
     }
     // All visible control surfaces consume input, including the compass
     // needle and the spaces between buttons, so no globe drag can begin.
+    // Wheel zoom should still work with the pointer over the passive ruler.
+    if (on_scale) return e.type!=SDL_EVENT_MOUSE_WHEEL;
     if (on_compass) {
         const Bounds north{cp.x+7,cp.y+107,106,24};
         const Bounds reset{cp.x+7,cp.y+135,106,24};
@@ -305,11 +314,158 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         if (e.type==SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button==SDL_BUTTON_LEFT) {
             input.dragging=false;
             camera_grab_end(cam);
-            execute(b.command,cam,map,globe,countries,input);
+            if (b.command == 15) ui.grid_visible = !ui.grid_visible;
+            else execute(b.command,cam,map,globe,countries,input);
         }
         break;
     }
     return true;
+}
+
+
+// Derive the local scale from actual projected geographic displacements, not
+// a nominal projection zoom. This works on the globe, maps, arbitrary map
+// roll, and through projection morphs. The Earth radius converts radians to km.
+namespace {
+struct LocalScale {
+    double pixels_east = 1., pixels_north = 1.; // pixels per radian
+    double lon = 0., lat = 0.;                 // physical center, degrees
+};
+LocalScale local_scale(const Ui& ui, const Camera& cam, const MapView& map,
+                       float aspect) {
+    const bool flat=map.globe_to_flat>=.5f;
+    const auto frame=map_frame(map);
+    const Vec3 eye=camera_view_to_world(cam,{0,0,1});
+    const std::array<double,3> c=flat ? frame.center :
+        std::array<double,3>{eye.x,eye.y,eye.z};
+    const Vec3 view_right=camera_view_to_world(cam,{1,0,0});
+    const Vec3 view_up=camera_view_to_world(cam,{0,1,0});
+    const std::array<double,3> east=flat ? frame.east :
+        std::array<double,3>{view_right.x,view_right.y,view_right.z};
+    const std::array<double,3> north=flat ? frame.north :
+        std::array<double,3>{view_up.x,view_up.y,view_up.z};
+    const auto ll=geo::xyz_to_lonlat(c[0],c[1],c[2]);
+    const auto screen=[&](const std::array<double,3>& v, float& x, float& y) {
+        const auto geo=geo::xyz_to_lonlat(v[0],v[1],v[2]);
+        return scene_project(cam,aspect,map,geo[0],geo[1],x,y);
+    };
+    constexpr double delta=.002;
+    float cx=0,cy=0;
+    const auto derivative=[&](const std::array<double,3>& tangent) {
+        float x=0,y=0;
+        const std::array<double,3> p{
+            c[0]*std::cos(delta)+tangent[0]*std::sin(delta),
+            c[1]*std::cos(delta)+tangent[1]*std::sin(delta),
+            c[2]*std::cos(delta)+tangent[2]*std::sin(delta)};
+        if (!screen(p,x,y)) return 0.;
+        return std::hypot((x-cx)*ui.viewport_w*.5,
+                          (y-cy)*ui.viewport_h*.5)/delta;
+    };
+    const double fallback=static_cast<double>(ui.viewport_h)*.5/
+        std::tan(.35)/(flat ? map.map_distance/std::max(.1f,map.zoom) :
+                                   std::max(.08f,cam.distance-1.f));
+    if (!screen(c,cx,cy)) return {fallback,fallback,ll[0],ll[1]};
+    const double px_e=derivative(east), px_n=derivative(north);
+    return {px_e>1. ? px_e : fallback,
+            px_n>1. ? px_n : fallback,ll[0],ll[1]};
+}
+
+void draw_scale_bar(Ui& ui) {
+    if (ui.scale_bar_km <= 0. || ui.scale_bar_pixels <= 1.f) return;
+    const Bounds b=scale_panel(ui);
+    rect(ui,b.x,b.y,b.w,b.h,panel);
+    draw_text(ui,b.x+12,b.y+8,"SCALE AT CENTER",1,muted);
+    char units[48];
+    if (ui.scale_bar_km < 1.)
+        std::snprintf(units,sizeof(units),"%.0f M",ui.scale_bar_km*1000.);
+    else if (ui.scale_bar_km < 10. && std::floor(ui.scale_bar_km)!=ui.scale_bar_km)
+        std::snprintf(units,sizeof(units),"%.1f KM",ui.scale_bar_km);
+    else
+        std::snprintf(units,sizeof(units),"%.0f KM",ui.scale_bar_km);
+    draw_text(ui,b.x+12,b.y+24,units,2,text);
+    const float x=b.x+12, bar_y=b.y+59;
+    const float width=std::clamp(ui.scale_bar_pixels,1.f,b.w-24.f);
+    for (int i=0;i<4;i++)
+        rect(ui,x+i*width/4,bar_y-6,width/4,6,
+             (i%2==0) ? text : inactive);
+    stroke(ui,x,bar_y-9,x,bar_y+2,1.3f,text);
+    stroke(ui,x+width,bar_y-9,x+width,bar_y+2,1.3f,text);
+    if (ui.grid_visible) {
+        char step[48];
+        std::snprintf(step,sizeof(step),"LAT %.3g / LON %.3g DEG",
+                      ui.grid_lat_step,ui.grid_lon_step);
+        draw_text(ui,b.x+12,b.y+70,step,1,muted);
+    }
+}
+} // namespace
+
+void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspect) {
+    const auto scale=local_scale(ui,cam,map,aspect);
+    const double km_for_150px=150.*grid::earth_radius_km/scale.pixels_east;
+    ui.scale_bar_km=grid::round_distance_km(km_for_150px);
+    ui.scale_bar_pixels=static_cast<float>(ui.scale_bar_km /
+        grid::earth_radius_km*scale.pixels_east);
+    const double coslat=std::abs(std::cos(scale.lat*geo::to_rad));
+    ui.grid_lon_step=grid::angular_step(scale.pixels_east * coslat * geo::to_rad);
+    ui.grid_lat_step=grid::angular_step(scale.pixels_north * geo::to_rad);
+    if (!ui.grid_visible) return;
+
+    // Only sample the cap around the visible center. At close zoom this
+    // avoids constructing hundreds of thousands of unseen world grid lines.
+    const double span=std::min(geo::pi,
+        1.5*std::hypot(ui.viewport_w,ui.viewport_h)/
+        std::max(1.,std::min(scale.pixels_east,scale.pixels_north)));
+    const double lat_span=span*geo::to_deg;
+    const double lon_span=(std::abs(scale.lat)+lat_span>=90.) ? 180. :
+        std::min(180.,lat_span/std::max(.1,coslat));
+    const double min_lat=std::max(-90.,scale.lat-lat_span);
+    const double max_lat=std::min(90.,scale.lat+lat_span);
+    const double min_lon=lon_span>=180. ? -180. : scale.lon-lon_span;
+    const double max_lon=lon_span>=180. ?  180. : scale.lon+lon_span;
+    // Cap the count near geographic poles, where meridians converge.
+    while ((max_lon-min_lon)/ui.grid_lon_step>100.) ui.grid_lon_step*=2.;
+    while ((max_lat-min_lat)/ui.grid_lat_step>100.) ui.grid_lat_step*=2.;
+
+    const Color color{.84f,.91f,1.f,.52f};
+    // Re-project each sampled geographic segment through the same code as
+    // the labels, including the rotating map frame, globe occlusion and seams.
+    // Reject large pixel jumps at projection cuts instead of joining across
+    // the opposite sides of the map.
+    const auto line=[&](bool meridian, double fixed, double lo, double hi) {
+        const double px_per_degree=std::max(scale.pixels_east,scale.pixels_north)*geo::to_rad;
+        const double sample_deg=std::clamp(7./std::max(1.,px_per_degree),.02,2.);
+        const int segments=std::clamp(static_cast<int>(std::ceil((hi-lo)/sample_deg)),1,4096);
+        bool had=false;
+        float lastx=0,lasty=0;
+        for (int i=0;i<=segments;i++) {
+            const double value=lo+(hi-lo)*i/segments;
+            const double lon=meridian ? fixed : value;
+            const double lat=meridian ? value : fixed;
+            float nx=0,ny=0;
+            const bool valid=scene_project(cam,aspect,map,lon,lat,nx,ny);
+            const float x=(nx+1.f)*ui.viewport_w*.5f;
+            const float y=(1.f-ny)*ui.viewport_h*.5f;
+            const bool inside=valid && x>=-3 && x<=ui.viewport_w+3 &&
+                y>=-3 && y<=ui.viewport_h+3;
+            if (inside && had && std::hypot(x-lastx,y-lasty)<35.f)
+                stroke(ui,lastx,lasty,x,y,1.15f,color);
+            had=inside;
+            lastx=x; lasty=y;
+        }
+    };
+    const auto each_line=[&](double lo, double hi, double step, auto draw) {
+        const long k0=static_cast<long>(std::ceil((lo-1e-8)/step));
+        const long k1=static_cast<long>(std::floor((hi+1e-8)/step));
+        for (long k=k0;k<=k1;k++) draw(k*step);
+    };
+    each_line(min_lon,max_lon,ui.grid_lon_step,[&](double lon) {
+        // Normalize dateline-spanning caps back onto the physical globe.
+        const double physical_lon=std::remainder(lon,360.);
+        line(true,physical_lon,min_lat,max_lat);
+    });
+    each_line(min_lat,max_lat,ui.grid_lat_step,[&](double lat) {
+        line(false,lat,min_lon,max_lon);
+    });
 }
 
 void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
@@ -317,7 +473,8 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
     rect(ui,toolbar.x,toolbar.y,toolbar.w,toolbar.h,panel);
     draw_text(ui,14,15,"GLOBTOO   VIEW",2,text);
     for (const auto& b : buttons()) {
-        Color color = command_active(b.command,cam,map,globe,countries) ? active : inactive;
+        Color color = (b.command==15 ? ui.grid_visible :
+            command_active(b.command,cam,map,globe,countries)) ? active : inactive;
         if (ui.hover==b.command) color=hover;
         rect(ui,b.x,b.y,b.w,b.h,color);
         const float namewidth = static_cast<float>(std::char_traits<char>::length(b.label)*6);
@@ -325,8 +482,8 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
         draw_text(ui,b.x+(b.w-namewidth*scale)*.5f,b.y+8,b.label,scale,text);
     }
     // Avoid overlapping the compass at narrow window widths.
-    const bool compact = compass_panel(ui).x < 750.f;
-    const float info_x = compact ? 14.f : 622.f;
+    const bool compact = compass_panel(ui).x < toolbar.x+toolbar.w+230.f;
+    const float info_x = compact ? 14.f : toolbar.x+toolbar.w+14.f;
     const float info_y = compact ? 116.f : 15.f;
     const char* mode = map.selected==MapProjection::Globe ? "SPHERE" : "FLAT MAP";
     draw_text(ui,info_x,info_y,mode,2,muted);
@@ -335,6 +492,7 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
         draw_text(ui,info_x,info_y+40.f,"DRAG THROUGH POLES",1,muted);
     }
     draw_compass(ui,cam,map);
+    draw_scale_bar(ui);
 }
 
 void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam,
@@ -353,7 +511,8 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         const float x=(nx+1.f)*ui.viewport_w*.5f;
         const float y=(1.f-ny)*ui.viewport_h*.5f;
         if (x<10 || y<10 || x>ui.viewport_w-10 || y>ui.viewport_h-10 ||
-            contains(toolbar,x,y) || contains(compass_panel(ui),x,y)) continue;
+            contains(toolbar,x,y) || contains(compass_panel(ui),x,y) ||
+            contains(scale_panel(ui),x,y)) continue;
         candidates.push_back({x,y,nx*nx+ny*ny,&l});
     }
     std::sort(candidates.begin(), candidates.end(), [](const auto& a,const auto& b) {
@@ -371,7 +530,8 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
                        candidate.x+tw*.5f+3,candidate.y+th*.5f+2};
         if (b.l<1 || b.r>ui.viewport_w-1 || b.t<1 || b.b>ui.viewport_h-1 ||
             overlaps({b.l,b.t,b.r-b.l,b.b-b.t},toolbar) ||
-            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},compass_panel(ui))) continue;
+            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},compass_panel(ui)) ||
+            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},scale_panel(ui))) continue;
         bool clash=false;
         for (const auto& other: occupied) {
             if (b.l<other.r+3 && b.r>other.l-3 && b.t<other.b+3 && b.b>other.t-3) {

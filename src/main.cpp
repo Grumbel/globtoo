@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
     Ui ui{};
     if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
 
-    fprintf(stderr, "Controls: on-screen buttons, drag=spin/pan (cross poles in maps), Shift+drag=rotate/roll, wheel=zoom, 1..5=views, Tab=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Esc=quit\n");
+    fprintf(stderr, "Controls: on-screen buttons, drag=spin/pan (cross poles in maps), Shift+drag=rotate/roll, wheel=zoom, 1..5=views, Tab=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
@@ -131,6 +131,7 @@ int main(int argc, char** argv) {
         // Preserve globe depth: it occludes political geometry behind the horizon.
         countries_draw(countries, cam, aspect, map, globe.shading,
                        country_fill_opacity(globe.texture_visible, globe.texture.id != 0));
+        ui_draw_graticule(ui,cam,map,aspect);
         ui_draw_country_names(ui,countries,cam,map,aspect);
         ui_draw(ui,cam,map,globe,countries);
         ui_flush(ui);
