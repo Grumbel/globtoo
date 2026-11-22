@@ -52,8 +52,16 @@ int main(int argc,char** argv) {
     std::remove(filename.c_str());
     if (argc>1) {
         GeographicFeatures real;
-        assert(read_geographic_features(argv[1],real,&error));
-        assert(!real.places.empty() && !real.rivers.empty());
+        if (!read_geographic_features(argv[1],real,&error)) {
+            std::fprintf(stderr,"cannot read compiled geography %s: %s\n",
+                         argv[1],error.c_str());
+            return 1;
+        }
+        if (real.places.empty() || real.rivers.empty()) {
+            std::fprintf(stderr,"compiled geography is empty: %zu places, %zu rivers\n",
+                         real.places.size(),real.rivers.size());
+            return 1;
+        }
     }
     return 0;
 }

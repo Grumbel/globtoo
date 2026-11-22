@@ -13,6 +13,22 @@ spec.loader.exec_module(compiler)
 
 
 class CompilerTest(unittest.TestCase):
+    def test_long_multibyte_aliases_match_reader_limits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / 'places.json'
+            # Previous encoder allowed 65535-byte strings, although the C++
+            # reader accepts at most 1024. Verify UTF-8 remains well-formed.
+            alias = 'Caf\u00e9 ' * 300
+            path.write_text(json.dumps({'type': 'FeatureCollection', 'features': [
+                {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [0, 0]},
+                 'properties': {'NAME': 'A' * 1100, 'NAMEALT': alias}},
+            ]}), encoding='utf-8')
+            city, = compiler.compile_places(path)
+            self.assertLessEqual(len(city[5]), 1024)
+            self.assertLessEqual(len(city[6]), 1024)
+            city[5].decode('utf-8')
+            city[6].decode('utf-8')
+
     def test_places_rivers_and_antimeridian(self):
         with tempfile.TemporaryDirectory() as directory:
             p = pathlib.Path(directory)

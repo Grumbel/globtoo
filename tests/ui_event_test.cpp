@@ -175,9 +175,12 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.surface==SurfaceLayer::Imagery);
 
-    // Ruler has moved to the right, just below the compass; it consumes clicks.
+    // The ruler begins below the compass (whose bottom is y=257).
+    // A click in the gap is map input, but a click within the ruler is consumed.
     event.button.x = 1100.f;
     event.button.y = 245.f;
+    assert(!ui_event(ui,event,cam,map,globe,countries,input));
+    event.button.y = 285.f;
     assert(ui_event(ui,event,cam,map,globe,countries,input));
 
     // North Lock is a separate button below Grab/Arcball.

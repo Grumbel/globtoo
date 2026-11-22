@@ -647,10 +647,20 @@ if(BUILD_TESTING)
     src/geographic_features.cpp)
   target_include_directories(geographic_features_test PRIVATE src)
   target_compile_options(geographic_features_test PRIVATE -Wall -Wextra -UNDEBUG)
+  # These two invocations both write "geography_fixture.gfeat". CTest can run
+  # them concurrently (e.g. -j or CTEST_PARALLEL_LEVEL), so they must not
+  # share a working directory: otherwise one can truncate/delete the other's
+  # fixture, aborting the test nondeterministically.
+  set(_geo_unit_dir "${CMAKE_CURRENT_BINARY_DIR}/test-geographic-features")
+  set(_geo_compiled_dir "${CMAKE_CURRENT_BINARY_DIR}/test-geographic-features-compilation")
+  file(MAKE_DIRECTORY "${_geo_unit_dir}" "${_geo_compiled_dir}")
   add_test(NAME geographic_features COMMAND geographic_features_test)
+  set_tests_properties(geographic_features PROPERTIES WORKING_DIRECTORY "${_geo_unit_dir}")
   if(GEOGRAPHIC_FEATURE_OUTPUT)
     add_test(NAME geographic_features_compilation
       COMMAND geographic_features_test "${GEOGRAPHIC_FEATURE_OUTPUT}")
+    set_tests_properties(geographic_features_compilation PROPERTIES
+      WORKING_DIRECTORY "${_geo_compiled_dir}")
   endif()
   add_executable(raster_legend_test tests/raster_legend_test.cpp src/raster_legend.cpp)
   target_include_directories(raster_legend_test PRIVATE src)

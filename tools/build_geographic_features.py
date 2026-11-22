@@ -13,6 +13,17 @@ import struct
 
 MAGIC = b"GLBFEAT1"
 VERSION = 1
+# The C++ GLBFEAT1 reader rejects names longer than 1024 bytes. Keep the
+# producer's limit identical, including for very long Natural Earth aliases.
+MAX_NAME_BYTES = 1024
+
+
+def encoded_label(value):
+    encoded = value.strip().encode("utf-8")
+    if len(encoded) <= MAX_NAME_BYTES:
+        return encoded
+    # Do not slice through a multibyte character.
+    return encoded[:MAX_NAME_BYTES].decode("utf-8", "ignore").encode("utf-8")
 
 
 def valid_point(point):
@@ -57,8 +68,8 @@ def compile_places(path):
         alternate = props.get("NAMEALT") or props.get("NAME") or ""
         if not isinstance(alternate, str) or alternate == name:
             alternate = ""
-        label = name.strip().encode("utf-8")[:65535]
-        alt = alternate.strip().encode("utf-8")[:65535]
+        label = encoded_label(name)
+        alt = encoded_label(alternate)
         result.append((float(point[0]), float(point[1]), pop, rank, int(capital), label, alt))
     # Ranked source order doesn't determine priority: a country's capital
     # always survives low zoom, then other cities ordered by prominence.
