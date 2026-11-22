@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Mouse navigation regression: left rotates the 2D geography, while middle
 // translates the sheet without changing the geographical reference frame.
 #include "input.hpp"

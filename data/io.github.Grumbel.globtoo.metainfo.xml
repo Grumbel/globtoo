@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+SPDX-License-Identifier: CC0-1.0
+-->
 <component type="desktop-application">
   <id>io.github.Grumbel.globtoo</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <name>Globtoo</name>
   <summary>Explore Earth with an interactive 3D globe and projected maps</summary>
   <description>

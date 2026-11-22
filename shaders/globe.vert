@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 attribute vec3 a_pos;
 attribute vec2 a_uv;
 uniform mat4 u_model;

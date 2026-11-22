@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # Packaging and release checklist
 
 Globtoo's top-level `VERSION` file is the **sole version source**.
@@ -18,7 +23,7 @@ builds and the Nix flake. Installed files include:
 - `share/metainfo/io.github.Grumbel.globtoo.metainfo.xml`: AppStream metadata
 - `share/icons/hicolor/{32,48,64,128,256}x*/apps/globtoo.png`: desktop icons
 - `share/man/man1/globtoo.1`: manual, configured from `VERSION`
-- `share/doc/globtoo/`: README, technical documentation, MIT license and asset credits
+- `share/doc/globtoo/`: README, technical documentation, GPL-3.0-or-later license, third-party license texts and asset credits
 
 Compiled `.gmesh` files are installed instead of the much larger original
 GeoJSON files. The build needs those original data files to regenerate the
@@ -63,6 +68,10 @@ that keyboard and mouse controls work in 3D and 2D.
 The geometry tests can be built without SDL3 using
 `-DGLOBTOO_BUILD_APP=OFF`. This doesn't validate the graphical runtime or
 Nix's pinned asset downloads.
+
+Run `reuse lint` before release (`nix develop -c reuse lint` or
+`nix flake check` also work);
+this validates per-file SPDX notices and the vendored MIT license.
 
 ## Release steps
 

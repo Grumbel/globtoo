@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # globtoo
 
 Tactile free-spinning Earth globe (globtoo) for Linux.
@@ -216,3 +221,16 @@ ctest --test-dir build-geometry --output-on-failure
 ```
 
 Run the geometry tests using `ctest --test-dir build --output-on-failure`.
+
+
+## License
+
+Globtoo is licensed under the **GNU General Public License, version 3 or
+(at your option) any later version** (`GPL-3.0-or-later`); see [LICENSE](LICENSE).
+The vendored `external/stb_image.h` retains its upstream MIT license.
+AppStream metadata is CC0-1.0. Natural Earth geographical data and the fetched
+NASA-derived Earth imagery are public domain. See [asset credits](data/CREDITS.md)
+and per-file SPDX declarations for details.
+
+Check license metadata using `reuse lint` (available in the Nix development shell
+with `nix develop -c reuse lint`).

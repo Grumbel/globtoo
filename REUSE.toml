@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version = 1
+
+# Files that cannot carry comments, plus generated metadata.
+[[annotations]]
+path = ["VERSION", "flake.lock"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Application artwork and user-provided screenshot.
+[[annotations]]
+path = ["assets/*.png", "data/icons/*.png", "docs/screenshots/*.png"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Preserve the upstream license on the vendored stb_image header.
+[[annotations]]
+path = "external/stb_image.h"
+precedence = "override"
+SPDX-FileCopyrightText = "2017 Sean Barrett and stb_image contributors"
+SPDX-License-Identifier = "MIT"

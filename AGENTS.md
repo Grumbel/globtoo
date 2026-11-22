@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # AGENTS.md — globtoo
 
 ## What this is
@@ -9,7 +14,7 @@ Data-oriented / ECS-ish: plain structs + free functions, no class hierarchies.
 - Texture upload must always force RGBA (or set GL_UNPACK_ALIGNMENT=1) — RGB 24-bit skews.
 - Sphere winding must be CCW from outside so GL_CULL_FACE + GL_BACK is correct.
 - Earth texture is fetched at build time by the Nix flake; do not commit large binary textures.
-- License: keep existing (MIT for the code we wrote; NASA public domain for the texture).
+- Licensing: project code and artwork are GPL-3.0-or-later. Keep per-file SPDX notices and `reuse lint` passing. `external/stb_image.h` stays MIT, AppStream metadata CC0-1.0, fetched Earth imagery and Natural Earth data are public domain.
 
 ## Layout
 - `src/` — C++ sources (camera, mesh, texture, shader, globe, input, main)

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Shared geographic projection for sphere, country fills, borders and labels.
 // The Earth is physically rotated into a local tangent frame before mapping.
 uniform mat4 u_view;

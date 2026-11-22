@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Catch GLES2 shader link failures caused by precision mismatches between
 // vertex and fragment declarations. In ESSL 1.00 vertex floats default to
 // highp, while our fragments declare a mediump float default.

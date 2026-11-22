@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 
 // Hysteresis avoids repeated mesh swaps when the zoom hovers at a threshold.

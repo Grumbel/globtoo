@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "texture.hpp"

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 {
   description = "globtoo – tactile free-spinning Earth globe - SDL3 + GLES2, ECS-style";
 
@@ -117,15 +120,25 @@
 
           meta = with pkgs.lib; {
             description = "Interactive 3D Earth globe with animated 2D projections";
-            license = licenses.mit;
+            license = licenses.gpl3Plus;
             platforms = platforms.linux;
             mainProgram = "globtoo";
           };
         };
 
+        # Keep licensing checks part of `nix flake check` on every system.
+        checks.reuse = pkgs.runCommand "globtoo-reuse-lint" {
+          src = ./.;
+          nativeBuildInputs = [ pkgs.reuse ];
+        } ''
+          cd "$src"
+          reuse lint
+          touch "$out"
+        '';
+
         devShells.default = pkgs.mkShell {
           packages = (with pkgs; [
-            cmake pkg-config sdl3 geos libGL libglvnd mesa
+            cmake pkg-config sdl3 geos libGL libglvnd mesa reuse
             gdb clang-tools curl
           ]) ++ sdl3PcDeps;
           shellHook = ''

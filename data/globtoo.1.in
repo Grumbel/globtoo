@@ -1,3 +1,5 @@
+.\" SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+.\" SPDX-License-Identifier: GPL-3.0-or-later
 .TH GLOBTOO 1 "2026-11" "Globtoo @PROJECT_VERSION_FULL@" "User Commands"
 .SH NAME
 globtoo \- interactive 3D Earth globe and projected world maps

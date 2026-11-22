@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 cmake_minimum_required(VERSION 3.16)
 # VERSION is the only source of the base version. Package builds (Nix) inject
 # the complete development identifier via PROJECT_VERSION_FULL.
@@ -212,6 +215,10 @@ if(GLOBTOO_BUILD_APP)
   install(FILES "${CMAKE_SOURCE_DIR}/LICENSE" "${CMAKE_SOURCE_DIR}/README.md"
     "${CMAKE_SOURCE_DIR}/data/CREDITS.md"
     DESTINATION "${CMAKE_INSTALL_DOCDIR}")
+  # Ship license texts for the GPL application and the MIT/CC0 components.
+  install(DIRECTORY "${CMAKE_SOURCE_DIR}/LICENSES/"
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}/LICENSES"
+    FILES_MATCHING PATTERN "*.txt")
   install(DIRECTORY "${CMAKE_SOURCE_DIR}/docs/"
     DESTINATION "${CMAKE_INSTALL_DOCDIR}/docs"
     FILES_MATCHING PATTERN "*.md")
