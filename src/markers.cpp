@@ -408,14 +408,19 @@ bool parse_command_line(int argc, const char* const* argv,
         } else if (!positional_done && key=="--layer") {
             const auto value=next();
             if (!value) return false;
-            if (*value!="imagery" && *value!="relief" && *value!="elevation") {
-                error="--layer must be imagery, relief or elevation"; return false;
+            if (*value!="imagery" && *value!="relief" && *value!="elevation" &&
+                *value!="population") {
+                error="--layer must be imagery, relief, elevation or population"; return false;
             }
             output.surface_layer=*value;
         } else if (!positional_done && key=="--elevation-dir") {
             const auto value=next();
             if (!value || value->empty()) { error="--elevation-dir requires a directory"; return false; }
             output.elevation_dir=*value;
+        } else if (!positional_done && key=="--population-dir") {
+            const auto value=next();
+            if (!value || value->empty()) { error="--population-dir requires a directory"; return false; }
+            output.population_dir=*value;
         } else if (!positional_done && key=="--relief-dir") {
             const auto value=next();
             if (!value || value->empty()) { error="--relief-dir requires a directory"; return false; }
@@ -448,9 +453,10 @@ std::string command_line_help(std::string_view program) {
     help += "      --marker-size PX      Radius 2..32 for subsequent markers (default 7)\n";
     help += "      --center COORDS       Center initial view here (otherwise local timezone)\n";
     help += "      --texture FILE        Earth texture (also accepts legacy positional path)\n";
-    help += "      --layer NAME          imagery, relief or elevation (if installed)\n";
+    help += "      --layer NAME          imagery, relief, elevation, population\n";
     help += "      --relief-dir DIR      Directory with visual relief tile data\n";
     help += "      --elevation-dir DIR   Directory with measured elevation tiles/legend\n";
+    help += "      --population-dir DIR  Directory with measured density tiles/legend\n";
     help += "  -h, --help                Display this help without starting SDL\n";
     help += "  -V, --version             Print full build version and exit\n\n";
     help += "Coordinate forms (latitude first unless explicitly marked E/W):\n";

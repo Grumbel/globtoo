@@ -155,6 +155,7 @@
         devShells.default = pkgs.mkShell {
           packages = (with pkgs; [
             cmake pkg-config python3 python3Packages.pillow python3Packages.numpy
+            python3Packages.rasterio
             sdl3 geos libGL libglvnd mesa reuse
             gdb clang-tools curl
           ]) ++ sdl3PcDeps;
@@ -163,6 +164,7 @@
             echo "Default imagery is fetched by the flake at build time (earthTexture)."
             echo "Optional large relief maps can be tiled with tools/build_raster_tiles.py."
             echo "Signed numeric ETOPO1 can be tiled with tools/build_elevation_tiles.py."
+            echo "GPWv4 density can be tiled with tools/build_population_tiles.py (optional)."
             echo "See docs/RASTER_LAYERS.md (Pillow is included in this shell)."
             echo "For a local high-res texture without rebuilding the flake:"
             echo "  curl -L -o /tmp/globtoo-earth.jpg \\"

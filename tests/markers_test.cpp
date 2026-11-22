@@ -101,7 +101,12 @@ int main() {
     assert(parsed.surface_layer=="elevation" && parsed.elevation_dir=="/tmp/topography");
     const char* missing_elevation_dir[]={"globtoo","--elevation-dir"};
     assert(!parse_command_line(2,missing_elevation_dir,parsed,error));
-    const char* bad_layer[]={"globtoo","--layer","population"};
+    const char* population[]={"globtoo","--layer=population","--population-dir","/tmp/population"};
+    assert(parse_command_line(4,population,parsed,error));
+    assert(parsed.surface_layer=="population" && parsed.population_dir=="/tmp/population");
+    const char* missing_population[]={"globtoo","--population-dir"};
+    assert(!parse_command_line(2,missing_population,parsed,error));
+    const char* bad_layer[]={"globtoo","--layer","precipitation"};
     assert(!parse_command_line(3,bad_layer,parsed,error));
     const char* help[]={"globtoo","--help"};
     assert(parse_command_line(2,help,parsed,error) && parsed.action==CommandAction::Help);

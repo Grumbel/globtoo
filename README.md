@@ -14,6 +14,7 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
 - Zoom-aware capitals, cities, and major rivers from Natural Earth 10m
 - Optional tiled Blue Marble relief/bathymetry raster for close-up views
+- Optional measured elevation/depth and population density (people/km²) layers
 
 ![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
 
@@ -63,7 +64,11 @@ the SDL window icon. Run `man globtoo` after installing to a prefix on your
 manpage search path.
 
 See [Raster layers and tiling](docs/RASTER_LAYERS.md) for high-resolution
-relief preparation and selection.
+relief preparation and selection, [measured elevation and bathymetry](docs/ELEVATION.md),
+and [population-density maps](docs/POPULATION.md). The POP button and
+`--layer population --population-dir DIR` select locally compiled density
+raster tiles. Original density data and its reference year are supplied
+explicitly at build time rather than guessed.
 See [Release and packaging](docs/RELEASE.md) for version tagging and checks.
 For the data conversion, ranking and geographic-overlay format, see
 [Geographic overlays](docs/GEOGRAPHY.md). For upcoming map, planet, and

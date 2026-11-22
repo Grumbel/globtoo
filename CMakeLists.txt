@@ -62,6 +62,22 @@ set(GLOBTOO_RELIEF_TEXTURE "" CACHE FILEPATH "NASA Blue Marble topography/bathym
 set(GLOBTOO_ELEVATION_RAW "" CACHE FILEPATH "Headerless signed i16 little-endian worldwide elevation in metres")
 set(GLOBTOO_ELEVATION_WIDTH 21601 CACHE STRING "Elevation source columns (ETOPO1 grid-registered default)")
 set(GLOBTOO_ELEVATION_HEIGHT 10801 CACHE STRING "Elevation source rows (ETOPO1 grid-registered default)")
+# Optional measured density: GPWv4-style global EPSG:4326 single-band
+# GeoTIFF (rasterio), or a raw little-endian float32 2:1 grid. Both carry
+# people/km2; do not accept an unlabeled population-count raster.
+set(GLOBTOO_POPULATION_RASTER "" CACHE FILEPATH "Global density GeoTIFF or float32 raw in people/km2")
+set(GLOBTOO_POPULATION_YEAR "" CACHE STRING "Required reference year of population density estimates")
+set(GLOBTOO_POPULATION_ATTRIBUTION "" CACHE STRING "Required source attribution for population dataset")
+set(GLOBTOO_POPULATION_WIDTH "" CACHE STRING "Raw float32 width (GeoTIFF reads georeferencing)")
+set(GLOBTOO_POPULATION_HEIGHT "" CACHE STRING "Raw float32 height (GeoTIFF reads georeferencing)")
+if(GLOBTOO_POPULATION_RASTER AND NOT EXISTS "${GLOBTOO_POPULATION_RASTER}")
+  message(FATAL_ERROR "GLOBTOO_POPULATION_RASTER does not exist: ${GLOBTOO_POPULATION_RASTER}")
+endif()
+if(GLOBTOO_POPULATION_RASTER AND
+   (NOT GLOBTOO_POPULATION_YEAR OR NOT GLOBTOO_POPULATION_ATTRIBUTION))
+  message(FATAL_ERROR "GLOBTOO_POPULATION_RASTER requires GLOBTOO_POPULATION_YEAR and GLOBTOO_POPULATION_ATTRIBUTION")
+endif()
+
 if(GLOBTOO_ELEVATION_RAW AND NOT EXISTS "${GLOBTOO_ELEVATION_RAW}")
   message(FATAL_ERROR "GLOBTOO_ELEVATION_RAW does not exist: ${GLOBTOO_ELEVATION_RAW}")
 endif()
@@ -237,6 +253,45 @@ if(GLOBTOO_ELEVATION_RAW)
   endif()
 endif()
 
+# Optional population density numeric raster, stored as log-ramp color JPEG
+# tiles with a tagged physical-unit legend. No runtime Python dependency.
+set(POPULATION_OUTPUT "")
+if(GLOBTOO_POPULATION_RASTER)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  execute_process(COMMAND ${Python3_EXECUTABLE} -c "import numpy; from PIL import Image"
+    RESULT_VARIABLE _globtoo_population_deps ERROR_QUIET)
+  if(NOT _globtoo_population_deps EQUAL 0)
+    message(FATAL_ERROR "Population preprocessing requires numpy and Pillow")
+  endif()
+  if(GLOBTOO_POPULATION_RASTER MATCHES "\\.[tT][iI][fF][fF]?$")
+    execute_process(COMMAND ${Python3_EXECUTABLE} -c "import rasterio"
+      RESULT_VARIABLE _globtoo_population_gdal ERROR_QUIET)
+    if(NOT _globtoo_population_gdal EQUAL 0)
+      message(FATAL_ERROR "GeoTIFF population preprocessing requires Python rasterio")
+    endif()
+  endif()
+  set(_population_dimensions)
+  if(GLOBTOO_POPULATION_WIDTH AND GLOBTOO_POPULATION_HEIGHT)
+    list(APPEND _population_dimensions --width ${GLOBTOO_POPULATION_WIDTH}
+      --height ${GLOBTOO_POPULATION_HEIGHT})
+  endif()
+  set(POPULATION_OUTPUT "${CMAKE_BINARY_DIR}/generated-population/manifest.txt")
+  add_custom_command(OUTPUT "${POPULATION_OUTPUT}"
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/build_population_tiles.py"
+      "${GLOBTOO_POPULATION_RASTER}" "${CMAKE_BINARY_DIR}/generated-population"
+      --year ${GLOBTOO_POPULATION_YEAR}
+      --attribution "${GLOBTOO_POPULATION_ATTRIBUTION}"
+      ${_population_dimensions}
+    DEPENDS "${GLOBTOO_POPULATION_RASTER}"
+      "${CMAKE_SOURCE_DIR}/tools/build_population_tiles.py"
+    COMMENT "Preparing measured population density (people/km2) tiles"
+    VERBATIM)
+  add_custom_target(population_tiles ALL DEPENDS "${POPULATION_OUTPUT}")
+  if(GLOBTOO_BUILD_APP)
+    add_dependencies(globtoo population_tiles)
+  endif()
+endif()
+
 # Stage only explicitly approved runtime assets beside a build-tree binary.
 # Never copy all of assets/: that could reintroduce an old placeholder image
 # or ship bulky GeoJSON source data by accident.
@@ -250,6 +305,12 @@ if(GLOBTOO_BUILD_APP)
     # Also clear a leftover placeholder after reconfiguring an old build tree.
     COMMAND ${CMAKE_COMMAND} -E rm -f "$<TARGET_FILE_DIR:globtoo>/assets/earth.jpg"
     VERBATIM)
+  if(POPULATION_OUTPUT)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/generated-population" "$<TARGET_FILE_DIR:globtoo>/population"
+      VERBATIM)
+  endif()
   if(ELEVATION_OUTPUT)
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -299,6 +360,10 @@ if(GLOBTOO_BUILD_APP)
     DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
   # Only the explicitly configured real Earth image may be installed as
   # earth.jpg. In particular, never package a source-tree placeholder.
+  if(POPULATION_OUTPUT)
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-population/"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/population")
+  endif()
   if(ELEVATION_OUTPUT)
     install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-elevation/"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/elevation")
@@ -391,6 +456,11 @@ if(BUILD_TESTING)
   target_include_directories(raster_legend_test PRIVATE src)
   target_compile_options(raster_legend_test PRIVATE -Wall -Wextra -UNDEBUG)
   add_test(NAME raster_legend COMMAND raster_legend_test)
+  if(POPULATION_OUTPUT)
+    add_test(NAME raster_population_manifest COMMAND raster_tiles_test "${POPULATION_OUTPUT}")
+    add_test(NAME raster_population_legend
+      COMMAND raster_legend_test "${CMAKE_BINARY_DIR}/generated-population/legend.txt")
+  endif()
   if(ELEVATION_OUTPUT)
     add_test(NAME raster_elevation_manifest COMMAND raster_tiles_test "${ELEVATION_OUTPUT}")
     add_test(NAME raster_elevation_legend
@@ -409,6 +479,9 @@ if(BUILD_TESTING)
     execute_process(COMMAND ${Python3_EXECUTABLE} -c "import numpy; from PIL import Image"
       RESULT_VARIABLE _globtoo_test_numpy ERROR_QUIET)
     if(_globtoo_test_numpy EQUAL 0)
+      add_test(NAME population_tiles_compiler
+        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+          ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/population_tiles_compiler_test.py")
       add_test(NAME elevation_tiles_compiler
         COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/elevation_tiles_compiler_test.py")

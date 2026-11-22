@@ -53,9 +53,10 @@ Center the startup view on the given latitude,longitude.
 Load the supplied equirectangular Earth image instead of the built-in one.
 A positional file name may be used for compatibility.
 .TP
-.BI \--layer\  "imagery|relief|elevation"
+.BI \--layer\  "imagery|relief|elevation|population"
 Choose the starting raster layer. Relief requires an installed visual tile set;
-elevation requires signed, measured-height tiles with a physical-unit legend.
+elevation requires signed, measured-height tiles; population requires measured
+people-per-square-kilometre tiles with a year and physical-unit legend.
 .TP
 .BI \--relief-dir\  "DIR"
 Use a locally prepared high-resolution raster tile set, with
@@ -69,6 +70,11 @@ and
 .BR manifest.txt .
 Signed elevation and depth values are expressed in metres, with the source
 and reference year displayed by the ELEV control.
+.TP
+.BI \--population-dir\  "DIR"
+Use locally prepared numeric population density (people per square kilometre)
+tiles and a logarithmic-scale legend recording source, resolution, and year.
+The data is optional and is not fetched on application launch.
 .SH COORDINATES
 By default, coordinate pairs are latitude first, longitude second, in degrees.
 North and east are positive. Accepted forms include:
@@ -134,7 +140,9 @@ geographically anchored diamonds and major cities as dots; ranked rivers and
 more cities are revealed at closer zoom. A Relief button selects the optional
 high-resolution topography and ocean-bathymetry imagery when installed. The
 ELEV button selects measured elevation and bathymetry, with a metres legend
-and source attribution, when separately installed. Their visibility toggles are in the
+and source attribution, when separately installed. POP selects optional
+population density maps with a people/km2 legend and reference year.
+Their visibility toggles are in the
 bottom toolbar. Supplied Natural Earth data is preprocessed into compact
 binary assets during build, with no runtime downloads.
 .SH ENVIRONMENT
@@ -144,7 +152,7 @@ Optional override for the resource directory, which should contain
 .B assets/
 and
 .B shaders/
-subdirectories, and optionally \fBrelief/\fR and \fBelevation/\fR directories. Otherwise,
+subdirectories, and optionally \fBrelief/\fR and \fBelevation/\fR and \fBpopulation/\fR directories. Otherwise,
 Globtoo searches next to a development binary
 or in its installation data directory. The executable can be launched from
 any working directory.

@@ -22,7 +22,7 @@ struct Ui {
     int hover = -1;
     bool visible = true; // Tab toggles screen-space controls, not map overlays
     bool grid_visible = false;
-    bool elevation_legend_visible = false;
+    bool raster_legend_visible = false;
     bool capitals_visible = true, cities_visible = true, rivers_visible = true;
     struct LabelBox { float x,y,w,h; };
     std::vector<LabelBox> label_boxes;

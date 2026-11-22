@@ -107,9 +107,12 @@ int main(int argc, char** argv) {
         (std::filesystem::path(options.relief_dir)/"manifest.txt").string();
     const std::string elevation_manifest=options.elevation_dir.empty() ? "" :
         (std::filesystem::path(options.elevation_dir)/"manifest.txt").string();
+    const std::string population_manifest=options.population_dir.empty() ? "" :
+        (std::filesystem::path(options.population_dir)/"manifest.txt").string();
     if (!globe_init(globe, texture.c_str(),
                     relief_manifest.empty() ? nullptr : relief_manifest.c_str(),
-                    elevation_manifest.empty() ? nullptr : elevation_manifest.c_str())) {
+                    elevation_manifest.empty() ? nullptr : elevation_manifest.c_str(),
+                    population_manifest.empty() ? nullptr : population_manifest.c_str())) {
         fprintf(stderr, "globe_init failed\n");
         return 1;
     }
@@ -117,6 +120,10 @@ int main(int argc, char** argv) {
     if (options.surface_layer=="elevation") {
         if (globe.elevation.valid()) globe.surface=SurfaceLayer::Elevation;
         else fprintf(stderr,"Elevation/bathymetry layer not installed; using imagery.\n");
+    }
+    if (options.surface_layer=="population") {
+        if (globe.population.valid()) globe.surface=SurfaceLayer::Population;
+        else fprintf(stderr,"Population density layer not installed; using imagery.\n");
     }
     if (options.surface_layer=="relief") {
         if (globe.relief.valid()) globe.surface=SurfaceLayer::Relief;
@@ -196,10 +203,12 @@ int main(int argc, char** argv) {
                        country_fill_opacity(globe.texture_visible,
                            (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) ||
                            (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid()) ||
+                           (globe.surface==SurfaceLayer::Population && globe.population.valid()) ||
                            globe.texture.id != 0));
         geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
-        ui.elevation_legend_visible = globe.surface==SurfaceLayer::Elevation &&
-            globe.texture_visible && globe.elevation.valid() && globe.elevation.legend.valid();
+        ui.raster_legend_visible = globe.texture_visible &&
+            ((globe.surface==SurfaceLayer::Elevation && globe.elevation.valid() && globe.elevation.legend.valid()) ||
+             (globe.surface==SurfaceLayer::Population && globe.population.valid() && globe.population.legend.valid()));
         ui.label_boxes.clear();
         ui_draw_graticule(ui,cam,map,aspect);
         ui_draw_country_names(ui,countries,cam,map,aspect);

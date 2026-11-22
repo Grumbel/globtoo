@@ -10,7 +10,8 @@
 
 bool globe_init(Globe& g, const char* texture_path,
                 const char* relief_manifest_path,
-                const char* elevation_manifest_path) {
+                const char* elevation_manifest_path,
+                const char* population_manifest_path) {
     // Extra tessellation keeps the texture/silhouette smooth at close zoom.
     // 257 * 129 vertices still fit GLES2 16-bit element indices.
     static_assert(257 * 129 <= 65536);
@@ -29,6 +30,13 @@ bool globe_init(Globe& g, const char* texture_path,
         fprintf(stderr,"Elevation layer missing valid measurement legend; ignoring it.\n");
         raster_cache_shutdown(g.elevation);
     }
+    if (raster_cache_init(g.population, population_manifest_path ? population_manifest_path :
+                                         resource_path("population/manifest.txt")) &&
+        (!g.population.legend.valid() || !g.population.legend.logarithmic ||
+         g.population.legend.units != "PEOPLE / KM2")) {
+        fprintf(stderr,"Population layer missing valid measured-density legend; ignoring it.\n");
+        raster_cache_shutdown(g.population);
+    }
     if (!g.texture.id) {
         fprintf(stderr, "Failed to load earth texture – using solid color fallback\n");
     }
@@ -42,12 +50,14 @@ void globe_shutdown(Globe& g) {
     destroy_texture(g.texture);
     raster_cache_shutdown(g.relief);
     raster_cache_shutdown(g.elevation);
+    raster_cache_shutdown(g.population);
 }
 
 void globe_draw(Globe& g, const Camera& cam, float aspect,
                 const MapView& map) {
     RasterCache* raster = g.surface==SurfaceLayer::Relief ? &g.relief :
-                         g.surface==SurfaceLayer::Elevation ? &g.elevation : nullptr;
+                         g.surface==SurfaceLayer::Elevation ? &g.elevation :
+                         g.surface==SurfaceLayer::Population ? &g.population : nullptr;
     if (raster && !raster->valid()) raster=nullptr;
     const bool thematic = g.texture_visible && raster!=nullptr;
     const bool textured = g.texture_visible && (g.texture.id != 0 || thematic);

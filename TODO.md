@@ -96,8 +96,10 @@ silently download large maps or satellite data on an existing installation.
       signed 16-bit metres data. Convert grid-registered height posts to
       cell centers, with source/year metadata and a signed metres legend;
       keep visual NASA Relief distinctly unmeasured.
-- [ ] Add measured population density with year, resolution and legend
-      rather than deriving numbers from visual imagery.
+- [x] Add an optional measured population density layer with explicit source
+      year, angular resolution, units (people/km2), legend, log color ramp,
+      no-data color and provenance. Support global EPSG:4326 GeoTIFF or raw
+      float32 values, with build-time tiles and no runtime dependency.
 - [x] Implement optional build-time GLES2 JPEG tile generation and local
       close-up tile cache with power-of-two mipmapping and preview fallback.
       Validate dateline gutters and source/image resolution metadata.
@@ -111,9 +113,12 @@ silently download large maps or satellite data on an existing installation.
       including separate land/sea color ramps and documented depth units;
       source NOAA ETOPO1:
       https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO1/tiled/
-- [ ] Add population density with year/resolution/legend metadata; consider
-      NASA/CIESIN GPWv4. Verify each layer's download terms and attribution.
+- [x] Document NASA/CIESIN GPWv4 density as an eligible measured data source;
+      the converter requires explicit year and source attribution.
       https://data.nasa.gov/dataset/gridded-population-of-the-world-version-4-gpwv4-population-density
+- [ ] Validate a full-size GPWv4 density raster's GeoTIFF interpretation,
+      observed coastline alignment, and redistribution terms; do not add
+      multi-gigabyte downloads to the default package without verification.
 
 ### Stage 4 — other planetary bodies
 - [ ] Refactor Earth-only data into a Body catalog (Earth, Moon, Mars, Io,
@@ -139,6 +144,8 @@ silently download large maps or satellite data on an existing installation.
       cache hit/miss/corrupt cases, and `reuse lint` for new metadata.
 
 ## Next
+- [ ] Test full-size GPWv4 population-density tiles and source metadata in
+      an interactive GLES2 session and check the logarithmic scale visually.
 - [ ] Test optional NOAA ETOPO1 grid with the complete 21601x10801 dataset,
       including signed colour range, poles, and source attribution.
 - [ ] Pin and verify the optional NASA relief source hash for Nix; test the

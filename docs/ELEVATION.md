@@ -5,11 +5,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Measured elevation and bathymetry (Stage 3b)
 
-Globtoo offers **three distinct Earth surface raster modes**:
+Globtoo distinguishes measured and visual Earth surface raster modes:
 
 - **Imagery:** the usual Earth photograph, shipped with the default Nix package.
 - **Relief:** an optional *colorized picture* of terrain and seafloor. Its colors
   do **not** encode exact depth or elevation; it has no numerical legend.
+- **Population (POP):** an optional measured density map in people/km²,
+  documented separately in [POPULATION.md](POPULATION.md). It is not a
+  height map or a population count per pixel.
 - **Elevation (ELEV):** an optional numerical model of elevation above and depth
   below mean sea level. The map is colorized from source measurements in **metres**
   and displays a signed, color-matched scale with provenance. Negative is below

@@ -124,6 +124,18 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.surface==SurfaceLayer::Imagery);
 
+    // A population-density layer has an independent toggle and visibility.
+    event.button.x=535.f;
+    event.button.y=772.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Imagery); // no dataset
+    globe.population.preview.id=1;
+    globe.population.cells.resize(1);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Population && globe.texture_visible);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Imagery);
+
     // Ruler has moved to the right, just below the compass; it consumes clicks.
     event.button.x = 1100.f;
     event.button.y = 245.f;

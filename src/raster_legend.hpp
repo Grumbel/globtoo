@@ -15,6 +15,7 @@ struct RasterLegend {
     std::string title;
     std::string units;
     std::string attribution;
+    bool logarithmic = false; // v2 LOG1P: for measured skewed density data
     std::vector<RasterLegendStop> stops;
     bool valid() const { return stops.size()>=2; }
 };

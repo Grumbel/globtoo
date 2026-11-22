@@ -21,11 +21,23 @@ bool raster_legend_parse(std::string_view data, RasterLegend& out, std::string& 
     std::string header;
     RasterLegend parsed;
     int count=0;
-    if (!std::getline(in,header) || header!="GLOBTOO_RASTER_LEGEND 1" ||
+    if (!std::getline(in,header) ||
+        (header!="GLOBTOO_RASTER_LEGEND 1" && header!="GLOBTOO_RASTER_LEGEND 2") ||
         !std::getline(in,parsed.title) || !std::getline(in,parsed.units) ||
-        !std::getline(in,parsed.attribution) || !(in >> count) ||
+        !std::getline(in,parsed.attribution) ||
         !safe_line(parsed.title) || !safe_line(parsed.units) ||
-        !safe_line(parsed.attribution) || count<2 || count>32) {
+        !safe_line(parsed.attribution)) {
+        error="invalid raster legend header";
+        return false;
+    }
+    if (header=="GLOBTOO_RASTER_LEGEND 2") {
+        std::string scale;
+        if (!std::getline(in,scale) || (scale!="LOG1P" && scale!="LINEAR")) {
+            error="invalid raster legend scale"; return false;
+        }
+        parsed.logarithmic = scale=="LOG1P";
+    }
+    if (!(in >> count) || count<2 || count>32) {
         error="invalid raster legend header";
         return false;
     }
@@ -34,7 +46,8 @@ bool raster_legend_parse(std::string_view data, RasterLegend& out, std::string& 
         if (!(in >> value >> r >> g >> b) ||
             value < -32767 || value > 32767 ||
             r<0 || r>255 || g<0 || g>255 || b<0 || b>255 ||
-            (!parsed.stops.empty() && value<=parsed.stops.back().value)) {
+            (!parsed.stops.empty() && value<=parsed.stops.back().value) ||
+            (parsed.logarithmic && value<0)) {
             error="invalid raster legend color stop"; return false;
         }
         parsed.stops.push_back({value,static_cast<std::uint8_t>(r),
