@@ -7,6 +7,7 @@
 #include <SDL3/SDL_opengles2.h>
 #include <cstdio>
 #include <chrono>
+#include <filesystem>
 
 #include "globe.hpp"
 #include "camera.hpp"
@@ -102,9 +103,17 @@ int main(int argc, char** argv) {
         ? resource_path("assets/earth.jpg") : options.texture_path;
 
     Globe globe{};
-    if (!globe_init(globe, texture.c_str())) {
+    const std::string relief_manifest=options.relief_dir.empty() ? "" :
+        (std::filesystem::path(options.relief_dir)/"manifest.txt").string();
+    if (!globe_init(globe, texture.c_str(),
+                    relief_manifest.empty() ? nullptr : relief_manifest.c_str())) {
         fprintf(stderr, "globe_init failed\n");
         return 1;
+    }
+
+    if (options.surface_layer=="relief") {
+        if (globe.relief.valid()) globe.surface=SurfaceLayer::Relief;
+        else fprintf(stderr,"Relief layer not installed; using imagery.\n");
     }
 
     Camera cam{};
@@ -177,7 +186,8 @@ int main(int argc, char** argv) {
         globe_draw(globe, cam, aspect, map);
         // Preserve globe depth: it occludes political geometry behind the horizon.
         countries_draw(countries, cam, aspect, map, globe.shading,
-                       country_fill_opacity(globe.texture_visible, globe.texture.id != 0));
+                       country_fill_opacity(globe.texture_visible,
+                           (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) || globe.texture.id != 0));
         geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
         ui.label_boxes.clear();
         ui_draw_graticule(ui,cam,map,aspect);

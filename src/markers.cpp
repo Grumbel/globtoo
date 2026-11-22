@@ -405,6 +405,17 @@ bool parse_command_line(int argc, const char* const* argv,
             if (!parse_coordinates(*value,CoordinateOrder::LatitudeLongitude,lat,lon,error))
                 return false;
             output.center=std::make_pair(lon,lat);
+        } else if (!positional_done && key=="--layer") {
+            const auto value=next();
+            if (!value) return false;
+            if (*value!="imagery" && *value!="relief") {
+                error="--layer must be imagery or relief"; return false;
+            }
+            output.surface_layer=*value;
+        } else if (!positional_done && key=="--relief-dir") {
+            const auto value=next();
+            if (!value || value->empty()) { error="--relief-dir requires a directory"; return false; }
+            output.relief_dir=*value;
         } else if (!positional_done && key=="--texture") {
             const auto value=next();
             if (!value) return false;
@@ -433,6 +444,8 @@ std::string command_line_help(std::string_view program) {
     help += "      --marker-size PX      Radius 2..32 for subsequent markers (default 7)\n";
     help += "      --center COORDS       Center initial view here (otherwise local timezone)\n";
     help += "      --texture FILE        Earth texture (also accepts legacy positional path)\n";
+    help += "      --layer NAME          imagery (default) or relief (if installed)\n";
+    help += "      --relief-dir DIR      Directory with manifest.txt and raster tiles\n";
     help += "  -h, --help                Display this help without starting SDL\n";
     help += "  -V, --version             Print full build version and exit\n\n";
     help += "Coordinate forms (latitude first unless explicitly marked E/W):\n";

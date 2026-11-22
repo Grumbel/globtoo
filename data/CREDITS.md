@@ -12,6 +12,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
   meshes and compact point/line feature asset.
 - **Earth imagery:** NASA Blue Marble–derived image, public domain; fetched by
   the Nix build. Credit: NASA Earth Observatory / Reto Stöckli. No placeholder Earth texture is distributed in the source tree.
+- **Optional relief/bathymetry imagery:** NASA Blue Marble Next Generation
+  topography and bathymetry visualization (public domain), credited to NASA
+  Earth Observatory / Reto Stöckli, using GEBCO ocean bathymetry. The high-res
+  source is user supplied at build time; the source JPEG is not installed.
+
 
 The application icon was created specifically for Globtoo. Downstream
 packagers should ship the icon and corresponding desktop entry together.

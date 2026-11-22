@@ -87,11 +87,19 @@ silently download large maps or satellite data on an existing installation.
       avoiding dateline/polar seams, and cull invisible segments.
       Source: https://www.naturalearthdata.com/downloads/10m-physical-vectors/10m-rivers-lake-centerlines/
 
-### Stage 3 — Earth surface and thematic map layers (next)
-- [ ] Introduce a selectable texture/layer catalog (imagery, topographic
-      elevation, population density, ocean bathymetry); preserve independent
-      blending with political country colors and shading.
-- [ ] Offer higher-resolution Earth imagery using **tiled/mipmapped** textures
+### Stage 3 — Earth surface and thematic map layers (in progress)
+- [x] Add independent Imagery / optional Relief raster selection in GUI and
+      `--layer`, preserving independent political-color blending and shading.
+      Support external tile directories with `--relief-dir`; absent datasets
+      do not change default imagery. Document the source and limitations.
+- [ ] Extend the layer catalog to actual numerical elevation, population
+      density and bathymetry with legends, years and units (rather than
+      treating a colorized relief visualization as measured elevation).
+- [x] Implement optional build-time GLES2 JPEG tile generation and local
+      close-up tile cache with power-of-two mipmapping and preview fallback.
+      Validate dateline gutters and source/image resolution metadata.
+- [ ] Offer a verified higher-resolution raster in the default Nix package,
+      using **tiled/mipmapped** textures
       (GLES2 maximum texture sizes vary). Avoid loading a 21600×10800 image
       as one giant GPU texture; choose visible/LOD tiles at zoom.
       NASA Blue Marble Next Generation 21600×10800 topography/bathymetry:
@@ -128,6 +136,10 @@ silently download large maps or satellite data on an existing installation.
       cache hit/miss/corrupt cases, and `reuse lint` for new metadata.
 
 ## Next
+- [ ] Pin and verify the optional NASA relief source hash for Nix; test the
+      complete fat package and visually check tile seams against the preview.
+- [ ] Benchmark upload stutter, LRU size and visual transitions on real GLES2
+      hardware; consider off-thread image decoding and per-tile frustum bounds.
 - [ ] Verify Nix fetch hashes for 10m places/rivers and test full interactive
       GLES2 rendering on Linux (offline geometry and conversion tests pass).
 - [ ] Optional proper Unicode/vector typeface with zoom-dependent country labeling

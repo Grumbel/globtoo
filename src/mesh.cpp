@@ -7,16 +7,22 @@
 #include <cstdio>
 #include <array>
 
-Mesh create_sphere(int slices, int stacks) {
+Mesh create_sphere_region(int slices, int stacks, double u0, double v0,
+                          double u1, double v1, double t0, double s0,
+                          double t1, double s1) {
     std::vector<float> verts; // pos.xyz + uv.st
     std::vector<unsigned short> indices;
 
     // Vertex positions and UVs must use the same geographic transform as
     // GeoJSON. Reversing longitude flips the triangle winding as well.
     for (int i = 0; i <= stacks; ++i) {
-        const float v = (float)i / stacks;
+        const double yf = double(i) / stacks;
+        const double v = v0 + (v1 - v0) * yf;
+        const float sv = static_cast<float>(s0 + (s1 - s0) * yf);
         for (int j = 0; j <= slices; ++j) {
-            const float u = (float)j / slices;
+            const double xf = double(j) / slices;
+            const double u = u0 + (u1 - u0) * xf;
+            const float tu = static_cast<float>(t0 + (t1 - t0) * xf);
             const auto pos = geo::uv_to_xyz(u, v);
             const float x = static_cast<float>(pos[0]);
             const float y = static_cast<float>(pos[1]);
@@ -25,8 +31,8 @@ Mesh create_sphere(int slices, int stacks) {
             verts.push_back(x);
             verts.push_back(y);
             verts.push_back(z);
-            verts.push_back(u);
-            verts.push_back(v);
+            verts.push_back(tu);
+            verts.push_back(sv);
         }
     }
 
@@ -109,4 +115,8 @@ void draw_mesh(const Mesh& m, bool reprojected) {
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
     glDisableVertexAttribArray(3);
+}
+
+Mesh create_sphere(int slices,int stacks) {
+    return create_sphere_region(slices,stacks,0,0,1,1,0,0,1,1);
 }

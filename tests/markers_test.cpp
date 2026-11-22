@@ -92,6 +92,12 @@ int main() {
     assert(!parse_command_line(3,invalid_color,parsed,error));
     const char* invalid_size[]={"globtoo","--marker-size","0"};
     assert(!parse_command_line(3,invalid_size,parsed,error));
+    const char* relief[]={"globtoo","--layer=relief","--relief-dir","/tmp/relief"};
+    assert(parse_command_line(4,relief,parsed,error));
+    assert(parsed.relief_dir=="/tmp/relief");
+    assert(parsed.surface_layer=="relief");
+    const char* bad_layer[]={"globtoo","--layer","population"};
+    assert(!parse_command_line(3,bad_layer,parsed,error));
     const char* help[]={"globtoo","--help"};
     assert(parse_command_line(2,help,parsed,error) && parsed.action==CommandAction::Help);
     const char* version[]={"globtoo","--version"};

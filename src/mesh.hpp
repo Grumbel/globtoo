@@ -16,5 +16,10 @@ struct Mesh {
 
 // UV sphere, radius 1, segments control detail
 Mesh create_sphere(int slices, int stacks);
+// Portion of the same geographic sphere, with local texture coordinates.
+// Geometry and triangle anchors use GLOBAL UVs; sampling uses padded tile UVs.
+Mesh create_sphere_region(int slices, int stacks, double u0, double v0,
+                          double u1, double v1, double t0, double s0,
+                          double t1, double s1);
 void destroy_mesh(Mesh& m);
 void draw_mesh(const Mesh& m, bool reprojected = false);

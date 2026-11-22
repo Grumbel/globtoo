@@ -7,17 +7,23 @@
 #include "texture.hpp"
 #include "camera.hpp"
 #include "map_view.hpp"
+#include "raster_cache.hpp"
+
+enum class SurfaceLayer { Imagery, Relief };
 
 struct Globe {
     Mesh    mesh;
     Shader  shader;
     Texture texture;
+    RasterCache relief;
+    SurfaceLayer surface = SurfaceLayer::Imagery;
     bool    shading = true;
     bool    texture_visible = true;  // Independent of political country colors
 };
 
-bool globe_init(Globe& g, const char* texture_path);
+bool globe_init(Globe& g, const char* texture_path,
+                const char* relief_manifest_path = nullptr);
 void globe_shutdown(Globe& g);
 // When texture is disabled, render the solid ocean base instead.
-void globe_draw(const Globe& g, const Camera& cam, float aspect,
+void globe_draw(Globe& g, const Camera& cam, float aspect,
                 const MapView& map);

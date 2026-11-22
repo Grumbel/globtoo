@@ -24,6 +24,8 @@ enum class CommandAction { Run, Help, Version };
 struct CommandLine {
     CommandAction action = CommandAction::Run;
     std::string texture_path;
+    std::string surface_layer = "imagery";
+    std::string relief_dir;
     std::vector<Marker> markers;
     // Explicit initial viewpoint, [longitude, latitude]; otherwise timezone.
     std::optional<std::pair<double,double>> center;

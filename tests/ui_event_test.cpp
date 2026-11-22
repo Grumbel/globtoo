@@ -99,6 +99,19 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(!ui.rivers_visible);
 
+    // Optional Relief layer is selectable without affecting political fills.
+    // The default/absent dataset must not silently select nonexistent tiles.
+    event.button.x=343.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Imagery);
+    globe.relief.preview.id=1; // simulate a validated, installed tile set
+    globe.relief.cells.resize(1);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Relief);
+    assert(globe.texture_visible);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Imagery);
+
     // Ruler has moved to the right, just below the compass; it consumes clicks.
     event.button.x = 1100.f;
     event.button.y = 245.f;

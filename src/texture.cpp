@@ -6,7 +6,7 @@
 #include "texture.hpp"
 #include <cstdio>
 
-Texture load_texture(const char* path) {
+Texture load_texture(const char* path, bool repeat) {
     Texture t{};
     int channels = 0;
     // Do NOT flip: equirectangular has north at the top of the image.
@@ -18,6 +18,22 @@ Texture load_texture(const char* path) {
     // Always request 4 channels. JPEG is typically 3; uploading RGB with
     // default GL_UNPACK_ALIGNMENT=4 skews the image whenever width*3 is
     // not a multiple of 4. Forcing RGBA removes that entire class of bugs.
+    // Inspect dimensions before decoding: a 21600x10800 JPEG would cost
+    // ~890 MiB just for the temporary RGBA buffer. Such sources belong in
+    // the build-time tiler, not the single-texture GLES2 upload path.
+    int source_width=0, source_height=0;
+    if (!stbi_info(path, &source_width, &source_height, &channels)) {
+        fprintf(stderr, "Failed to inspect texture: %s\n", path);
+        return t;
+    }
+    GLint max_size=0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_size);
+    if (source_width>max_size || source_height>max_size) {
+        fprintf(stderr, "Texture %s (%dx%d) exceeds GLES2 max %d: "
+                        "prepare it as raster tiles instead.\n",
+                path,source_width,source_height,max_size);
+        return t;
+    }
     unsigned char* data = stbi_load(path, &t.width, &t.height, &channels, 4);
     if (!data) {
         fprintf(stderr, "Failed to load texture: %s\n", path);
@@ -28,7 +44,7 @@ Texture load_texture(const char* path) {
     glBindTexture(GL_TEXTURE_2D, t.id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, repeat ? GL_REPEAT : GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

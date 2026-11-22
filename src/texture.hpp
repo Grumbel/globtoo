@@ -11,6 +11,6 @@ struct Texture {
 };
 
 // Load RGB/RGBA JPEG or PNG via stb_image (header-only)
-Texture load_texture(const char* path);
+Texture load_texture(const char* path, bool repeat = true);
 void    destroy_texture(Texture& t);
 void    bind_texture(const Texture& t, int unit = 0);

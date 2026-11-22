@@ -50,8 +50,8 @@ bool overlaps(Bounds a, Bounds b) {
 
 struct Button { const char* label; int x,y,w,h; int command; };
 // All hit rectangles and draw positions derive from the same layout.
-std::array<Button,16> buttons(const Ui& ui) {
-    std::array<Button,16> out{};
+std::array<Button,17> buttons(const Ui& ui) {
+    std::array<Button,17> out{};
     std::size_t k=0;
     const char* top[] = {"3D GLOBE", "PLATE", "MERCATOR", "MOLLWEIDE", "HAMMER", "-", "+"};
     const int topw[] = {103,72,108,121,88,30,30};
@@ -63,10 +63,10 @@ std::array<Button,16> buttons(const Ui& ui) {
     for (int i=0;i<7;i++) { out[k++] = {top[i],x,static_cast<int>(panel.y+26),topw[i],30,i}; x += topw[i]+5; }
     x = static_cast<int>(panel.x+6);
     for (int i=0;i<6;i++) { out[k++] = {bottom[i],x,static_cast<int>(panel.y+62),botw[i],30,botcmd[i]}; x += botw[i]+5; }
-    const char* features[] = {"CAPITALS", "CITIES", "RIVERS"};
-    const int widths[] = {112,90,90};
+    const char* features[] = {"CAPITALS", "CITIES", "RIVERS", "RELIEF"};
+    const int widths[] = {112,90,90,100};
     x=static_cast<int>(panel.x+6);
-    for (int i=0;i<3;i++) {
+    for (int i=0;i<4;i++) {
         out[k++] = {features[i],x,static_cast<int>(panel.y+98),widths[i],30,17+i};
         x+=widths[i]+5;
     }
@@ -241,6 +241,7 @@ bool command_active(int id, const Camera& cam, const MapView& m,
     case 9: return c.borders_visible;
     case 10: return c.names_visible;
     case 11: return g.texture_visible;
+    case 20: return g.surface==SurfaceLayer::Relief && g.relief.valid();
     case 12: return cam.mode == ControlMode::Grab;
     case 15: return false; // GRID uses the Ui state, handled by the caller
     }
@@ -377,6 +378,13 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
             else if (b.command == 17) ui.capitals_visible = !ui.capitals_visible;
             else if (b.command == 18) ui.cities_visible = !ui.cities_visible;
             else if (b.command == 19) ui.rivers_visible = !ui.rivers_visible;
+            else if (b.command == 20) {
+                if (globe.relief.valid()) {
+                    globe.surface = globe.surface==SurfaceLayer::Relief ?
+                        SurfaceLayer::Imagery : SurfaceLayer::Relief;
+                    globe.texture_visible=true;
+                } else fprintf(stderr,"Relief layer is not installed.\n");
+            }
             else execute(b.command,cam,map,globe,countries,input);
         }
         break;
@@ -557,6 +565,8 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
     }
     const char* mode = map.selected==MapProjection::Globe ? "SPHERE" : "FLAT MAP";
     draw_text(ui,toolbar.x+205.f,toolbar.y+9.f,mode,1,muted);
+    if (globe.surface==SurfaceLayer::Relief && globe.relief.valid())
+        draw_text(ui,toolbar.x+320.f,toolbar.y+9.f,"NASA RELIEF",1,muted);
     draw_compass(ui,cam,map);
     draw_scale_bar(ui);
 }

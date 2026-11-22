@@ -54,6 +54,12 @@ option(GLOBTOO_BUILD_APP "Build the SDL3 + GLES2 globe viewer" ON)
 # Nix supplies the pinned fetchurl output here. Keep imagery out of the source
 # tree and never infer an Earth texture from a random file in assets/.
 set(GLOBTOO_EARTH_TEXTURE "" CACHE FILEPATH "Real equirectangular Earth image to package (e.g. a Nix fetchurl output)")
+# Optional full-world topographic/bathymetric source, converted to GLES2-safe
+# 1024px tiles at build time. Never package the untiled source image.
+set(GLOBTOO_RELIEF_TEXTURE "" CACHE FILEPATH "NASA Blue Marble topography/bathymetry raster (north-up equirectangular)")
+if(GLOBTOO_RELIEF_TEXTURE AND NOT EXISTS "${GLOBTOO_RELIEF_TEXTURE}")
+  message(FATAL_ERROR "GLOBTOO_RELIEF_TEXTURE does not exist: ${GLOBTOO_RELIEF_TEXTURE}")
+endif()
 if(GLOBTOO_EARTH_TEXTURE AND NOT EXISTS "${GLOBTOO_EARTH_TEXTURE}")
   message(FATAL_ERROR "GLOBTOO_EARTH_TEXTURE does not exist: ${GLOBTOO_EARTH_TEXTURE}")
 endif()
@@ -89,6 +95,8 @@ add_executable(globtoo
   src/resources.cpp
   src/geographic_features.cpp
   src/geographic_overlay.cpp
+  src/tiled_raster.cpp
+  src/raster_cache.cpp
 )
 
 target_include_directories(globtoo PRIVATE
@@ -169,6 +177,32 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/assets/places_10m.geojson" AND
   endif()
 endif()
 
+# Prepare optional, high-resolution topography/bathymetry as power-of-two tiles.
+# Pillow is only a build dependency when the layer source is supplied.  A
+# normal CMake/Nix build has no extra requirements and uses the existing Earth
+# imagery.  Large raster sources remain outside Git and the install closure.
+set(RELIEF_OUTPUT "")
+if(GLOBTOO_RELIEF_TEXTURE)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  execute_process(COMMAND ${Python3_EXECUTABLE} -c "from PIL import Image"
+    RESULT_VARIABLE _globtoo_pillow_result ERROR_QUIET)
+  if(NOT _globtoo_pillow_result EQUAL 0)
+    message(FATAL_ERROR "GLOBTOO_RELIEF_TEXTURE requires Pillow (Python PIL) at build time")
+  endif()
+  set(RELIEF_OUTPUT "${CMAKE_BINARY_DIR}/generated-relief/manifest.txt")
+  add_custom_command(OUTPUT "${RELIEF_OUTPUT}"
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+      "${GLOBTOO_RELIEF_TEXTURE}" "${CMAKE_BINARY_DIR}/generated-relief"
+    DEPENDS "${GLOBTOO_RELIEF_TEXTURE}"
+      "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+    COMMENT "Preparing high-resolution relief/bathymetry GLES2 tiles"
+    VERBATIM)
+  add_custom_target(relief_tiles ALL DEPENDS "${RELIEF_OUTPUT}")
+  if(GLOBTOO_BUILD_APP)
+    add_dependencies(globtoo relief_tiles)
+  endif()
+endif()
+
 # Stage only explicitly approved runtime assets beside a build-tree binary.
 # Never copy all of assets/: that could reintroduce an old placeholder image
 # or ship bulky GeoJSON source data by accident.
@@ -182,6 +216,12 @@ if(GLOBTOO_BUILD_APP)
     # Also clear a leftover placeholder after reconfiguring an old build tree.
     COMMAND ${CMAKE_COMMAND} -E rm -f "$<TARGET_FILE_DIR:globtoo>/assets/earth.jpg"
     VERBATIM)
+  if(RELIEF_OUTPUT)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/generated-relief" "$<TARGET_FILE_DIR:globtoo>/relief"
+      VERBATIM)
+  endif()
   if(GLOBTOO_EARTH_TEXTURE)
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -219,6 +259,10 @@ if(GLOBTOO_BUILD_APP)
     DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
   # Only the explicitly configured real Earth image may be installed as
   # earth.jpg. In particular, never package a source-tree placeholder.
+  if(RELIEF_OUTPUT)
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-relief/"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/relief")
+  endif()
   if(GLOBTOO_EARTH_TEXTURE)
     install(FILES "${GLOBTOO_EARTH_TEXTURE}"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets"
@@ -298,6 +342,22 @@ if(BUILD_TESTING)
   if(GEOGRAPHIC_FEATURE_OUTPUT)
     add_test(NAME geographic_features_compilation
       COMMAND geographic_features_test "${GEOGRAPHIC_FEATURE_OUTPUT}")
+  endif()
+  add_executable(raster_tiles_test tests/raster_tiles_test.cpp src/tiled_raster.cpp)
+  target_include_directories(raster_tiles_test PRIVATE src)
+  target_compile_options(raster_tiles_test PRIVATE -Wall -Wextra -UNDEBUG)
+  add_test(NAME raster_tiles COMMAND raster_tiles_test)
+  if(RELIEF_OUTPUT)
+    add_test(NAME raster_tiles_manifest COMMAND raster_tiles_test "${RELIEF_OUTPUT}")
+  endif()
+  if(Python3_Interpreter_FOUND)
+    execute_process(COMMAND ${Python3_EXECUTABLE} -c "from PIL import Image"
+      RESULT_VARIABLE _globtoo_test_pillow ERROR_QUIET)
+    if(_globtoo_test_pillow EQUAL 0)
+      add_test(NAME raster_tiles_compiler
+        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+          ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/raster_tiles_compiler_test.py")
+    endif()
   endif()
   add_executable(markers_test tests/markers_test.cpp src/markers.cpp)
   target_include_directories(markers_test PRIVATE src)

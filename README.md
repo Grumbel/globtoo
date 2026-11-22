@@ -13,6 +13,7 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Smooth zoom down to individual small countries
 - Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
 - Zoom-aware capitals, cities, and major rivers from Natural Earth 10m
+- Optional tiled Blue Marble relief/bathymetry raster for close-up views
 
 ![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
 
@@ -61,6 +62,8 @@ The on-screen application icon is installed both for desktop launchers and as
 the SDL window icon. Run `man globtoo` after installing to a prefix on your
 manpage search path.
 
+See [Raster layers and tiling](docs/RASTER_LAYERS.md) for high-resolution
+relief preparation and selection.
 See [Release and packaging](docs/RELEASE.md) for version tagging and checks.
 For the data conversion, ranking and geographic-overlay format, see
 [Geographic overlays](docs/GEOGRAPHY.md). For upcoming map, planet, and
@@ -111,6 +114,8 @@ Use `--marker` / `-m` repeatedly, `--label` / `-l` for the previous pin,
 `--marker-color #RRGGBB` and `--marker-size 2..32` for subsequent pins,
 `--marker-file` for bulk input, `--center` for the starting viewpoint, and
 `--texture` (or the legacy positional filename) for a custom Earth image.
+`--layer imagery|relief` selects the starting raster, and `--relief-dir DIR`
+loads an external preprocessed relief tile set without rebuilding the app.
 By default the starting viewpoint still follows the local timezone.
 
 The coordinate parser understands signed decimal degrees (latitude first),
@@ -126,18 +131,21 @@ The top-level `VERSION` file is the sole version source. `--version` (and the
 window title) display the same full version produced by CMake or Nix. Git
 `-dev` builds include the revision count and hash; releases do not.
 
-## Texture
+## Raster textures
 
-The flake fetches a public-domain equirectangular Earth map at build time.
+The default Nix build fetches its pinned 4K Earth image. There is also an
+**optional high-resolution Relief** layer: a real NASA Blue Marble topography
+and ocean-bathymetry image preprocessed into GLES2-friendly tiles, with
+on-demand local tile loading at close zoom. The optional layer has its own
+**RELIEF** button and `--layer relief` startup switch; TEXTURE still controls
+visibility, independently of political colors. On builds without relief tiles,
+the button reports that the optional data is absent.
 
-To switch to the full NASA Blue Marble Next Generation (5400×2700, topography + bathymetry):
-
-1. Open `flake.nix`
-2. Comment out the current `earthTexture` and uncomment the NASA one
-3. `nix build` once – it will print the correct `sha256`
-4. Paste the hash and rebuild
-
-NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
+The current build intentionally does not silently fetch or ship a new large
+raster. See [raster preparation instructions](docs/RASTER_LAYERS.md) for a
+NASA source URL, Pillow tile preprocessing, `--relief-dir` and the optional
+`-DGLOBTOO_RELIEF_TEXTURE=...` CMake install flag. Future stages will add
+numerical bathymetry, population-density legends, and verified Nix downloads.
 
 ## Controls
 
@@ -164,6 +172,8 @@ names, markers, and the optional geographic grid remain visible.
 - **Cities**: toggle dots and labels for other Natural Earth populated places.
   The display adds smaller cities as you zoom closer; rank and population
   determine their priority.
+- **Relief**: switch between standard imagery and the optional high-resolution
+  NASA topography/bathymetry raster (only usable when data is installed).
 - **Rivers**: toggle major rivers and lake centerlines, in blue. Additional
   tributaries are revealed as you zoom in. River segments follow the same
   rotating geography and moving map seam as the country outlines.
@@ -199,7 +209,8 @@ The 3D globe now permits roughly **1.9× closer** views (minimum camera
 distance 1.08 Earth radii versus 1.15 previously). Flat-map zoom reaches
 **80×** instead of 60×. The globe sphere uses a finer mesh to stay smooth
 at close range. The 10m country mesh is selected automatically at these scales;
-the raster Earth texture still has its original resolution.
+the optional Relief layer supplies additional raster detail when configured;
+otherwise the baseline Earth imagery retains its original resolution.
 Roll gestures rotate the globe or flat map around the screen center when North Lock is off.
 Optional shortcuts: `1..5` select projection, `Space` shading, `B` borders,
 `N` names, `P` political coloring, `V` texture, `Tab` toggle GUI,
