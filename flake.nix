@@ -78,6 +78,19 @@
           name = "ne_10m_admin_0_countries.geojson";
         };
 
+        # Natural Earth 5.1.2 populated places (simplified properties) and
+        # 10m river centerlines; source data stays in the build sandbox.
+        places10m = pkgs.fetchurl {
+          url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_populated_places_simple.geojson";
+          hash = "sha256-/T+oZ6Mgy9XFtrtbxVCv7sKTn7LO9ojlCABygqVaxC8=";
+          name = "ne_10m_populated_places_simple.geojson";
+        };
+        rivers10m = pkgs.fetchurl {
+          url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_rivers_lake_centerlines.geojson";
+          hash = "sha256-u4VKkA7L07QI30bV4W4+D5dLpVmT+di1wm6FUnPAkFo=";
+          name = "ne_10m_rivers_lake_centerlines.geojson";
+        };
+
       in
       {
         packages.default = pkgs.stdenv.mkDerivation {
@@ -88,6 +101,7 @@
           nativeBuildInputs = with pkgs; [
             cmake
             pkg-config
+            python3
           ];
 
           buildInputs = (with pkgs; [
@@ -112,6 +126,8 @@
             mkdir -p assets
             cp ${countries50m} assets/countries_50m.geojson
             cp ${countries10m} assets/countries_10m.geojson
+            cp ${places10m} assets/places_10m.geojson
+            cp ${rivers10m} assets/rivers_10m.geojson
           '';
 
           # cmake --install installs binary, shared resources, launcher,
@@ -138,7 +154,7 @@
 
         devShells.default = pkgs.mkShell {
           packages = (with pkgs; [
-            cmake pkg-config sdl3 geos libGL libglvnd mesa reuse
+            cmake pkg-config python3 sdl3 geos libGL libglvnd mesa reuse
             gdb clang-tools curl
           ]) ++ sdl3PcDeps;
           shellHook = ''

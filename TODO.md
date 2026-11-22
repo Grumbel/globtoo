@@ -55,7 +55,7 @@ The checkboxes below distinguish shipped functionality from planned work.
 Finish and validate one stage before making the next one the default; never
 silently download large maps or satellite data on an existing installation.
 
-### Stage 1 — interaction and low-risk rendering performance (this change)
+### Stage 1 — interaction and low-risk rendering performance (completed)
 - [x] Halve mouse-wheel zoom increments in globe and flat modes; make
       zoom-in/zoom-out reciprocal at ordinary distances.
 - [x] Preserve 2D middle-drag sheet panning; add Shift+middle-drag roll in 2D
@@ -76,18 +76,18 @@ silently download large maps or satellite data on an existing installation.
       use counters and before/after benchmarks, avoid visual regressions.
 
 ### Stage 2 — geographic point and line features
-- [ ] Fetch Natural Earth **10m populated places** at a pinned version/hash;
+- [x] Fetch Natural Earth **10m populated places** at a pinned version/hash;
       import capitals and major cities with name, prominence, population,
       alternate names and overlap-aware labels. Different symbols and separate
       toggles for capitals versus other major cities. Default to major cities
       only beyond an appropriate zoom threshold.
       Source: https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/
-- [ ] Add ranked major rivers and lake centerlines, with LOD and a toggle;
+- [x] Add ranked major rivers and lake centerlines, with LOD and a toggle;
       project through exactly the same rotated frame as the country borders,
       avoiding dateline/polar seams, and cull invisible segments.
       Source: https://www.naturalearthdata.com/downloads/10m-physical-vectors/10m-rivers-lake-centerlines/
 
-### Stage 3 — Earth surface and thematic map layers
+### Stage 3 — Earth surface and thematic map layers (next)
 - [ ] Introduce a selectable texture/layer catalog (imagery, topographic
       elevation, population density, ocean bathymetry); preserve independent
       blending with political country colors and shading.
@@ -128,6 +128,8 @@ silently download large maps or satellite data on an existing installation.
       cache hit/miss/corrupt cases, and `reuse lint` for new metadata.
 
 ## Next
+- [ ] Verify Nix fetch hashes for 10m places/rivers and test full interactive
+      GLES2 rendering on Linux (offline geometry and conversion tests pass).
 - [ ] Optional proper Unicode/vector typeface with zoom-dependent country labeling
 - [ ] More seamless antimeridian clipping while globe is mid-morph
 - [ ] Live visual tests for GLES2, especially 10m datasets during map transitions

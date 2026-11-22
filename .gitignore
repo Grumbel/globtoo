@@ -6,7 +6,14 @@ assets/countries.geojson
 # Large map sources are fetched by Nix / supplied by the developer.
 assets/countries_50m.geojson
 assets/countries_10m.geojson
+assets/places_10m.geojson
+assets/rivers_10m.geojson
+assets/*.gfeat
 assets/*.gmesh
 
 # Real Earth imagery is fetched by Nix or explicitly provided to CMake.
 assets/earth.jpg
+
+# Python bytecode from build-time GeoJSON preprocessing
+__pycache__/
+*.pyc

@@ -7,8 +7,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 - **Globtoo application source code, icons, documentation and screenshots:** GPL-3.0-or-later (see `LICENSE` and `LICENSES/GPL-3.0-or-later.txt`).
 - **stb_image.h** in `external/`: Sean Barrett and contributors. The upstream header offers MIT or public-domain terms; Globtoo uses its MIT option (see `LICENSES/MIT.txt`).
-- **Natural Earth country boundaries:** public domain. Downloaded by the Nix
-  build and compiled into the distributed country meshes.
+- **Natural Earth boundaries, populated places, and rivers:** public domain.
+  Downloaded by the Nix build and converted into the distributed country
+  meshes and compact point/line feature asset.
 - **Earth imagery:** NASA Blue Marble–derived image, public domain; fetched by
   the Nix build. Credit: NASA Earth Observatory / Reto Stöckli. No placeholder Earth texture is distributed in the source tree.
 

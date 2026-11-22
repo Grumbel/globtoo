@@ -17,6 +17,7 @@
 #include "ui.hpp"
 #include "map_view.hpp"
 #include "markers.hpp"
+#include "geographic_overlay.hpp"
 #include "resources.hpp"
 #include "stb_image.h"
 
@@ -128,6 +129,9 @@ int main(int argc, char** argv) {
     if (!countries_init(countries, nullptr))
         fprintf(stderr, "Warning: countries failed to init\n");
 
+    GeographicOverlay geography{};
+    geographic_overlay_init(geography);
+
     Ui ui{};
     if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
 
@@ -174,8 +178,11 @@ int main(int argc, char** argv) {
         // Preserve globe depth: it occludes political geometry behind the horizon.
         countries_draw(countries, cam, aspect, map, globe.shading,
                        country_fill_opacity(globe.texture_visible, globe.texture.id != 0));
+        geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
+        ui.label_boxes.clear();
         ui_draw_graticule(ui,cam,map,aspect);
         ui_draw_country_names(ui,countries,cam,map,aspect);
+        ui_draw_places(ui,geography.features,cam,map,aspect);
         ui_draw_markers(ui,options.markers,cam,map,aspect);
         ui_draw(ui,cam,map,globe,countries);
         ui_flush(ui);
@@ -184,6 +191,7 @@ int main(int argc, char** argv) {
     }
 
     ui_shutdown(ui);
+    geographic_overlay_shutdown(geography);
     countries_shutdown(countries);
     stars_shutdown(stars);
     globe_shutdown(globe);

@@ -83,9 +83,21 @@ int main() {
     assert(!ui_event(ui,event,cam,map,globe,countries,input));
 
     // Main toolbar has moved to the bottom; hit-testing follows drawing.
-    event.button.y = 777.f;
+    event.button.y = 731.f;
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(ui.grid_visible);
+
+    // New third-row overlays are independent, and can be toggled separately.
+    event.button.y = 772.f;
+    event.button.x = 40.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(!ui.capitals_visible && ui.cities_visible && ui.rivers_visible);
+    event.button.x = 160.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(!ui.cities_visible);
+    event.button.x = 260.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(!ui.rivers_visible);
 
     // Ruler has moved to the right, just below the compass; it consumes clicks.
     event.button.x = 1100.f;

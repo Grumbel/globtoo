@@ -87,6 +87,8 @@ add_executable(globtoo
   src/ui.cpp
   src/markers.cpp
   src/resources.cpp
+  src/geographic_features.cpp
+  src/geographic_overlay.cpp
 )
 
 target_include_directories(globtoo PRIVATE
@@ -142,6 +144,31 @@ if(COUNTRY_MESH_OUTPUTS)
   endif()
 endif()
 
+# Optional Natural Earth 10m populated places / river centerlines. Convert to
+# one compact versioned binary file, so startup never parses huge GeoJSON.
+# Local source builds can omit these files; Nix provides both pinned inputs.
+set(GEOGRAPHIC_FEATURE_OUTPUT "")
+if(EXISTS "${CMAKE_SOURCE_DIR}/assets/places_10m.geojson" AND
+   EXISTS "${CMAKE_SOURCE_DIR}/assets/rivers_10m.geojson")
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  set(GEOGRAPHIC_FEATURE_OUTPUT "${CMAKE_BINARY_DIR}/generated-assets/geographic_10m.gfeat")
+  add_custom_command(OUTPUT "${GEOGRAPHIC_FEATURE_OUTPUT}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/generated-assets"
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/build_geographic_features.py"
+      --places "${CMAKE_SOURCE_DIR}/assets/places_10m.geojson"
+      --rivers "${CMAKE_SOURCE_DIR}/assets/rivers_10m.geojson"
+      --output "${GEOGRAPHIC_FEATURE_OUTPUT}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/tools/build_geographic_features.py"
+      "${CMAKE_SOURCE_DIR}/assets/places_10m.geojson"
+      "${CMAKE_SOURCE_DIR}/assets/rivers_10m.geojson"
+    COMMENT "Compiling Natural Earth 10m populated places and rivers"
+    VERBATIM)
+  add_custom_target(geographic_features_asset ALL DEPENDS "${GEOGRAPHIC_FEATURE_OUTPUT}")
+  if(GLOBTOO_BUILD_APP)
+    add_dependencies(globtoo geographic_features_asset)
+  endif()
+endif()
+
 # Stage only explicitly approved runtime assets beside a build-tree binary.
 # Never copy all of assets/: that could reintroduce an old placeholder image
 # or ship bulky GeoJSON source data by accident.
@@ -165,6 +192,12 @@ if(GLOBTOO_BUILD_APP)
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/assets/countries.geojson" "$<TARGET_FILE_DIR:globtoo>/assets/countries.geojson"
+      VERBATIM)
+  endif()
+  if(GEOGRAPHIC_FEATURE_OUTPUT)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${GEOGRAPHIC_FEATURE_OUTPUT}" "$<TARGET_FILE_DIR:globtoo>/assets/geographic_10m.gfeat"
       VERBATIM)
   endif()
   if(COUNTRY_MESH_OUTPUTS)
@@ -193,6 +226,10 @@ if(GLOBTOO_BUILD_APP)
   endif()
   if(EXISTS "${CMAKE_SOURCE_DIR}/assets/countries.geojson")
     install(FILES "${CMAKE_SOURCE_DIR}/assets/countries.geojson"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
+  endif()
+  if(GEOGRAPHIC_FEATURE_OUTPUT)
+    install(FILES "${GEOGRAPHIC_FEATURE_OUTPUT}"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
   endif()
   if(COUNTRY_MESH_OUTPUTS)
@@ -242,11 +279,25 @@ if(BUILD_TESTING)
     add_test(NAME input_mouse COMMAND input_mouse_test)
     add_executable(ui_event_test tests/ui_event_test.cpp
       src/ui.cpp src/input.cpp src/camera.cpp src/map_view.cpp src/scene.cpp
-      src/shader.cpp src/resources.cpp)
+      src/shader.cpp src/resources.cpp src/geographic_features.cpp)
     target_include_directories(ui_event_test PRIVATE src ${SDL3_INCLUDE_DIRS})
     target_link_libraries(ui_event_test PRIVATE ${SDL3_LIBRARIES} ${GLES2_LIB} m)
     target_compile_options(ui_event_test PRIVATE -Wall -Wextra -UNDEBUG)
     add_test(NAME ui_event COMMAND ui_event_test)
+  endif()
+  find_package(Python3 QUIET COMPONENTS Interpreter)
+  if(Python3_Interpreter_FOUND)
+    add_test(NAME geographic_compiler
+      COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/geographic_compiler_test.py")
+  endif()
+  add_executable(geographic_features_test tests/geographic_features_test.cpp
+    src/geographic_features.cpp)
+  target_include_directories(geographic_features_test PRIVATE src)
+  target_compile_options(geographic_features_test PRIVATE -Wall -Wextra -UNDEBUG)
+  add_test(NAME geographic_features COMMAND geographic_features_test)
+  if(GEOGRAPHIC_FEATURE_OUTPUT)
+    add_test(NAME geographic_features_compilation
+      COMMAND geographic_features_test "${GEOGRAPHIC_FEATURE_OUTPUT}")
   endif()
   add_executable(markers_test tests/markers_test.cpp src/markers.cpp)
   target_include_directories(markers_test PRIVATE src)

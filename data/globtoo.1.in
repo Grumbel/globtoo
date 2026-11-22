@@ -16,7 +16,7 @@ The starting view is oriented to the system timezone unless overridden with
 .BR \-\-center .
 .PP
 The on-screen toolbar controls projection, shading, texture, political
-colors, borders, labels, and grid. It also includes a compass and reset control.
+colors, borders, labels, capitals, cities, rivers, and grid. It also includes a compass and reset control.
 .SH OPTIONS
 .TP
 .BR \-h ", " \-\-help
@@ -112,7 +112,11 @@ Exit trackball mode, or quit Globtoo.
 The GUI provides a globe and four projections: equirectangular (Plate
 Carr\('ee), Mercator, Mollweide, and Hammer. The map transforms smoothly
 between the views. Layers can be independently enabled, including blending
-Earth texture beneath translucent political colors.
+Earth texture beneath translucent political colors. Capitals are shown as
+geographically anchored diamonds and major cities as dots; ranked rivers and
+more cities are revealed at closer zoom. Their visibility toggles are in the
+bottom toolbar. Supplied Natural Earth data is preprocessed into compact
+binary assets during build, with no runtime downloads.
 .SH ENVIRONMENT
 .TP
 .B GLOBE_ASSET_DIR
@@ -126,7 +130,7 @@ any working directory.
 .SH FILES
 .TP
 .I @CMAKE_INSTALL_FULL_DATADIR@/globtoo/
-Installed Earth imagery, compiled country meshes, and shaders.
+Installed Earth imagery, compiled country meshes, ranked geographic overlays, and shaders.
 .TP
 .I @CMAKE_INSTALL_FULL_DATADIR@/applications/io.github.Grumbel.globtoo.desktop
 Desktop launcher.

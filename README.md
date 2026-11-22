@@ -12,6 +12,7 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Inertia-based spin that feels like turning a real globe
 - Smooth zoom down to individual small countries
 - Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
+- Zoom-aware capitals, cities, and major rivers from Natural Earth 10m
 
 ![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
 
@@ -32,7 +33,10 @@ build, use `find result -type f` or `man -l result/share/man/man1/globtoo.1`.
 Dependencies: C++20 compiler, CMake 3.16+, SDL3, OpenGL ES 2.0/EGL, GEOS
 and pkg-config. For a complete political map, provide the Natural Earth
 50m/10m GeoJSON inputs under `assets/` before configuring (Nix downloads them
-automatically). For a textured standalone build, supply a real image with
+automatically). The optional populated-place and river overlays require
+`assets/places_10m.geojson` and `assets/rivers_10m.geojson` at configure
+time; Nix also downloads these sources automatically and compiles a compact
+`geographic_10m.gfeat` asset. For a textured standalone build, supply a real image with
 `-DGLOBTOO_EARTH_TEXTURE=/absolute/path/to/earth.jpg`. Without that option,
 Globtoo uses the solid-color globe (or accepts `--texture FILE` at runtime).
 No placeholder Earth image is distributed or installed.
@@ -58,7 +62,9 @@ the SDL window icon. Run `man globtoo` after installing to a prefix on your
 manpage search path.
 
 See [Release and packaging](docs/RELEASE.md) for version tagging and checks.
-For upcoming map, planet, and downloadable-layer features, see the ordered
+For the data conversion, ranking and geographic-overlay format, see
+[Geographic overlays](docs/GEOGRAPHY.md). For upcoming map, planet, and
+downloadable-layer features, see the ordered
 [development roadmap](TODO.md).
 
 Or development shell:
@@ -152,6 +158,15 @@ names, markers, and the optional geographic grid remain visible.
 - **Texture**: toggle the Earth imagery independently of the country colors. When both
   are enabled (the default), translucent country colors mix with the texture
   so terrain remains visible beneath the colors. Either layer can be shown alone.
+- **Capitals**: toggle national-capital diamonds and English labels.
+  Capital locations are always eligible regardless of zoom, but labels
+  are decluttered rather than drawn over one another.
+- **Cities**: toggle dots and labels for other Natural Earth populated places.
+  The display adds smaller cities as you zoom closer; rank and population
+  determine their priority.
+- **Rivers**: toggle major rivers and lake centerlines, in blue. Additional
+  tributaries are revealed as you zoom in. River segments follow the same
+  rotating geography and moving map seam as the country outlines.
 - **Grid**: toggle the adaptive geographic latitude/longitude graticule in
   all globe and map projections. Intervals get finer when zoomed in. Lines
   follow the actual geographic meridians/parallels, including polar rotation;

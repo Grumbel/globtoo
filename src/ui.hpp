@@ -9,6 +9,7 @@
 #include "countries.hpp"
 #include "map_view.hpp"
 #include "markers.hpp"
+#include "geographic_features.hpp"
 #include <SDL3/SDL.h>
 #include <string_view>
 #include <vector>
@@ -21,6 +22,9 @@ struct Ui {
     int hover = -1;
     bool visible = true; // Tab toggles screen-space controls, not map overlays
     bool grid_visible = false;
+    bool capitals_visible = true, cities_visible = true, rivers_visible = true;
+    struct LabelBox { float x,y,w,h; };
+    std::vector<LabelBox> label_boxes;
     double scale_bar_km = 0.;
     float scale_bar_pixels = 0.f;
     double grid_lon_step = 30., grid_lat_step = 30.;
@@ -39,6 +43,8 @@ void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspe
 void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam,
                            const MapView& map, float aspect);
 // Draw screen-space marker pins on top of country labels, but behind controls.
+void ui_draw_places(Ui& ui, const GeographicFeatures& geography,
+                    const Camera& cam, const MapView& map, float aspect);
 void ui_draw_markers(Ui& ui, const std::vector<Marker>& markers, const Camera& cam,
                      const MapView& map, float aspect);
 void ui_flush(Ui& ui);
