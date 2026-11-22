@@ -139,6 +139,7 @@ MapFrame map_frame(const MapView& m) {
 
 void map_reset_navigation(MapView& m) {
     m.navigation_active=false;
+    m.pan_x=m.pan_y=0.;
 }
 
 std::array<double, 2> map_relative_lonlat(const MapView& m,
@@ -171,9 +172,105 @@ std::array<double, 2> map_geographic_center(const MapView& m) {
             std::asin(std::clamp(f.center[1],-1.,1.))};
 }
 
+std::optional<std::array<double, 2>> map_sheet_center(const MapView& m) {
+    if (m.flat_goal < .5f) return std::nullopt;
+    // Undo screen translation and roll to get the sheet coordinate under the
+    // viewport center. The inverse of each projection then recovers the point
+    // on the *rotated* geographic globe (which can cross the physical poles).
+    const double cr=std::cos(m.roll), sr=std::sin(m.roll);
+    const double x=-(cr*m.pan_x+sr*m.pan_y)/m.zoom;
+    const double y=(sr*m.pan_x-cr*m.pan_y)/m.zoom;
+    auto inverse=[](MapProjection p, double x, double y,
+                    double& lon, double& lat) -> bool {
+        switch (p) {
+        case MapProjection::Globe:
+        case MapProjection::Equirectangular:
+            lon=x; lat=y; break;
+        case MapProjection::Mercator: {
+            lon=x;
+            const double ymax=.65*std::asinh(std::tan(max_lat));
+            if (std::abs(y)>ymax)
+                lat=std::copysign(max_lat+(std::abs(y)-ymax)*std::cos(max_lat)/.65,y);
+            else lat=std::atan(std::sinh(y/.65));
+            break;
+        }
+        case MapProjection::Mollweide: {
+            if (std::abs(y)>std::sqrt(2.)+1e-8) return false;
+            const double theta=std::asin(std::clamp(y/std::sqrt(2.),-1.,1.));
+            lat=std::asin(std::clamp((2*theta+std::sin(2*theta))/pi,-1.,1.));
+            const double c=std::cos(theta);
+            if (std::abs(c)<1e-8) { if (std::abs(x)>1e-8) return false; lon=0.; }
+            else lon=x*pi/(2*std::sqrt(2.)*c);
+            break;
+        }
+        case MapProjection::Hammer: {
+            const double z2=1.-x*x/16.-y*y/4.;
+            if (z2<0.) return false;
+            const double z=std::sqrt(z2);
+            if (std::abs(z*y)>1.+1e-8) return false;
+            lat=std::asin(std::clamp(z*y,-1.,1.));
+            lon=2*std::atan2(z*x,2*(2*z*z-1.));
+            break;
+        }
+        }
+        return std::abs(lon)<=pi+1e-8 && std::abs(lat)<=pi/2+1e-8;
+    };
+    // Cylindrical maps are periodic in longitude; keep the inverse inside
+    // one map, independently of the current middle-drag translation.
+    const bool repeating=(m.from==MapProjection::Equirectangular ||
+                          m.from==MapProjection::Mercator) &&
+                         (m.to==MapProjection::Equirectangular ||
+                          m.to==MapProjection::Mercator);
+    const double px=repeating ? std::remainder(x,2*pi) : x;
+    double lon=0.,lat=0.;
+    if (!inverse(m.projection_blend<.5f ? m.from : m.to,px,y,lon,lat))
+        return std::nullopt;
+    if (m.from!=m.to && m.projection_blend>0. && m.projection_blend<1.) {
+        // Projection-to-projection morph: invert the blended map by Newton
+        // iteration, starting from the analytic inverse of the nearest end.
+        const double t=m.projection_blend;
+        const auto projected=[&](double l, double a) {
+            const auto f=map_project(m.from,l,a), g=map_project(m.to,l,a);
+            return std::array<double,2>{(1.-t)*f[0]+t*g[0],
+                                        (1.-t)*f[1]+t*g[1]};
+        };
+        for (int i=0;i<12;i++) {
+            const auto p=projected(lon,lat);
+            const double fx=p[0]-px, fy=p[1]-y;
+            if (std::hypot(fx,fy)<1e-8) break;
+            constexpr double h=1e-5;
+            const auto ex=projected(lon+h,lat), ey=projected(lon,lat+h);
+            const double a=(ex[0]-p[0])/h, b=(ey[0]-p[0])/h;
+            const double c=(ex[1]-p[1])/h, d=(ey[1]-p[1])/h;
+            const double det=a*d-b*c;
+            if (std::abs(det)<1e-10) return std::nullopt;
+            lon-=std::clamp((d*fx-b*fy)/det,-.5,.5);
+            lat=std::clamp(lat-std::clamp((-c*fx+a*fy)/det,-.5,.5),-pi/2,pi/2);
+        }
+        const auto p=projected(lon,lat);
+        if (std::hypot(p[0]-px,p[1]-y)>1e-5 || std::abs(lon)>pi+1e-8)
+            return std::nullopt;
+    }
+    const auto f=map_frame(m);
+    const double cp=std::cos(lat);
+    const std::array<double,3> v{
+        cp*(std::cos(lon)*f.center[0]+std::sin(lon)*f.east[0])+std::sin(lat)*f.north[0],
+        cp*(std::cos(lon)*f.center[1]+std::sin(lon)*f.east[1])+std::sin(lat)*f.north[1],
+        cp*(std::cos(lon)*f.center[2]+std::sin(lon)*f.east[2])+std::sin(lat)*f.north[2]};
+    return std::array<double,2>{std::atan2(-v[2],v[0]),
+                                std::asin(std::clamp(v[1],-1.,1.))};
+}
+
 void map_apply_roll(MapView& m, float dx_pixels, float sensitivity) {
     if (m.flat_goal < .5f) return;
-    m.roll = std::remainder(m.roll + dx_pixels*sensitivity, 2*pi);
+    const double angle=dx_pixels*sensitivity;
+    m.roll = std::remainder(m.roll + angle, 2*pi);
+    // Roll the panned sheet around the viewport center, not around its
+    // original geographic origin (which may now lie outside the screen).
+    const double cr=std::cos(angle), sr=std::sin(angle);
+    const double x=cr*m.pan_x-sr*m.pan_y;
+    m.pan_y=sr*m.pan_x+cr*m.pan_y;
+    m.pan_x=x;
 }
 
 double map_north_heading(const MapView& m, const Camera& cam) {
@@ -206,7 +303,7 @@ double map_north_heading(const MapView& m, const Camera& cam) {
 
 void map_align_north(MapView& m, Camera& cam) {
     if (m.flat_goal > .5f) {
-        m.roll=std::remainder(m.roll+map_north_heading(m,cam),2*pi);
+        map_apply_roll(m,static_cast<float>(map_north_heading(m,cam)),1.f);
     } else {
         camera_grab_end(cam);
         camera_grab_kill_inertia(cam);
@@ -231,7 +328,7 @@ void map_select(MapView& m, MapProjection selected, Camera& cam) {
     if (selected == MapProjection::Globe) {
         // Fold using the complete navigated frame, not the Euler angles that
         // become singular when the user drags sideways at a geographic pole.
-        const auto center=map_geographic_center(m);
+        const auto center=map_sheet_center(m).value_or(map_geographic_center(m));
         const double heading=map_north_heading(m,cam);
         camera_center_on(cam,center[0]*geo::to_deg,center[1]*geo::to_deg);
         camera_apply_roll(cam,static_cast<float>(-heading),1.f);
@@ -321,6 +418,30 @@ void map_pan(MapView& m, float dx_pixels, float dy_pixels, int height) {
     m.center_lat=std::asin(std::clamp(m.navigation_frame.center[1],-1.,1.));
     m.navigation_lon=m.center_lon;
     m.navigation_lat=m.center_lat;
+}
+
+void map_grab_pan(MapView& m, float dx_pixels, float dy_pixels, int height) {
+    if (height <= 0 || m.flat_goal < .5f) return;
+    // Orthographic translation of the flat sheet in camera-plane units.
+    // Unlike map_pan(), this never changes the projected geographic frame.
+    const double units_per_pixel=2.*std::tan(.35)*m.map_distance/height;
+    m.pan_x += dx_pixels*units_per_pixel;
+    m.pan_y -= dy_pixels*units_per_pixel;
+
+    // Cylindrical maps repeat east/west. Reduce translation modulo one
+    // projected world in the ROLLED east direction so dragging arbitrarily
+    // far never makes the [-1,0,+1] rendered copies run out.
+    const auto cylindrical=[](MapProjection p) {
+        return p==MapProjection::Equirectangular || p==MapProjection::Mercator;
+    };
+    if (cylindrical(m.from) && cylindrical(m.to)) {
+        const double cr=std::cos(m.roll), sr=std::sin(m.roll);
+        const double east=cr*m.pan_x+sr*m.pan_y;
+        const double period=2*pi*m.zoom;
+        const double delta=std::remainder(east,period)-east;
+        m.pan_x+=delta*cr;
+        m.pan_y+=delta*sr;
+    }
 }
 
 void map_zoom(MapView& m, float wheel) {

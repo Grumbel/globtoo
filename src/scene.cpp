@@ -51,6 +51,9 @@ void scene_uniforms(const Shader& shader, const Camera& camera, float aspect,
     };
     setf(shader.program,"u_bounded_projection",oval(map.from)||oval(map.to) ? 1.f : 0.f);
     setf(shader.program,"u_map_roll",static_cast<float>(map.roll));
+    const GLint pan=glGetUniformLocation(shader.program,"u_map_pan");
+    if (pan>=0) glUniform2f(pan,static_cast<float>(map.pan_x),
+                           static_cast<float>(map.pan_y));
 }
 
 bool scene_project(const Camera& camera, float aspect, const MapView& map,
@@ -80,8 +83,8 @@ bool scene_project(const Camera& camera, float aspect, const MapView& map,
         const double cx=(1.-t)*cf[0]+t*ct[0];
         const double cy=(1.-t)*cf[1]+t*ct[1];
         const double cr=std::cos(map.roll),sr=std::sin(map.roll);
-        const double mx=(cr*cx-sr*cy)*map.zoom;
-        const double my=(sr*cx+cr*cy)*map.zoom;
+        const double mx=(cr*cx-sr*cy)*map.zoom+map.pan_x;
+        const double my=(sr*cx+cr*cy)*map.zoom+map.pan_y;
         const double morph=map.globe_to_flat;
         const Vec4 p{static_cast<float>(sphere.x*(1-morph)+mx*morph),
                      static_cast<float>(sphere.y*(1-morph)+my*morph),
@@ -103,5 +106,7 @@ bool scene_map_seam_visible(const MapView& map,float aspect) {
     const double t=map.projection_blend;
     const double half_width=.5*((1.-t)*map_world_width(map.from)+
                                   t*map_world_width(map.to));
-    return extent>=half_width*.97;
+    const double center_shift=std::abs(std::cos(map.roll)*map.pan_x+
+                                       std::sin(map.roll)*map.pan_y)/map.zoom;
+    return extent+center_shift>=half_width*.97;
 }

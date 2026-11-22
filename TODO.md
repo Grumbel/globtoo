@@ -13,6 +13,7 @@
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Middle-button screen-space grab/pan for 2D projections, separate from left-drag Earth rotation; seamless cylindrical wrap
 - [x] Repeatable CLI markers (decimal, compass, DMS, decimal minutes, Geo URI,
       ISO 6709) with optional labels, CSV import, pin colors/sizes and explicit view center
 - [x] Markers follow globe/map projection, occlusion and transformations

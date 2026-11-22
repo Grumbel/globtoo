@@ -2,6 +2,7 @@
 
 #include "camera.hpp"
 #include <array>
+#include <optional>
 
 // Geographic projections. 0 is the three-dimensional globe, 1..4 are flat.
 enum class MapProjection : int { Globe = 0, Equirectangular = 1, Mercator = 2,
@@ -22,6 +23,9 @@ struct MapView {
     float projection_blend = 1.f;
     float map_distance = 5.8f;
     float zoom = 1.f;
+    // Flat map sheet translation in camera-plane units, independent of the
+    // rotating geographic reference frame (middle-mouse grab/pan).
+    double pan_x = 0.0, pan_y = 0.0;
     static constexpr float max_zoom = 80.f;
     double center_lon = 0.0; // radians, projection's central meridian
     double center_lat = 0.0; // radians; initial orientation / current geographic latitude
@@ -38,6 +42,8 @@ std::array<double, 2> map_project(MapProjection projection, double relative_lon,
 void map_select(MapView& map, MapProjection projection, Camera& cam);
 void map_update(MapView& map, float dt);
 void map_pan(MapView& map, float dx_pixels, float dy_pixels, int height);
+// Move the projected map on screen, without rotating the Earth or its compass.
+void map_grab_pan(MapView& map, float dx_pixels, float dy_pixels, int height);
 void map_zoom(MapView& map, float wheel);
 // Reprojection is defined by a *rotated globe* centered at the viewing point.
 // These form a right-handed local tangent frame; unlike reflected map copies,
@@ -52,6 +58,9 @@ double map_unwrap_lon(double longitude, double reference);
 // Width of a complete projected world for horizontal tiling.
 double map_world_width(MapProjection projection);
 std::array<double, 2> map_geographic_center(const MapView& map);
+// Geographic point under the screen center after a 2D sheet grab, in radians.
+// Empty if a finite oval map was dragged completely away from screen center.
+std::optional<std::array<double, 2>> map_sheet_center(const MapView& map);
 void map_apply_roll(MapView& map, float dx_pixels, float sensitivity = .005f);
 // Clockwise screen bearing of geographic north at the viewport center, in
 // radians (zero means north points up); follows true geographic north

@@ -273,6 +273,11 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
               Globe& globe,Countries& countries,InputState& input) {
     if (e.type!=SDL_EVENT_MOUSE_MOTION && e.type!=SDL_EVENT_MOUSE_BUTTON_DOWN &&
         e.type!=SDL_EVENT_MOUSE_BUTTON_UP && e.type!=SDL_EVENT_MOUSE_WHEEL) return false;
+    // Captured drags continue even if the cursor passes over controls;
+    // otherwise releasing above the toolbar leaves a stuck drag.
+    if (input.dragging && (e.type==SDL_EVENT_MOUSE_MOTION ||
+        (e.type==SDL_EVENT_MOUSE_BUTTON_UP && e.button.button==input.drag_button)))
+        return false;
     float x=0,y=0;
     if (e.type==SDL_EVENT_MOUSE_MOTION) { x=e.motion.x; y=e.motion.y; }
     else if(e.type==SDL_EVENT_MOUSE_BUTTON_DOWN || e.type==SDL_EVENT_MOUSE_BUTTON_UP) {
@@ -287,6 +292,7 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
     if (!on_toolbar && !on_compass && !on_scale) return false;
     if (e.type==SDL_EVENT_MOUSE_BUTTON_UP && e.button.button==SDL_BUTTON_LEFT) {
         input.dragging=false;
+        input.drag_button=0;
         camera_grab_end(cam);
     }
     // All visible control surfaces consume input, including the compass
@@ -304,6 +310,7 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         if (command>=0 && e.type==SDL_EVENT_MOUSE_BUTTON_DOWN &&
             e.button.button==SDL_BUTTON_LEFT) {
             input.dragging=false;
+            input.drag_button=0;
             execute(command,cam,map,globe,countries,input);
         }
         return true;
@@ -313,6 +320,7 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         ui.hover=b.command;
         if (e.type==SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button==SDL_BUTTON_LEFT) {
             input.dragging=false;
+            input.drag_button=0;
             camera_grab_end(cam);
             if (b.command == 15) ui.grid_visible = !ui.grid_visible;
             else execute(b.command,cam,map,globe,countries,input);
@@ -336,13 +344,19 @@ LocalScale local_scale(const Ui& ui, const Camera& cam, const MapView& map,
     const bool flat=map.globe_to_flat>=.5f;
     const auto frame=map_frame(map);
     const Vec3 eye=camera_view_to_world(cam,{0,0,1});
-    const std::array<double,3> c=flat ? frame.center :
-        std::array<double,3>{eye.x,eye.y,eye.z};
+    const auto ll_center=flat ? map_sheet_center(map) : std::nullopt;
+    const std::array<double,3> c=ll_center ?
+        geo::lonlat_to_xyz((*ll_center)[0]*geo::to_deg,(*ll_center)[1]*geo::to_deg,1.) :
+        (flat ? frame.center : std::array<double,3>{eye.x,eye.y,eye.z});
     const Vec3 view_right=camera_view_to_world(cam,{1,0,0});
     const Vec3 view_up=camera_view_to_world(cam,{0,1,0});
-    const std::array<double,3> east=flat ? frame.east :
+    const auto realgeo=geo::xyz_to_lonlat(c[0],c[1],c[2]);
+    const double lon=realgeo[0]*geo::to_rad, lat=realgeo[1]*geo::to_rad;
+    const std::array<double,3> east=flat ?
+        std::array<double,3>{-std::sin(lon),0.,-std::cos(lon)} :
         std::array<double,3>{view_right.x,view_right.y,view_right.z};
-    const std::array<double,3> north=flat ? frame.north :
+    const std::array<double,3> north=flat ?
+        std::array<double,3>{-std::sin(lat)*std::cos(lon),std::cos(lat),std::sin(lat)*std::sin(lon)} :
         std::array<double,3>{view_up.x,view_up.y,view_up.z};
     const auto ll=geo::xyz_to_lonlat(c[0],c[1],c[2]);
     const auto screen=[&](const std::array<double,3>& v, float& x, float& y) {

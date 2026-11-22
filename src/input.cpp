@@ -9,6 +9,7 @@ static void mouse_to_ndc(const InputState& in, float mx, float my, float& ndc_x,
 void input_set_trackball(InputState& in, bool on) {
     in.trackball = on;
     in.dragging = false;
+    in.drag_button = 0;
     in.rotation_drag = false;
     if (in.window) {
         // SDL3: relative mode grabs the mouse and reports deltas
@@ -67,6 +68,7 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
                 fprintf(stderr, "Control: Arcball\n");
             }
             in.dragging = false;
+            in.drag_button = 0;
             camera_grab_kill_inertia(cam);
         } else if (e.key.key == SDLK_SPACE) {
             globe.shading = !globe.shading;
@@ -95,8 +97,18 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
             if (e.button.button == SDL_BUTTON_LEFT) input_set_trackball(in, false);
             break;
         }
+        if (in.dragging) break;
+        if (e.button.button == SDL_BUTTON_MIDDLE && map.flat_goal > .5f) {
+            in.dragging = true;
+            in.drag_button = SDL_BUTTON_MIDDLE;
+            in.rotation_drag = false;
+            in.last_x = e.button.x;
+            in.last_y = e.button.y;
+            break;
+        }
         if (e.button.button == SDL_BUTTON_LEFT) {
             in.dragging = true;
+            in.drag_button = SDL_BUTTON_LEFT;
             in.rotation_drag = in.shift_down || (SDL_GetModState() & SDL_KMOD_SHIFT);
             in.last_x = e.button.x;
             in.last_y = e.button.y;
@@ -109,15 +121,18 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
                 float nx, ny;
                 mouse_to_ndc(in, e.button.x, e.button.y, nx, ny);
                 float aspect = (float)in.viewport_w / (float)(in.viewport_h > 0 ? in.viewport_h : 1);
-                if (!camera_grab_begin(cam, nx, ny, aspect))
+                if (!camera_grab_begin(cam, nx, ny, aspect)) {
                     in.dragging = false;
+                    in.drag_button = 0;
+                }
             }
         }
         break;
 
     case SDL_EVENT_MOUSE_BUTTON_UP:
-        if (e.button.button == SDL_BUTTON_LEFT) {
+        if (in.dragging && e.button.button == in.drag_button) {
             in.dragging = false;
+            in.drag_button = 0;
             in.rotation_drag = false;
             if (cam.mode == ControlMode::Grab)
                 camera_grab_end(cam);
@@ -141,7 +156,9 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
 
         if (map.flat_goal > .5f) {
             if (in.dragging) {
-                if (in.rotation_drag) map_apply_roll(map,dx);
+                if (in.drag_button == SDL_BUTTON_MIDDLE)
+                    map_grab_pan(map,dx,dy,in.viewport_h);
+                else if (in.rotation_drag) map_apply_roll(map,dx);
                 else map_pan(map,dx,dy,in.viewport_h);
             }
         } else if (in.rotation_drag || in.shift_down) {

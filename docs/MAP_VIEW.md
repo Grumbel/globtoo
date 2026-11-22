@@ -58,10 +58,15 @@ The globe and flat maps still have intrinsic topological differences. A global
 reprojection puts its cut opposite the current viewing center. Mercator's
 finite continuation above ±85° is intentionally not conformal at the pole.
 
-Shift+left-drag rotates the flat map around its center. Regular dragging
-applies the inverse roll before updating the map's geographic center,
-allowing panning in any rotated orientation. Globe↔map mode switches preserve
-this roll and the true geographic center even after crossing the poles.
+Shift+left-drag rotates the flat map around its center. Left-drag
+reprojects the entire Earth, applying inverse roll to geographic movement
+so navigation crosses either pole. **Middle-drag** instead translates the
+projected 2D sheet in the screen plane, without changing the geographic
+center or the projection frame. This works at any zoom and orientation;
+for cylindrical projections the horizontal translation wraps continuously.
+The graticule and distance ruler follow the location beneath screen center,
+and folding a panned map back into the globe centers that visible location.
+Globe↔map mode switches preserve the map roll and geographic orientation.
 
 ## Compass, North-up and Reset
 

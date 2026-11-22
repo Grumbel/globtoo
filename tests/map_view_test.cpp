@@ -56,6 +56,115 @@ int main() {
     assert(map.zoom <= MapView::max_zoom);
     map_select(map,MapProjection::Globe,cam);
 
+    // Middle-button grab is a screen-space sheet translation, NOT geographic
+    // reprojection. At every zoom, a 75x40 pixel drag moves the map by exactly
+    // 75x40 pixels; the map frame, compass and geographic center stay put.
+    for (auto projection : {MapProjection::Equirectangular, MapProjection::Mercator,
+                            MapProjection::Mollweide, MapProjection::Hammer}) {
+        MapView sheet{};
+        sheet.selected=sheet.from=sheet.to=projection;
+        sheet.flat_goal=sheet.globe_to_flat=1.f;
+        sheet.center_lon=.4;
+        sheet.center_lat=.6;
+        sheet.roll=.7;
+        for (float zoom : {1.f, 25.f, 80.f}) {
+            sheet.zoom=zoom;
+            sheet.pan_x=sheet.pan_y=0.;
+            const auto saved_frame=map_frame(sheet);
+            const auto saved_geo=map_geographic_center(sheet);
+            const auto heading=map_north_heading(sheet,cam);
+            map_grab_pan(sheet,75.f,-40.f,800);
+            const double unit=2.*std::tan(.35)*sheet.map_distance/800.;
+            assert(near(sheet.pan_x,75.*unit,1e-6));
+            assert(near(sheet.pan_y,40.*unit,1e-6));
+            assert(near(map_north_heading(sheet,cam),heading,1e-9));
+            const auto geo=map_geographic_center(sheet);
+            assert(near(geo[0],saved_geo[0],1e-9) && near(geo[1],saved_geo[1],1e-9));
+            const auto new_frame=map_frame(sheet);
+            for (int k=0;k<3;k++) {
+                assert(near(saved_frame.east[k],new_frame.east[k],1e-9));
+                assert(near(saved_frame.north[k],new_frame.north[k],1e-9));
+                assert(near(saved_frame.center[k],new_frame.center[k],1e-9));
+            }
+            map_grab_pan(sheet,-75.f,40.f,800);
+            assert(near(sheet.pan_x,0.,1e-6) && near(sheet.pan_y,0.,1e-6));
+        }
+        sheet.zoom=7.f;
+        map_grab_pan(sheet,100.f,70.f,800);
+        const auto old_x=sheet.pan_x, old_y=sheet.pan_y;
+        // Projection changes retain the sheet translation.
+        map_select(sheet,MapProjection::Equirectangular,cam);
+        assert(near(sheet.pan_x,old_x) && near(sheet.pan_y,old_y));
+        // Full reset clears it, as does returning from the globe.
+        map_reset_navigation(sheet);
+        assert(sheet.pan_x==0. && sheet.pan_y==0.);
+    }
+    // A screen-space grab must also update the physical location under the
+    // screen center. Verify inverse projection for every 2D map, including
+    // high zoom, roll, and a geographic reference frame away from the equator.
+    for (auto projection : {MapProjection::Equirectangular, MapProjection::Mercator,
+                            MapProjection::Mollweide, MapProjection::Hammer}) {
+        MapView m{};
+        m.selected=m.from=m.to=projection;
+        m.flat_goal=m.globe_to_flat=1.f;
+        m.zoom=30.f;
+        m.roll=.35;
+        m.center_lon=.7;
+        m.center_lat=.4;
+        const double local_lon=.42, local_lat=.27;
+        const auto xy=map_project(projection,local_lon,local_lat);
+        const double cr=std::cos(m.roll), sr=std::sin(m.roll);
+        m.pan_x=-(cr*xy[0]-sr*xy[1])*m.zoom;
+        m.pan_y=-(sr*xy[0]+cr*xy[1])*m.zoom;
+        const auto at_center=map_sheet_center(m);
+        assert(at_center);
+        // Rolling a panned map must rotate the translation as well, keeping
+        // the same geographic point under the viewport center.
+        map_apply_roll(m,20.f);
+        const auto after_roll=map_sheet_center(m);
+        assert(after_roll);
+        assert(near(after_roll->at(0),at_center->at(0),1e-6));
+        assert(near(after_roll->at(1),at_center->at(1),1e-6));
+        const auto actual=map_relative_lonlat(m,(*at_center)[0],(*at_center)[1]);
+        assert(near(actual[0],local_lon,1e-6));
+        assert(near(actual[1],local_lat,1e-6));
+        // Folding into a 3D globe should center the location the user slid
+        // beneath the screen, not the old (now off-screen) map origin.
+        Camera globe_camera{};
+        map_select(m,MapProjection::Globe,globe_camera);
+        const Vec3 facing=camera_view_to_world(globe_camera,{0,0,1});
+        const auto ll=geo::xyz_to_lonlat(facing.x,facing.y,facing.z);
+        assert(near(ll[0]*geo::to_rad,(*at_center)[0],1e-5));
+        assert(near(ll[1]*geo::to_rad,(*at_center)[1],1e-5));
+    }
+    // If a bounded oval has been pulled completely off screen, there is no
+    // geographic sheet center to invent.
+    MapView oval{};
+    oval.flat_goal=oval.globe_to_flat=1.f;
+    oval.from=oval.to=oval.selected=MapProjection::Hammer;
+    oval.pan_x=100.;
+    assert(!map_sheet_center(oval));
+
+    // Longitude wraps endlessly in cylindrical maps even after dragging many
+    // complete worlds, including when the sheet has been rolled.
+    for (auto projection : {MapProjection::Equirectangular, MapProjection::Mercator}) {
+        MapView wrapped{};
+        wrapped.selected=wrapped.from=wrapped.to=projection;
+        wrapped.flat_goal=wrapped.globe_to_flat=1.f;
+        wrapped.zoom=10.f;
+        wrapped.roll=.8;
+        const auto before=map_frame(wrapped);
+        for (int i=0;i<300;i++) map_grab_pan(wrapped,800.f,500.f,800);
+        const double along=std::cos(wrapped.roll)*wrapped.pan_x+
+                           std::sin(wrapped.roll)*wrapped.pan_y;
+        assert(std::abs(along)<=geo::pi*wrapped.zoom+1e-6);
+        const auto after=map_frame(wrapped);
+        for (int k=0;k<3;k++) assert(near(before.center[k],after.center[k],1e-9));
+    }
+    MapView sphere_pan{};
+    map_grab_pan(sphere_pan,100.f,100.f,800);
+    assert(sphere_pan.pan_x==0. && sphere_pan.pan_y==0.);
+
     // Reprojection rotates the geographic globe, not a map sheet. Moving
     // across a pole must change the *positions of every country*, not create
     // a mirrored copy of a flat 2D projection.

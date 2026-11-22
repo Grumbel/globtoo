@@ -13,6 +13,7 @@ uniform float u_map_zoom;
 uniform float u_map_distance;
 uniform float u_wrap; // longitude-copy index -1, 0, +1
 uniform float u_map_roll;
+uniform vec2 u_map_pan;
 varying mediump float v_map_lon;
 
 const float geo_pi = 3.141592653589793;
@@ -61,7 +62,7 @@ vec4 scene_position(vec3 sphere_xyz, vec3 primitive_anchor) {
         xy = mix(from_xy,xy,u_projection_blend);
     }
     float cr=cos(u_map_roll), sr=sin(u_map_roll);
-    xy = vec2(cr*xy.x-sr*xy.y, sr*xy.x+cr*xy.y)*u_map_zoom;
+    xy = vec2(cr*xy.x-sr*xy.y, sr*xy.x+cr*xy.y)*u_map_zoom + u_map_pan;
     vec3 globe_camera = (u_view * vec4(sphere_xyz,1.0)).xyz;
     vec3 flat_camera = vec3(xy,-u_map_distance);
     return u_projection * vec4(mix(globe_camera,flat_camera,u_morph),1.0);

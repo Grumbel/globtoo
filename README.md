@@ -119,9 +119,12 @@ Globtoo now has a small on-screen toolbar; keyboard shortcuts remain optional.
 - **North Up**: click the button or compass rose to straighten the view without panning or changing zoom (also works after a polar crossing).
 - **Reset**: below the compass; restore the timezone-relative viewpoint, North-up orientation, and default zoom without changing the selected projection.
 
-Mouse: drag to spin the globe or pan the flat map; wheel to zoom.
-**Shift+drag** rotates the 2D map around the viewport center, just as it
-rolls the 3D globe. The rotation is retained when unfolding or folding.
+Mouse: **left-drag** spins the globe or rotates/reprojects the Earth in 2D;
+**middle-drag** grabs and slides the 2D map like a paper sheet (no geographic
+rotation); wheel zooms. **Shift+left-drag** rolls the map around the viewport
+center, just as it rolls the 3D globe. The rotation is retained when unfolding or folding.
+The geographic grid and distance ruler track the point beneath screen center
+after middle-drag; folding to 3D centers that same point.
 Flat maps can be dragged north or south **through the poles**. Rather than
 mirroring a flat map sheet, the entire Earth rotates and is reprojected around
 the new geographic center. There are no mirrored north/south map copies.
