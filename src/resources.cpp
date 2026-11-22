@@ -29,7 +29,8 @@ std::string resource_user_data_path(std::string_view relative_path) {
     for (const char* name : {"moon", "mars", "io"}) {
         const std::string body(name);
         if (relative_path == "assets/" + body + ".jpg" ||
-            relative_path == "imagery/" + body + "/manifest.txt") {
+            relative_path == "imagery/" + body + "/manifest.txt" ||
+            relative_path == "imagery/" + body + "/preview-small.jpg") {
             approved=true;
             break;
         }
@@ -82,6 +83,22 @@ std::string resource_path(std::string_view relative_path) {
     // manifest integrity before publishing the entire directory.
     const std::string user_data = resource_user_data_path(relative_path);
     if (!user_data.empty() && regular_file(user_data)) return user_data;
+
+    // An audited map installer publishes imagery/<body>/preview-small.jpg,
+    // not assets/<body>.jpg. Prefer that preview to any packaged image, so
+    // the globe and its detail tiles always come from the SAME map. Limit
+    // this special case to the three supported bodies, never arbitrary paths.
+    for (const char* name : {"moon", "mars", "io"}) {
+        if (relative_path == std::string("assets/") + name + ".jpg") {
+            const std::string manifest = resource_user_data_path(
+                std::string("imagery/") + name + "/manifest.txt");
+            const std::string preview = resource_user_data_path(
+                std::string("imagery/") + name + "/preview-small.jpg");
+            if (!manifest.empty() && regular_file(manifest) && regular_file(preview))
+                return preview;
+            break;
+        }
+    }
 
     if (!executable_dir.empty()) {
         const fs::path bin = fs::path(executable_dir);

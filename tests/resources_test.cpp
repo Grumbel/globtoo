@@ -75,12 +75,21 @@ int main() {
     fs::create_directories(user_planets / "imagery" / "mars");
     fs::create_directories(user_planets / "assets");
     std::ofstream(user_planets / "imagery" / "mars" / "manifest.txt") << "user-mars";
+    std::ofstream(user_planets / "imagery" / "mars" / "preview-small.jpg") << "user-mars-preview";
     std::ofstream(user_planets / "assets" / "moon.jpg") << "user-moon";
     assert(fs::equivalent(resource_path("imagery/mars/manifest.txt"),
                           user_planets / "imagery" / "mars" / "manifest.txt"));
+    // The per-user installer puts both the tile manifest and preview under
+    // imagery/mars, and that preview must beat a packaged Mars base map.
+    assert(fs::equivalent(resource_path("assets/mars.jpg"),
+                          user_planets / "imagery" / "mars" / "preview-small.jpg"));
     assert(fs::equivalent(resource_path("assets/moon.jpg"),
                           user_planets / "assets" / "moon.jpg"));
     fs::remove(user_planets / "assets" / "moon.jpg");
+    // An incomplete directory must not shadow a packaged globe texture.
+    fs::remove(user_planets / "imagery" / "mars" / "preview-small.jpg");
+    assert(fs::equivalent(resource_path("assets/mars.jpg"),
+                          base / "bin" / "assets" / "mars.jpg"));
 #ifdef GLOBTOO_INSTALL_DATADIR
     assert(fs::equivalent(resource_path("assets/moon.jpg"),
                           base / "share" / "globtoo" / "assets" / "moon.jpg"));

@@ -155,6 +155,11 @@ silently download large maps or satellite data on an existing installation.
       directories. Verify manifest/checksums before publishing, use an atomic
       replacement and preserve the original maps on failures. This is **not**
       evidence of scientific coordinate registration or upstream hash checks.
+- [x] Wire pinned Moon/Mars Solar System Scope and USGS/Commons Io maps into
+      the default Nix package, with build-time GLES2 tiling and matching
+      low-resolution previews; keep a planetary-free `globtoo-earth` variant.
+      Published checksum records are used; live fetch/Nix build and landmark
+      orientation are still pending verification.
 - [ ] Expand verified asset catalog to licensed Moon/Mars/Io data and
       high-resolution tiled sources; support resumable multi-part downloads
       and interactive UI consent/progress as appropriate.

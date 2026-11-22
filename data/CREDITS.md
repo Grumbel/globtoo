@@ -23,3 +23,20 @@ packagers should ship the icon and corresponding desktop entry together.
 
 The AppStream metadata document is CC0-1.0 (`LICENSES/CC0-1.0.txt`).
 For individual file licensing, see the SPDX headers and `REUSE.toml`.
+
+## Bundled planetary imagery in the default Nix package
+
+- **Moon and Mars:** Solar System Scope, 8K planetary surface textures,
+  used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+  Source: https://www.solarsystemscope.com/textures/ . The images include
+  aesthetic processing and reconstructed/fictitious coverage; Globtoo rotates
+  and tiles them for OpenGL ES 2.0 and generates lower-resolution previews.
+- **Io:** USGS Astrogeology Research Program Galileo/Voyager composite,
+  public domain, mirrored at
+  https://commons.wikimedia.org/wiki/File:Io_for_GeoHacks.jpg .
+  Globtoo changes the source aspect ratio by one pixel to form an exact
+  2:1 global plate-carrée grid and produces tiled, longitude-normalized output.
+
+The files are downloaded at build time, not checked into the source tree.
+These acknowledgments do not imply affiliation or endorsement by NASA, USGS,
+Solar System Scope or Wikimedia Commons.

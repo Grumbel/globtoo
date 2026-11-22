@@ -419,3 +419,56 @@ subsequent Nix fetch.
   boundaries are Earth-only.
 - Hardware rendering and the geographic alignment of actual mosaics need
   testing with the original verified datasets, not just synthetic fixtures.
+
+## Reproducible Nix installation (Stage 13)
+
+The default `nix build` / `nix run` packages Earth, Moon, Mars and Io. The
+planetary data is **not** committed to Git: `flake.nix` pins each upstream
+image with a fixed-output hash, performs the oriented plate-carrée tile
+conversion during the build, and installs `share/globtoo/imagery/<body>/`
+(manifest, tiles, previews, source record). The `preview-small.jpg` is also
+installed as `share/globtoo/assets/<body>.jpg` so both the distant globe and
+close zoom show the same map.
+
+Sources and limitations:
+
+- Moon and Mars: Solar System Scope 8K maps (`8k_moon.jpg`, `8k_mars.jpg`),
+  CC BY 4.0. The hash pins are published in
+  [Orrery's ASSETS.md](https://github.com/RTF22/Orrery/blob/master/ASSETS.md);
+  the author fills some missing data with illustrative terrain. Map placement
+  (east-positive, −180° at the left) is a rendering assumption pending
+  comparison against authoritative crater/landmark coordinates.
+- Io: USGS Galileo/Voyager photomosaic mirrored by
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Io_for_GeoHacks.jpg),
+  public domain. The upstream SHA-1 hash is published in Commons file
+  metadata. The source is 1225×613 pixels, one column short of an exact 2:1
+  cylindrical texture, so Nix resamples it to 1226×613 before tiling. The
+  cartographic input is treated as west-positive, 0° at the left, with
+  spherical latitude. Visual registration against IAU features is outstanding.
+
+The package choices are `default` (Earth and all three bodies),
+`globtoo-earth` (full Earth assets only), and `globtoo-lite` (no bundled
+textures; the explicit Earth downloader is retained). Changing the map
+source or its hash in `flake.nix` should be accompanied by verifying the
+source's licensing and cartographic coordinate convention. A Nix hash
+ensures byte identity; it does not establish scientific georegistration.
+
+Downstream flakes can override just one body with a previously audited map:
+
+```nix
+let globtoo = inputs.globtoo.lib.${system}.withPlanetaryMaps {
+      mars = ./prepared-mars-tiles;
+    };
+in globtoo
+```
+
+The other bundled bodies remain unchanged. With `withPlanetaryMapsLite`, only
+the explicitly passed audited maps are included. For already-installed users,
+`tools/install_planetary_map.py` publishes maps to XDG user data and the viewer
+uses their preview and tiles together ahead of the package's bundled assets.
+
+**Build limitation:** These raster source URLs and externally published hashes
+have not yet been fetched/recomputed in the development sandbox, which lacks
+network access. Full Nix evaluation, package builds and GLES2 rendering must
+be verified on NixOS before treating the image pins and axis assumptions as
+fully validated.

@@ -91,9 +91,102 @@
           name = "ne_10m_rivers_lake_centerlines.geojson";
         };
 
-        # Downstream flakes can pass verified, already prepared tile trees
-        # without adding arbitrary network fetches or fake source hashes here.
-        mkPackage = { lite ? false, planetaryMaps ? {} }: pkgs.stdenv.mkDerivation {
+        # Real planetary rasters. Full/default builds prepare and install all
+        # three; lite builds do not fetch or process any planetary imagery.
+        # Fixed-output hashes come from published source/integrity records:
+        #   Moon/Mars: https://github.com/RTF22/Orrery/blob/master/ASSETS.md
+        #   Io: Wikimedia Commons File:Io_for_GeoHacks.jpg (SHA-1 imageinfo)
+        # These pins identify the bytes; scientifically exact registration still
+        # requires comparison with planetary control-network maps.
+        pythonWithPillow = pkgs.python3.withPackages (ps: [ ps.pillow ps.numpy ]);
+        moonRaster = pkgs.fetchurl {
+          url = "https://www.solarsystemscope.com/textures/download/8k_moon.jpg";
+          hash = "sha256-0Ydbzsg1iMol5IAuV29rufiLOeHkA8tB/1WGdBnFR5Y=";
+          name = "moon-8k.jpg";
+        };
+        marsRaster = pkgs.fetchurl {
+          url = "https://www.solarsystemscope.com/textures/download/8k_mars.jpg";
+          hash = "sha256-TMUhSZJKvGrlB9YwMvmU4dQqVcuCwJ4ALRpWf/ZsI+4=";
+          name = "mars-8k.jpg";
+        };
+        ioOriginal = pkgs.fetchurl {
+          url = "https://upload.wikimedia.org/wikipedia/commons/4/48/Io_for_GeoHacks.jpg";
+          sha1 = "8349d9424be6570cccda1d7ab3e85a82daf557cf";
+          name = "io-usgs.jpg";
+        };
+        # Commons' USGS original has 1225x613 pixels (one pixel short of an
+        # exact 2:1 grid). The raster compiler requires 2:1 cell sampling.
+        # Resample the width by just 0.08%; retain the original upstream pin
+        # and cite this geometric adjustment in the installed source record.
+        ioRaster = pkgs.runCommand "globtoo-io-plate-carree.jpg" {
+          nativeBuildInputs = [ pythonWithPillow ];
+        } ''
+          python3 - <<'PYTHON'
+          import os
+          from PIL import Image
+          with Image.open("${ioOriginal}") as source:
+              if source.size != (1225, 613):
+                  raise SystemExit(f"unexpected USGS Io mosaic size: {source.size}")
+              source.convert("RGB").resize((1226, 613), Image.Resampling.LANCZOS).save(
+                  os.environ["out"], format="JPEG", quality=95, subsampling=0)
+          PYTHON
+        '';
+
+        # All published imagery sources are global, north-up, plate carrée.
+        # Longitude conventions are explicit; they are not inferred by the
+        # converter. Solar System Scope maps are render-oriented (CC BY 4.0),
+        # not authoritative geographic control-network basemaps.
+        planetaryRasters = {
+          moon = {
+            source = moonRaster;
+            url = "https://www.solarsystemscope.com/textures/download/8k_moon.jpg";
+            license = "SolarSystemScope-CC-BY-4.0-display-mosaic";
+            positive = "east"; left = "180"; latitude = "planetocentric";
+          };
+          mars = {
+            source = marsRaster;
+            url = "https://www.solarsystemscope.com/textures/download/8k_mars.jpg";
+            license = "SolarSystemScope-CC-BY-4.0-display-mosaic";
+            positive = "east"; left = "180"; latitude = "planetocentric";
+          };
+          io = {
+            source = ioRaster;
+            url = "https://commons.wikimedia.org/wiki/File:Io_for_GeoHacks.jpg";
+            license = "USGS-NASA-public-domain";
+            positive = "west"; left = "0"; latitude = "planetocentric";
+          };
+        };
+
+        # A supplied audited map replaces the corresponding bundled source;
+        # a caller does not have to build, install or manually copy assets.
+        # Passing {} uses all bundled sources in the full build.
+        mkPackage = { lite ? false, planetaryMaps ? {},
+                      includePlanetaryTextures ? !lite }:
+          let
+            bodies = [ "moon" "mars" "io" ];
+            # Only selected assets are fetched; lite has no planetary fetches
+            # unless an audited map was explicitly supplied by the caller.
+            activeBodies = builtins.filter (body:
+              builtins.hasAttr body planetaryMaps || includePlanetaryTextures) bodies;
+            bodyFlags = pkgs.lib.concatMap (body:
+              let
+                upper = pkgs.lib.strings.toUpper body;
+              in
+                if builtins.hasAttr body planetaryMaps then [
+                  "-DGLOBTOO_${upper}_PREPARED_MAP=${builtins.getAttr body planetaryMaps}"
+                ] else if includePlanetaryTextures then
+                  let image = builtins.getAttr body planetaryRasters;
+                  in [
+                    "-DGLOBTOO_${upper}_IMAGERY_TEXTURE=${image.source}"
+                    "-DGLOBTOO_${upper}_LONGITUDE_POSITIVE=${image.positive}"
+                    "-DGLOBTOO_${upper}_LONGITUDE_LEFT=${image.left}"
+                    "-DGLOBTOO_${upper}_LATITUDE_TYPE=${image.latitude}"
+                    "-DGLOBTOO_${upper}_SOURCE=${image.url}"
+                    "-DGLOBTOO_${upper}_LICENSE=${image.license}"
+                  ]
+                else []
+            ) bodies;
+          in pkgs.stdenv.mkDerivation {
           pname = if lite then "globtoo-lite" else "globtoo";
           inherit version;
           src = ./.;
@@ -101,7 +194,7 @@
           nativeBuildInputs = with pkgs; [
             cmake
             pkg-config
-            python3
+            (if includePlanetaryTextures then pythonWithPillow else python3)
           ];
 
           buildInputs = (with pkgs; [
@@ -116,16 +209,8 @@
             "-DCMAKE_BUILD_TYPE=Release"
             "-DPROJECT_VERSION_FULL=${version}"
             "-DGLOBTOO_ENABLE_DOWNLOADS=${if lite then "ON" else "OFF"}"
-            # Install the pinned, fetched image itself; never a source-tree
-            # placeholder or a file that happened to be named earth.jpg.
-          ] ++ pkgs.lib.concatMap (body:
-            pkgs.lib.optional (builtins.hasAttr body planetaryMaps)
-              "-DGLOBTOO_${pkgs.lib.strings.toUpper body}_PREPARED_MAP=${builtins.getAttr body planetaryMaps}"
-          ) [ "moon" "mars" "io" ] ++ pkgs.lib.optionals (!lite) [
+          ] ++ bodyFlags ++ pkgs.lib.optionals (!lite) [
             "-DGLOBTOO_EARTH_TEXTURE=${earthTexture}"
-            # Optional high-resolution true-color tiles are supported by
-            # -DGLOBTOO_IMAGERY_TEXTURE=<verified path> from a downstream
-            # derivation; do not add a fetch with a fabricated hash here.
           ];
 
           doCheck = true;
@@ -135,8 +220,6 @@
             runHook postCheck
           '';
 
-          # Only GeoJSON is needed at source/configure time (mesh generation).
-          # The image is installed directly from its immutable fetchurl path.
           postPatch = ''
             mkdir -p assets
             cp ${countries50m} assets/countries_50m.geojson
@@ -146,13 +229,25 @@
             cp ${rivers10m} assets/rivers_10m.geojson
           '';
 
-          # cmake --install installs binary, shared resources, launcher,
-          # hicolor icon, AppStream metadata, manual and license. The binary
-          # locates share/globtoo relative to itself; no cd/wrapper required.
+          # An install lacking a body's preview would display a flat sphere at
+          # distant zoom levels, even though its tiles were installed. Fail
+          # the package build if the resource layout is incomplete.
+          postInstall = pkgs.lib.concatMapStringsSep "\n" (body: ''
+            test -s "$out/share/globtoo/imagery/${body}/manifest.txt"
+            test -s "$out/share/globtoo/imagery/${body}/preview-small.jpg"
+            test -s "$out/share/globtoo/assets/${body}.jpg"
+            cmp "$out/share/globtoo/assets/${body}.jpg" \
+                "$out/share/globtoo/imagery/${body}/preview-small.jpg"
+            test -s "$out/share/globtoo/imagery/${body}/source.txt" || \
+              test -s "$out/share/globtoo/imagery/${body}/source.json"
+          '') activeBodies;
 
           meta = with pkgs.lib; {
-            description = "Interactive 3D Earth globe with animated 2D projections";
-            license = licenses.gpl3Plus;
+            description = "Interactive 3D Earth and planetary globe with animated 2D projections";
+            # The optional bundled Solar System Scope mosaics are CC BY 4.0;
+            # the USGS Io map is public domain.
+            license = [ licenses.gpl3Plus ] ++
+              pkgs.lib.optionals includePlanetaryTextures [ licenses.cc-by-40 ];
             platforms = platforms.linux;
             mainProgram = "globtoo";
           };
@@ -162,6 +257,8 @@
       {
         packages.default = mkPackage { };
         packages.globtoo-lite = mkPackage { lite = true; };
+        # Full geographic data and Earth image without planetary tile assets.
+        packages.globtoo-earth = mkPackage { includePlanetaryTextures = false; };
 
         # Reproducible opt-in package composition for downstream Nix flakes.
         # Input maps must be locally prepared/pinned store paths; CMake
@@ -171,9 +268,11 @@
           lite = true; inherit planetaryMaps;
         };
 
-        # Both build variants participate in nix flake check.
+        # Full and lite builds participate in nix flake check.
         checks.fat-build = self.packages.${system}.default;
         checks.lite-build = self.packages.${system}.globtoo-lite;
+        # The default fat-build check covers the three packaged planetary maps.
+        # globtoo-earth is an optional reduced-data package, not another check.
 
         # Keep licensing checks part of `nix flake check` on every system.
         checks.reuse = pkgs.runCommand "globtoo-reuse-lint" {
@@ -194,7 +293,8 @@
           ]) ++ sdl3PcDeps;
           shellHook = ''
             echo "Dev shell ready."
-            echo "Default imagery is fetched by the flake at build time (earthTexture)."
+            echo "Default builds fetch Earth, Moon, Mars and Io textures at pinned hashes."
+            echo "globtoo-lite omits bundled imagery; globtoo-earth keeps only Earth imagery."
             echo "Optional high-resolution Earth imagery / relief can be tiled with tools/build_raster_tiles.py."
             echo "Signed numeric ETOPO1 can be tiled with tools/build_elevation_tiles.py."
             echo "GPWv4 density can be tiled with tools/build_population_tiles.py (optional)."
@@ -213,6 +313,10 @@
         apps.globtoo-lite = {
           type = "app";
           program = "${self.packages.${system}.globtoo-lite}/bin/globtoo";
+        };
+        apps.globtoo-earth = {
+          type = "app";
+          program = "${self.packages.${system}.globtoo-earth}/bin/globtoo";
         };
       });
 }

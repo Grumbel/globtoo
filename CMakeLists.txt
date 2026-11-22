@@ -523,6 +523,10 @@ if(GLOBTOO_BUILD_APP)
       COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${PLANET_PREPARED_SOURCE_${body}}"
         "$<TARGET_FILE_DIR:globtoo>/imagery/${body}"
+      # The zoomed-out globe still needs a GLES2-safe base texture.
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${PLANET_PREPARED_SOURCE_${body}}/preview-small.jpg"
+        "$<TARGET_FILE_DIR:globtoo>/assets/${body}.jpg"
       VERBATIM)
   endforeach()
   foreach(body IN LISTS PLANET_IMAGERY_OUTPUTS)
@@ -532,6 +536,10 @@ if(GLOBTOO_BUILD_APP)
       COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_BINARY_DIR}/generated-imagery/${body}"
         "$<TARGET_FILE_DIR:globtoo>/imagery/${body}"
+      # Avoid an oversized texture upload on GLES2 at distant zoom levels.
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_BINARY_DIR}/generated-imagery/${body}/preview-small.jpg"
+        "$<TARGET_FILE_DIR:globtoo>/assets/${body}.jpg"
       VERBATIM)
   endforeach()
   if(GLOBTOO_EARTH_TEXTURE)
@@ -596,10 +604,14 @@ if(GLOBTOO_BUILD_APP)
   foreach(body IN LISTS PLANET_PREPARED_DIRS)
     install(DIRECTORY "${PLANET_PREPARED_SOURCE_${body}}/"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/imagery/${body}")
+    install(FILES "${PLANET_PREPARED_SOURCE_${body}}/preview-small.jpg"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets" RENAME "${body}.jpg")
   endforeach()
   foreach(body IN LISTS PLANET_IMAGERY_OUTPUTS)
     install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-imagery/${body}/"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/imagery/${body}")
+    install(FILES "${CMAKE_BINARY_DIR}/generated-imagery/${body}/preview-small.jpg"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets" RENAME "${body}.jpg")
   endforeach()
   if(GLOBTOO_EARTH_TEXTURE)
     install(FILES "${GLOBTOO_EARTH_TEXTURE}"

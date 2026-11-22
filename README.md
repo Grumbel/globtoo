@@ -13,7 +13,7 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Smooth zoom down to individual small countries
 - Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
 - Zoom-aware capitals, cities, and major rivers from Natural Earth 10m
-- Optional high-resolution tiled Earth, Moon, Mars and Io imagery (verified external source required for planetary maps) and Blue Marble relief for close-up views
+- Pinned Moon, Mars and Io raster sources are tiled and installed by the default Nix package; optional custom planetary maps and Blue Marble relief are supported
 - Optional measured elevation/depth and population density (people/km²) layers
 
 ![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
@@ -25,10 +25,27 @@ nix build
 ./result/bin/globtoo
 ```
 
-The Nix build installs an ordinary executable plus the application desktop
-entry, icons, manual, AppStream metadata, and resources. It no longer requires
-a launcher that changes the process working directory. To inspect a packaged
-build, use `find result -type f` or `man -l result/share/man/man1/globtoo.1`.
+The default Nix package fetches and tiles Moon and Mars (8K Solar System Scope,
+CC BY 4.0) and Io (USGS via Wikimedia Commons, public domain) **at build time**,
+in addition to the existing Earth imagery and geographic data. It installs a
+small base texture for each body plus a matching set of GLES2 tiles. No
+network access is needed when starting Globtoo. These presentation mosaics
+are not suitable for scientific measurements; source registration and precise
+IAU landmark alignment remain to be checked on real hardware.
+
+Available packages:
+
+```sh
+nix build .#default        # Earth + Moon + Mars + Io, all packaged offline
+nix build .#globtoo-earth  # Full Earth maps, without planetary rasters
+nix build .#globtoo-lite   # Lean package; explicitly download Earth on demand
+nix run .#default -- --body mars
+```
+
+All variants install the executable, desktop entry, icons, manual, AppStream
+metadata, and resources without requiring a launcher that changes the current
+directory. To inspect a packaged build, use `find result -type f` or
+`man -l result/share/man/man1/globtoo.1`.
 
 ## Install with CMake (Linux)
 
@@ -67,10 +84,14 @@ For persistent Moon, Mars, or Io maps, run
 `python3 tools/install_planetary_map.py /path/to/prepared-tiles` after
 [preparing and auditing the source](docs/PLANETARY_MAPS.md). The viewer then
 finds the tiles under `$XDG_DATA_HOME/globtoo/imagery/<body>` automatically,
-including in Nix installs. Packagers can instead supply
+including in Nix installs; per-user maps override the bundled texture and
+tiles together. Packagers can instead supply
 `-DGLOBTOO_MARS_PREPARED_MAP=/path/to/mars-tiles` at CMake configure time,
 or compose a Nix build with `globtoo.lib.${system}.withPlanetaryMaps`.
-Neither path downloads new imagery automatically.
+The full/default flake package already fetches the three pinned sources;
+`withPlanetaryMaps` replaces only the bodies explicitly specified in the
+argument set. `withPlanetaryMapsLite` adds only the specified prebuilt maps to
+the lite package. Neither function automatically fetches additional sources.
 
 See [Raster layers and tiling](docs/RASTER_LAYERS.md) for high-resolution
 imagery and relief preparation and selection, and
