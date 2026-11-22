@@ -421,6 +421,10 @@ bool parse_command_line(int argc, const char* const* argv,
             const auto value=next();
             if (!value || value->empty()) { error="--population-dir requires a directory"; return false; }
             output.population_dir=*value;
+        } else if (!positional_done && key=="--imagery-dir") {
+            const auto value=next();
+            if (!value || value->empty()) { error="--imagery-dir requires a directory"; return false; }
+            output.imagery_dir=*value;
         } else if (!positional_done && key=="--relief-dir") {
             const auto value=next();
             if (!value || value->empty()) { error="--relief-dir requires a directory"; return false; }
@@ -454,6 +458,7 @@ std::string command_line_help(std::string_view program) {
     help += "      --center COORDS       Center initial view here (otherwise local timezone)\n";
     help += "      --texture FILE        Earth texture (also accepts legacy positional path)\n";
     help += "      --layer NAME          imagery, relief, elevation, population\n";
+    help += "      --imagery-dir DIR     High-resolution Earth imagery tiles\n";
     help += "      --relief-dir DIR      Directory with visual relief tile data\n";
     help += "      --elevation-dir DIR   Directory with measured elevation tiles/legend\n";
     help += "      --population-dir DIR  Directory with measured density tiles/legend\n";

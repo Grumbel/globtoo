@@ -92,6 +92,11 @@ int main() {
     assert(!parse_command_line(3,invalid_color,parsed,error));
     const char* invalid_size[]={"globtoo","--marker-size","0"};
     assert(!parse_command_line(3,invalid_size,parsed,error));
+    const char* imagery[]={"globtoo","--imagery-dir=/tmp/imagery"};
+    assert(parse_command_line(2,imagery,parsed,error));
+    assert(parsed.imagery_dir=="/tmp/imagery");
+    const char* missing_imagery[]={"globtoo","--imagery-dir"};
+    assert(!parse_command_line(2,missing_imagery,parsed,error));
     const char* relief[]={"globtoo","--layer=relief","--relief-dir","/tmp/relief"};
     assert(parse_command_line(4,relief,parsed,error));
     assert(parsed.relief_dir=="/tmp/relief");

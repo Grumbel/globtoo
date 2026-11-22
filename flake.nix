@@ -118,6 +118,9 @@
             # Install the pinned, fetched image itself; never a source-tree
             # placeholder or a file that happened to be named earth.jpg.
             "-DGLOBTOO_EARTH_TEXTURE=${earthTexture}"
+            # Optional high-resolution true-color tiles are supported by
+            # -DGLOBTOO_IMAGERY_TEXTURE=<verified path> from a downstream
+            # derivation; do not add a fetch with a fabricated hash here.
           ];
 
           # Only GeoJSON is needed at source/configure time (mesh generation).
@@ -162,7 +165,7 @@
           shellHook = ''
             echo "Dev shell ready."
             echo "Default imagery is fetched by the flake at build time (earthTexture)."
-            echo "Optional large relief maps can be tiled with tools/build_raster_tiles.py."
+            echo "Optional high-resolution Earth imagery / relief can be tiled with tools/build_raster_tiles.py."
             echo "Signed numeric ETOPO1 can be tiled with tools/build_elevation_tiles.py."
             echo "GPWv4 density can be tiled with tools/build_population_tiles.py (optional)."
             echo "See docs/RASTER_LAYERS.md (Pillow is included in this shell)."

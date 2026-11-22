@@ -54,6 +54,9 @@ option(GLOBTOO_BUILD_APP "Build the SDL3 + GLES2 globe viewer" ON)
 # Nix supplies the pinned fetchurl output here. Keep imagery out of the source
 # tree and never infer an Earth texture from a random file in assets/.
 set(GLOBTOO_EARTH_TEXTURE "" CACHE FILEPATH "Real equirectangular Earth image to package (e.g. a Nix fetchurl output)")
+# Optional higher-resolution *imagery*, unlike the independently selected
+# visual relief layer. Build-time tiles, not a huge runtime GL texture.
+set(GLOBTOO_IMAGERY_TEXTURE "" CACHE FILEPATH "High-resolution equirectangular Earth imagery to tile for close zoom")
 # Optional full-world topographic/bathymetric source, converted to GLES2-safe
 # 1024px tiles at build time. Never package the untiled source image.
 set(GLOBTOO_RELIEF_TEXTURE "" CACHE FILEPATH "NASA Blue Marble topography/bathymetry raster (north-up equirectangular)")
@@ -82,13 +85,16 @@ if(GLOBTOO_ELEVATION_RAW AND NOT EXISTS "${GLOBTOO_ELEVATION_RAW}")
   message(FATAL_ERROR "GLOBTOO_ELEVATION_RAW does not exist: ${GLOBTOO_ELEVATION_RAW}")
 endif()
 
+if(GLOBTOO_IMAGERY_TEXTURE AND NOT EXISTS "${GLOBTOO_IMAGERY_TEXTURE}")
+  message(FATAL_ERROR "GLOBTOO_IMAGERY_TEXTURE does not exist: ${GLOBTOO_IMAGERY_TEXTURE}")
+endif()
 if(GLOBTOO_RELIEF_TEXTURE AND NOT EXISTS "${GLOBTOO_RELIEF_TEXTURE}")
   message(FATAL_ERROR "GLOBTOO_RELIEF_TEXTURE does not exist: ${GLOBTOO_RELIEF_TEXTURE}")
 endif()
 if(GLOBTOO_EARTH_TEXTURE AND NOT EXISTS "${GLOBTOO_EARTH_TEXTURE}")
   message(FATAL_ERROR "GLOBTOO_EARTH_TEXTURE does not exist: ${GLOBTOO_EARTH_TEXTURE}")
 endif()
-if(GLOBTOO_BUILD_APP AND NOT GLOBTOO_EARTH_TEXTURE)
+if(GLOBTOO_BUILD_APP AND NOT GLOBTOO_EARTH_TEXTURE AND NOT GLOBTOO_IMAGERY_TEXTURE)
   message(STATUS "No Earth image configured; globe will use solid color unless --texture is specified")
 endif()
 find_path(GEOS_INCLUDE_DIR geos_c.h REQUIRED)
@@ -200,6 +206,31 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/assets/places_10m.geojson" AND
   add_custom_target(geographic_features_asset ALL DEPENDS "${GEOGRAPHIC_FEATURE_OUTPUT}")
   if(GLOBTOO_BUILD_APP)
     add_dependencies(globtoo geographic_features_asset)
+  endif()
+endif()
+
+# True-color high-resolution imagery remains in the IMAGERY mode. It uses
+# the same versioned tile layout as Relief, but a separate runtime cache.
+# The original GLOBTOO_EARTH_TEXTURE is retained for distant views, morphs,
+# and transient missing tiles. Only the generated tiles are installed.
+set(IMAGERY_OUTPUT "")
+if(GLOBTOO_IMAGERY_TEXTURE)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  execute_process(COMMAND ${Python3_EXECUTABLE} -c "from PIL import Image"
+    RESULT_VARIABLE _globtoo_imagery_pillow ERROR_QUIET)
+  if(NOT _globtoo_imagery_pillow EQUAL 0)
+    message(FATAL_ERROR "GLOBTOO_IMAGERY_TEXTURE requires Pillow (Python PIL)")
+  endif()
+  set(IMAGERY_OUTPUT "${CMAKE_BINARY_DIR}/generated-imagery/manifest.txt")
+  add_custom_command(OUTPUT "${IMAGERY_OUTPUT}"
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+      "${GLOBTOO_IMAGERY_TEXTURE}" "${CMAKE_BINARY_DIR}/generated-imagery"
+    DEPENDS "${GLOBTOO_IMAGERY_TEXTURE}" "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+    COMMENT "Preparing high-resolution true-color Earth imagery tiles"
+    VERBATIM)
+  add_custom_target(imagery_tiles ALL DEPENDS "${IMAGERY_OUTPUT}")
+  if(GLOBTOO_BUILD_APP)
+    add_dependencies(globtoo imagery_tiles)
   endif()
 endif()
 
@@ -317,6 +348,12 @@ if(GLOBTOO_BUILD_APP)
         "${CMAKE_BINARY_DIR}/generated-elevation" "$<TARGET_FILE_DIR:globtoo>/elevation"
       VERBATIM)
   endif()
+  if(IMAGERY_OUTPUT)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/generated-imagery" "$<TARGET_FILE_DIR:globtoo>/imagery"
+      VERBATIM)
+  endif()
   if(RELIEF_OUTPUT)
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -367,6 +404,10 @@ if(GLOBTOO_BUILD_APP)
   if(ELEVATION_OUTPUT)
     install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-elevation/"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/elevation")
+  endif()
+  if(IMAGERY_OUTPUT)
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-imagery/"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/imagery")
   endif()
   if(RELIEF_OUTPUT)
     install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-relief/"
@@ -470,6 +511,9 @@ if(BUILD_TESTING)
   target_include_directories(raster_tiles_test PRIVATE src)
   target_compile_options(raster_tiles_test PRIVATE -Wall -Wextra -UNDEBUG)
   add_test(NAME raster_tiles COMMAND raster_tiles_test)
+  if(IMAGERY_OUTPUT)
+    add_test(NAME raster_imagery_manifest COMMAND raster_tiles_test "${IMAGERY_OUTPUT}")
+  endif()
   if(RELIEF_OUTPUT)
     add_test(NAME raster_tiles_manifest COMMAND raster_tiles_test "${RELIEF_OUTPUT}")
   endif()

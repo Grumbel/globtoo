@@ -103,6 +103,10 @@ silently download large maps or satellite data on an existing installation.
 - [x] Implement optional build-time GLES2 JPEG tile generation and local
       close-up tile cache with power-of-two mipmapping and preview fallback.
       Validate dateline gutters and source/image resolution metadata.
+- [x] Extend the tiled renderer to ordinary Earth Imagery as well as Relief,
+      with independent CMake tile generation, `--imagery-dir` CLI override,
+      automatic close-zoom detail, and 4K fallback during globe/map morphs.
+      Test normal and optional-data CMake builds with synthetic 2:1 imagery.
 - [ ] Offer a verified higher-resolution raster in the default Nix package,
       using **tiled/mipmapped** textures
       (GLES2 maximum texture sizes vary). Avoid loading a 21600×10800 image
@@ -148,7 +152,7 @@ silently download large maps or satellite data on an existing installation.
       an interactive GLES2 session and check the logarithmic scale visually.
 - [ ] Test optional NOAA ETOPO1 grid with the complete 21601x10801 dataset,
       including signed colour range, poles, and source attribution.
-- [ ] Pin and verify the optional NASA relief source hash for Nix; test the
+- [ ] Pin and verify NASA high-resolution Imagery/Relief source hashes for Nix; test the
       complete fat package and visually check tile seams against the preview.
 - [ ] Benchmark upload stutter, LRU size and visual transitions on real GLES2
       hardware; consider off-thread image decoding and per-tile frustum bounds.

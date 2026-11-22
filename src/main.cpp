@@ -103,6 +103,8 @@ int main(int argc, char** argv) {
         ? resource_path("assets/earth.jpg") : options.texture_path;
 
     Globe globe{};
+    const std::string imagery_manifest=options.imagery_dir.empty() ? "" :
+        (std::filesystem::path(options.imagery_dir)/"manifest.txt").string();
     const std::string relief_manifest=options.relief_dir.empty() ? "" :
         (std::filesystem::path(options.relief_dir)/"manifest.txt").string();
     const std::string elevation_manifest=options.elevation_dir.empty() ? "" :
@@ -112,7 +114,8 @@ int main(int argc, char** argv) {
     if (!globe_init(globe, texture.c_str(),
                     relief_manifest.empty() ? nullptr : relief_manifest.c_str(),
                     elevation_manifest.empty() ? nullptr : elevation_manifest.c_str(),
-                    population_manifest.empty() ? nullptr : population_manifest.c_str())) {
+                    population_manifest.empty() ? nullptr : population_manifest.c_str(),
+                    imagery_manifest.empty() ? nullptr : imagery_manifest.c_str())) {
         fprintf(stderr, "globe_init failed\n");
         return 1;
     }
@@ -204,7 +207,7 @@ int main(int argc, char** argv) {
                            (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) ||
                            (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid()) ||
                            (globe.surface==SurfaceLayer::Population && globe.population.valid()) ||
-                           globe.texture.id != 0));
+                           globe.texture.id != 0 || globe.imagery.valid()));
         geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
         ui.raster_legend_visible = globe.texture_visible &&
             ((globe.surface==SurfaceLayer::Elevation && globe.elevation.valid() && globe.elevation.legend.valid()) ||

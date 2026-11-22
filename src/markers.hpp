@@ -25,6 +25,7 @@ struct CommandLine {
     CommandAction action = CommandAction::Run;
     std::string texture_path;
     std::string surface_layer = "imagery";
+    std::string imagery_dir;
     std::string relief_dir;
     std::string elevation_dir;
     std::string population_dir;

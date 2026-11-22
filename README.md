@@ -13,7 +13,7 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Smooth zoom down to individual small countries
 - Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
 - Zoom-aware capitals, cities, and major rivers from Natural Earth 10m
-- Optional tiled Blue Marble relief/bathymetry raster for close-up views
+- Optional high-resolution tiled Earth imagery and Blue Marble relief for close-up views
 - Optional measured elevation/depth and population density (people/km²) layers
 
 ![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
@@ -64,7 +64,7 @@ the SDL window icon. Run `man globtoo` after installing to a prefix on your
 manpage search path.
 
 See [Raster layers and tiling](docs/RASTER_LAYERS.md) for high-resolution
-relief preparation and selection, [measured elevation and bathymetry](docs/ELEVATION.md),
+imagery and relief preparation and selection, [measured elevation and bathymetry](docs/ELEVATION.md),
 and [population-density maps](docs/POPULATION.md). The POP button and
 `--layer population --population-dir DIR` select locally compiled density
 raster tiles. Original density data and its reference year are supplied
@@ -119,9 +119,11 @@ Use `--marker` / `-m` repeatedly, `--label` / `-l` for the previous pin,
 `--marker-color #RRGGBB` and `--marker-size 2..32` for subsequent pins,
 `--marker-file` for bulk input, `--center` for the starting viewpoint, and
 `--texture` (or the legacy positional filename) for a custom Earth image.
-`--layer imagery|relief|elevation` selects the starting raster; `--relief-dir DIR`
-loads a visual relief tile set, while `--elevation-dir DIR` uses a measured
-elevation/bathymetry tile set with a physical-unit legend.
+`--layer imagery|relief|elevation|population` selects the starting raster;
+`--imagery-dir DIR` supplies higher-resolution true-color close-up tiles
+for the normal Imagery mode, `--relief-dir DIR` supplies a separate visual relief
+layer, and `--elevation-dir DIR` uses a measured elevation/bathymetry tile set
+with a physical-unit legend.
 By default the starting viewpoint still follows the local timezone.
 
 The coordinate parser understands signed decimal degrees (latitude first),
@@ -139,7 +141,10 @@ window title) display the same full version produced by CMake or Nix. Git
 
 ## Raster textures
 
-The default Nix build fetches its pinned 4K Earth image. There is also an
+The default Nix build fetches its pinned 4K Earth image. Optional
+**high-resolution Imagery tiles** can augment the normal Earth mode at close
+zoom (`--imagery-dir DIR` or `-DGLOBTOO_IMAGERY_TEXTURE=...`) while retaining
+that 4K image as the overview fallback. There is also an
 **optional high-resolution Relief** layer: a real NASA Blue Marble topography
 and ocean-bathymetry image preprocessed into GLES2-friendly tiles, with
 on-demand local tile loading at close zoom. The optional layer has its own
@@ -156,8 +161,10 @@ without treating brightness as measured height. See
 
 The default package intentionally does not silently fetch or ship a new large
 raster. See [raster preparation instructions](docs/RASTER_LAYERS.md) for a
-NASA source URL, Pillow tile preprocessing, and relief setup. Population
-density and verified large Nix downloads remain future work.
+NASA source URLs, Pillow tile preprocessing, and both imagery and relief setup.
+Measured population density is also supported as an optional layer; shipping a
+new high-resolution source in the default Nix package still requires a verified
+source checksum and an actual Nix build.
 
 ## Controls
 
@@ -221,8 +228,8 @@ The 3D globe now permits roughly **1.9× closer** views (minimum camera
 distance 1.08 Earth radii versus 1.15 previously). Flat-map zoom reaches
 **80×** instead of 60×. The globe sphere uses a finer mesh to stay smooth
 at close range. The 10m country mesh is selected automatically at these scales;
-the optional Relief layer supplies additional raster detail when configured;
-otherwise the baseline Earth imagery retains its original resolution.
+optional Imagery tiles and the Relief layer supply additional raster detail
+when configured; otherwise Earth imagery retains its original resolution.
 Roll gestures rotate the globe or flat map around the screen center when North Lock is off.
 Optional shortcuts: `1..5` select projection, `Space` shading, `B` borders,
 `N` names, `P` political coloring, `V` texture, `Tab` toggle GUI,

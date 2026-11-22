@@ -15,6 +15,7 @@ struct Globe {
     Mesh    mesh;
     Shader  shader;
     Texture texture;
+    RasterCache imagery;
     RasterCache relief;
     RasterCache elevation;
     RasterCache population;
@@ -26,7 +27,8 @@ struct Globe {
 bool globe_init(Globe& g, const char* texture_path,
                 const char* relief_manifest_path = nullptr,
                 const char* elevation_manifest_path = nullptr,
-                const char* population_manifest_path = nullptr);
+                const char* population_manifest_path = nullptr,
+                const char* imagery_manifest_path = nullptr);
 void globe_shutdown(Globe& g);
 // When texture is disabled, render the solid ocean base instead.
 void globe_draw(Globe& g, const Camera& cam, float aspect,

@@ -58,6 +58,14 @@ Choose the starting raster layer. Relief requires an installed visual tile set;
 elevation requires signed, measured-height tiles; population requires measured
 people-per-square-kilometre tiles with a year and physical-unit legend.
 .TP
+.BI \--imagery-dir\  "DIR"
+Use a prepared high-resolution Earth imagery tile set in the ordinary
+Imagery mode. Close views load geographic JPEG tiles lazily; distant views
+and projection transitions retain the ordinary Earth base texture. The
+folder must contain a valid
+.B manifest.txt
+and the generated tiles.
+.TP
 .BI \--relief-dir\  "DIR"
 Use a locally prepared high-resolution raster tile set, with
 .B manifest.txt
@@ -152,7 +160,7 @@ Optional override for the resource directory, which should contain
 .B assets/
 and
 .B shaders/
-subdirectories, and optionally \fBrelief/\fR and \fBelevation/\fR and \fBpopulation/\fR directories. Otherwise,
+subdirectories, and optionally \fBimagery/\fR, \fBrelief/\fR, \fBelevation/\fR and \fBpopulation/\fR directories. Otherwise,
 Globtoo searches next to a development binary
 or in its installation data directory. The executable can be launched from
 any working directory.
