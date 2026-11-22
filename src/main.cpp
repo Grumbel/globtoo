@@ -13,6 +13,11 @@
 #include "layer_composition.hpp"
 #include "ui.hpp"
 #include "map_view.hpp"
+#include "markers.hpp"
+
+#ifndef GLOBTOO_VERSION
+#error "GLOBTOO_VERSION must be provided by CMake"
+#endif
 
 static SDL_Window*   window  = nullptr;
 static SDL_GLContext glctx   = nullptr;
@@ -30,7 +35,7 @@ static bool init_sdl(int w, int h) {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-    window = SDL_CreateWindow("globtoo", w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow("globtoo " GLOBTOO_VERSION, w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         return false;
@@ -47,6 +52,21 @@ static bool init_sdl(int w, int h) {
 }
 
 int main(int argc, char** argv) {
+    CommandLine options;
+    std::string error;
+    if (!parse_command_line(argc, argv, options, error)) {
+        fprintf(stderr, "globtoo: %s\nTry 'globtoo --help' for usage.\n", error.c_str());
+        return 2;
+    }
+    if (options.action == CommandAction::Help) {
+        std::fputs(command_line_help(argc ? argv[0] : "globtoo").c_str(), stdout);
+        return 0;
+    }
+    if (options.action == CommandAction::Version) {
+        std::printf("globtoo %s\n", GLOBTOO_VERSION);
+        return 0;
+    }
+
     const int width  = 1280;
     const int height = 800;
 
@@ -54,8 +74,8 @@ int main(int argc, char** argv) {
         return 1;
 
     const char* tex_path = "assets/earth.jpg";
-    if (argc > 1) {
-        tex_path = argv[1];
+    if (!options.texture_path.empty()) {
+        tex_path = options.texture_path.c_str();
     } else if (const char* asset_dir = std::getenv("GLOBE_ASSET_DIR")) {
         static std::string path = std::string(asset_dir) + "/assets/earth.jpg";
         tex_path = path.c_str();
@@ -68,10 +88,13 @@ int main(int argc, char** argv) {
     }
 
     Camera cam{};
-    const auto home = timezone_center();
-    camera_center_on(cam,home[0],home[1]);
-    fprintf(stderr, "Startup center from timezone: %.2f E, %.2f N (or UTC-offset fallback)\n",
-            home[0],home[1]);
+    const auto home = options.center.value_or([&] {
+        const auto tz=timezone_center();
+        return std::make_pair(tz[0],tz[1]);
+    }());
+    camera_center_on(cam,home.first,home.second);
+    fprintf(stderr, "Startup center: %.2f E, %.2f N%s\n",
+            home.first,home.second,options.center ? " (command line)" : " (timezone)");
     MapView map{};
     InputState input{};
     input.viewport_w = width;
@@ -133,6 +156,7 @@ int main(int argc, char** argv) {
                        country_fill_opacity(globe.texture_visible, globe.texture.id != 0));
         ui_draw_graticule(ui,cam,map,aspect);
         ui_draw_country_names(ui,countries,cam,map,aspect);
+        ui_draw_markers(ui,options.markers,cam,map,aspect);
         ui_draw(ui,cam,map,globe,countries);
         ui_flush(ui);
 

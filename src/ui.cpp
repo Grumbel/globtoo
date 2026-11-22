@@ -545,6 +545,63 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
     }
 }
 
+void ui_draw_markers(Ui& ui, const std::vector<Marker>& markers, const Camera& cam,
+                     const MapView& map, float aspect) {
+    // scene_project applies the same 3D occlusion, rotating geography,
+    // projection morph and seam handling as country names and the grid.
+    // Markers are fixed-size screen-space annotations, not Earth geometry.
+    struct LabelBounds { float x,y,w,h; };
+    std::vector<LabelBounds> occupied;
+    for (const auto& marker : markers) {
+        float ndc_x=0,ndc_y=0;
+        if (!scene_project(cam,aspect,map,marker.longitude,marker.latitude,
+                           ndc_x,ndc_y)) continue;
+        const float x=(ndc_x+1.f)*ui.viewport_w*.5f;
+        const float y=(1.f-ndc_y)*ui.viewport_h*.5f;
+        const float r=marker.radius;
+        if (x < -r || x > ui.viewport_w+r || y < -r || y > ui.viewport_h+r)
+            continue;
+        // A ring and contrasting center stay legible over both the terrain
+        // texture and the solid country color layer.
+        const Color marker_color{
+            ((marker.color>>16)&255)/255.f,
+            ((marker.color>>8)&255)/255.f,
+            (marker.color&255)/255.f,1.f};
+        ring(ui,x,y,r+2.f,{.015f,.035f,.06f,.85f});
+        for (int i=0;i<24;i++) {
+            const float a=2*pi*i/24.f, b=2*pi*(i+1)/24.f;
+            triangle(ui,x,y,x+r*std::cos(a),y+r*std::sin(a),
+                     x+r*std::cos(b),y+r*std::sin(b),marker_color);
+        }
+        ring(ui,x,y,r, text);
+        rect(ui,x-1.25f,y-1.25f,2.5f,2.5f,{.035f,.055f,.085f,1.f});
+        if (marker.label.empty()) continue;
+        const int scale=2;
+        // The compact built-in font supports ASCII plus basic transliteration.
+        // Truncate long labels rather than covering the entire viewport.
+        const auto label=std::string_view(marker.label).substr(0,48);
+        const float w=label.size()*6.f*scale+12.f, h=7.f*scale+10.f;
+        float lx=x+r+9.f;
+        if (lx+w>ui.viewport_w-4.f) lx=x-r-9.f-w;
+        const float ly=std::clamp(y-h*.5f,4.f,std::max(4.f,ui.viewport_h-h-4.f));
+        const LabelBounds box{lx,ly,w,h};
+        if (lx<4.f || lx+w>ui.viewport_w-4.f ||
+            overlaps({lx,ly,w,h},toolbar) ||
+            overlaps({lx,ly,w,h},compass_panel(ui)) ||
+            overlaps({lx,ly,w,h},scale_panel(ui))) continue;
+        bool overlap=false;
+        for (const auto& other : occupied)
+            if (overlaps({lx-4,ly-4,w+8,h+8}, {other.x,other.y,other.w,other.h})) {
+                overlap=true; break;
+            }
+        if (overlap) continue;
+        rect(ui,lx,ly,w,h,panel);
+        rect(ui,lx,ly,3.f,h,marker_color);
+        draw_text(ui,lx+8.f,ly+5.f,label,scale,text);
+        occupied.push_back(box);
+    }
+}
+
 void ui_flush(Ui& ui) {
     if (!ui.shader.program || !ui.vbo || ui.triangles.empty()) return;
     glDisable(GL_DEPTH_TEST);

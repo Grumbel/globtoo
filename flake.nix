@@ -10,6 +10,12 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        versionBase = nixpkgs.lib.strings.removeSuffix "\n" (builtins.readFile ./VERSION);
+        gitRev = self.dirtyShortRev or self.shortRev or "dirty";
+        isDev = nixpkgs.lib.strings.hasInfix "-dev" versionBase;
+        version = if isDev then
+          "${versionBase}.${toString (self.revCount or 0)}+g${gitRev}"
+          else versionBase;
 
         # ---------------------------------------------------------------
         # Earth texture (fetched at build time – does NOT bloat the repo)
@@ -47,7 +53,7 @@
       {
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "globtoo";
-          version = "0.1.0";
+          inherit version;
           src = ./.;
 
           nativeBuildInputs = with pkgs; [
@@ -63,7 +69,7 @@
             mesa
           ];
 
-          cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" ];
+          cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" "-DPROJECT_VERSION_FULL=${version}" ];
 
           # Inject the fetched texture so the binary always has a real map
           postPatch = ''

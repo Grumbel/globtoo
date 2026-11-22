@@ -13,6 +13,10 @@
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Repeatable CLI markers (decimal, compass, DMS, decimal minutes, Geo URI,
+      ISO 6709) with optional labels, CSV import, pin colors/sizes and explicit view center
+- [x] Markers follow globe/map projection, occlusion and transformations
+- [x] Single-source VERSION with CMake/Nix development metadata and `--version`
 - [x] Optional adaptive geographic graticule in globe / all flat projections
 - [x] Graduated, kilometer/meter great-circle scale bar at viewport center
 - [x] Independently toggle country colors and Earth imagery; blend both when enabled

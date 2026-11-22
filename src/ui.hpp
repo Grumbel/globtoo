@@ -5,6 +5,7 @@
 #include "input.hpp"
 #include "countries.hpp"
 #include "map_view.hpp"
+#include "markers.hpp"
 #include <SDL3/SDL.h>
 #include <string_view>
 #include <vector>
@@ -33,4 +34,7 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
 void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspect);
 void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam,
                            const MapView& map, float aspect);
+// Draw screen-space marker pins on top of country labels, but behind controls.
+void ui_draw_markers(Ui& ui, const std::vector<Marker>& markers, const Camera& cam,
+                     const MapView& map, float aspect);
 void ui_flush(Ui& ui);

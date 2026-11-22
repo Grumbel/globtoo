@@ -1,5 +1,46 @@
 cmake_minimum_required(VERSION 3.16)
-project(globtoo LANGUAGES CXX)
+# VERSION is the only source of the base version. Package builds (Nix) inject
+# the complete development identifier via PROJECT_VERSION_FULL.
+if(NOT DEFINED PROJECT_VERSION_FULL)
+  file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" _globtoo_base LIMIT_COUNT 1)
+  set(PROJECT_VERSION_FULL "${_globtoo_base}")
+  if(_globtoo_base MATCHES "-dev")
+    find_package(Git QUIET)
+    set(_globtoo_count "0")
+    set(_globtoo_hash "dirty")
+    if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+      execute_process(COMMAND "${GIT_EXECUTABLE}" rev-list --count HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE _count OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET RESULT_VARIABLE _count_result)
+      execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --short=8 HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE _hash OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET RESULT_VARIABLE _hash_result)
+      execute_process(COMMAND "${GIT_EXECUTABLE}" status --porcelain
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE _git_changes OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+      if(_count_result EQUAL 0 AND _count MATCHES "^[0-9]+$")
+        set(_globtoo_count "${_count}")
+      endif()
+      if(_hash_result EQUAL 0 AND _hash MATCHES "^[0-9a-fA-F]+$")
+        set(_globtoo_hash "${_hash}")
+        if(NOT _git_changes STREQUAL "")
+          string(APPEND _globtoo_hash "-dirty")
+        endif()
+      endif()
+    endif()
+    set(PROJECT_VERSION_FULL "${_globtoo_base}.${_globtoo_count}+g${_globtoo_hash}")
+  endif()
+endif()
+string(REGEX MATCH "^[0-9]+(\\.[0-9]+)*" _globtoo_numeric_version "${PROJECT_VERSION_FULL}")
+if(NOT _globtoo_numeric_version)
+  message(FATAL_ERROR "VERSION must begin with a numeric version: ${PROJECT_VERSION_FULL}")
+endif()
+project(globtoo VERSION "${_globtoo_numeric_version}" LANGUAGES CXX)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+message(STATUS "Globtoo version: ${PROJECT_VERSION_FULL}")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,6 +72,7 @@ add_executable(globtoo
   src/map_view.cpp
   src/scene.cpp
   src/ui.cpp
+  src/markers.cpp
 )
 
 target_include_directories(globtoo PRIVATE
@@ -49,6 +91,7 @@ target_link_libraries(globtoo PRIVATE
 )
 
 target_compile_options(globtoo PRIVATE -Wall -Wextra -O2)
+target_compile_definitions(globtoo PRIVATE GLOBTOO_VERSION="${PROJECT_VERSION_FULL}")
 endif()
 
 # Triangulate both Natural Earth resolutions while building, not at startup.
@@ -99,6 +142,10 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(markers_test tests/markers_test.cpp src/markers.cpp)
+  target_include_directories(markers_test PRIVATE src)
+  target_compile_options(markers_test PRIVATE -Wall -Wextra -UNDEBUG)
+  add_test(NAME markers COMMAND markers_test)
   add_executable(grid_metrics_test tests/grid_metrics_test.cpp)
   target_include_directories(grid_metrics_test PRIVATE src)
   target_compile_options(grid_metrics_test PRIVATE -Wall -Wextra -UNDEBUG)

@@ -31,6 +31,50 @@ curl -L -o assets/earth.jpg \
 ./globtoo
 ```
 
+## Command-line markers and version
+
+Markers are rendered on the globe and **all** flat map projections, including
+animated transitions. Pins remain a constant pixel size when zooming; labels
+are optional. Pins on the far side of the globe are hidden. Multiple `--marker`
+arguments, including different formats, may be combined:
+
+```sh
+globtoo --marker '52.5200,13.4050|Berlin' \
+        --marker '40°41′21″N, 74°02′40″W' --label 'Liberty Island' \
+        --marker 'geo:48.8583,2.2945' --label 'Eiffel Tower' \
+        --center '52.5200,13.4050'
+
+# Colors and sizes apply to subsequent pins; --marker-lonlat uses GIS order.
+globtoo --marker-color '#ff6565' --marker-size 9 \
+        --marker-lonlat '13.4050,52.5200' --label 'Berlin' \
+        --marker-color '#66ddff' --marker '+40.6892-074.0445/'
+
+# CSV (latitude,longitude,label) or coordinate | label on each line:
+globtoo --marker-file locations.csv
+
+globtoo --version
+globtoo --help
+```
+
+Use `--marker` / `-m` repeatedly, `--label` / `-l` for the previous pin,
+`--marker-color #RRGGBB` and `--marker-size 2..32` for subsequent pins,
+`--marker-file` for bulk input, `--center` for the starting viewpoint, and
+`--texture` (or the legacy positional filename) for a custom Earth image.
+By default the starting viewpoint still follows the local timezone.
+
+The coordinate parser understands signed decimal degrees (latitude first),
+`N/S/E/W` directional prefixes or suffixes, degrees/minutes/seconds (`° ' "`
+or `:` separators), degrees/decimal minutes, `geo:latitude,longitude` URIs
+(RFC 5870; altitude accepted but not used), and ISO 6709 signed pairs such as
+`+5230.5+01324.5/`. It also accepts whitespace-separated coordinates and
+`--marker-lonlat` for longitude-first GIS values. Numeric values are validated
+against WGS84 latitude/longitude ranges. For examples and limitations see
+[Marker CLI](docs/MARKERS.md).
+
+The top-level `VERSION` file is the sole version source. `--version` (and the
+window title) display the same full version produced by CMake or Nix. Git
+`-dev` builds include the revision count and hash; releases do not.
+
 ## Texture
 
 The flake fetches a public-domain equirectangular Earth map at build time.
