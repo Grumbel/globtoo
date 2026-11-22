@@ -94,6 +94,70 @@ endif()
 if(GLOBTOO_EARTH_TEXTURE AND NOT EXISTS "${GLOBTOO_EARTH_TEXTURE}")
   message(FATAL_ERROR "GLOBTOO_EARTH_TEXTURE does not exist: ${GLOBTOO_EARTH_TEXTURE}")
 endif()
+# Optional, explicitly sourced global planetary mosaics. Each source must be
+# north-up, 360x180-degree equirectangular; the preparer converts its declared
+# longitude axis to Globtoo's east-positive -180..180 UV convention.
+# No default URL or hash is invented: a downstream packager must supply and
+# check the original file and its redistribution terms.
+set(GLOBTOO_PLANET_MAX_WIDTH 2048 CACHE STRING
+    "Maximum width of normalized Moon/Mars/Io texture for GLES2")
+set(PLANET_TEXTURE_OUTPUTS)
+foreach(body moon mars io)
+  string(TOUPPER "${body}" upper)
+  set(GLOBTOO_${upper}_TEXTURE "" CACHE FILEPATH "Optional ${body} global plate-carree texture")
+  set(GLOBTOO_${upper}_LONGITUDE_POSITIVE "" CACHE STRING "Source direction: east or west")
+  set(GLOBTOO_${upper}_LONGITUDE_LEFT "" CACHE STRING "Source left boundary: 0 or 180 degrees")
+  set(GLOBTOO_${upper}_SOURCE "" CACHE STRING "Source publication/URL for ${body} map")
+  set(GLOBTOO_${upper}_LATITUDE_TYPE "" CACHE STRING "Source latitude: must be planetocentric")
+  set(GLOBTOO_${upper}_LICENSE "" CACHE STRING "Verified redistributable license for ${body} map")
+  if(GLOBTOO_${upper}_TEXTURE)
+    if(NOT EXISTS "${GLOBTOO_${upper}_TEXTURE}")
+      message(FATAL_ERROR "GLOBTOO_${upper}_TEXTURE does not exist: ${GLOBTOO_${upper}_TEXTURE}")
+    endif()
+    if(NOT GLOBTOO_${upper}_SOURCE OR NOT GLOBTOO_${upper}_LICENSE OR
+       NOT GLOBTOO_${upper}_LATITUDE_TYPE STREQUAL "planetocentric" OR
+       NOT GLOBTOO_${upper}_LONGITUDE_POSITIVE MATCHES "^(east|west)$" OR
+       NOT GLOBTOO_${upper}_LONGITUDE_LEFT MATCHES "^(0|180)$")
+      message(FATAL_ERROR "${body} texture requires SOURCE, LICENSE, LATITUDE_TYPE=planetocentric, LONGITUDE_POSITIVE=east|west and LONGITUDE_LEFT=0|180")
+    endif()
+    if(NOT GLOBTOO_PLANET_MAX_WIDTH MATCHES "^[0-9]+$" OR
+       GLOBTOO_PLANET_MAX_WIDTH LESS 2)
+      message(FATAL_ERROR "GLOBTOO_PLANET_MAX_WIDTH must be an even integer >= 2")
+    endif()
+    math(EXPR _planet_width_mod "${GLOBTOO_PLANET_MAX_WIDTH} % 2")
+    if(NOT _planet_width_mod EQUAL 0)
+      message(FATAL_ERROR "GLOBTOO_PLANET_MAX_WIDTH must be even")
+    endif()
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    execute_process(COMMAND ${Python3_EXECUTABLE} -c "from PIL import Image"
+      RESULT_VARIABLE _planet_pillow ERROR_QUIET)
+    if(NOT _planet_pillow EQUAL 0)
+      message(FATAL_ERROR "Planet texture preprocessing requires Python Pillow")
+    endif()
+    set(_planet_output "${CMAKE_BINARY_DIR}/generated-planetary/${body}.jpg")
+    add_custom_command(OUTPUT "${_planet_output}"
+      COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/normalize_planet_texture.py"
+        "${GLOBTOO_${upper}_TEXTURE}" "${_planet_output}"
+        --positive "${GLOBTOO_${upper}_LONGITUDE_POSITIVE}"
+        --left "${GLOBTOO_${upper}_LONGITUDE_LEFT}"
+        --max-width "${GLOBTOO_PLANET_MAX_WIDTH}"
+      DEPENDS "${GLOBTOO_${upper}_TEXTURE}"
+        "${CMAKE_SOURCE_DIR}/tools/normalize_planet_texture.py"
+      COMMENT "Normalizing ${body} global raster" VERBATIM)
+    add_custom_target(${body}_texture ALL DEPENDS "${_planet_output}")
+    list(APPEND PLANET_TEXTURE_OUTPUTS "${body}")
+    # These records are installed with the normalized imagery; they explicitly
+    # preserve the provenance/longitude semantics of the external source.
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated-planetary")
+    file(WRITE "${CMAKE_BINARY_DIR}/generated-planetary/${body}.source.txt"
+      "Source: ${GLOBTOO_${upper}_SOURCE}\nLicense: ${GLOBTOO_${upper}_LICENSE}\n"
+      "Original longitude direction: ${GLOBTOO_${upper}_LONGITUDE_POSITIVE}\n"
+      "Original left longitude: ${GLOBTOO_${upper}_LONGITUDE_LEFT} degrees\n"
+      "Source latitude type: ${GLOBTOO_${upper}_LATITUDE_TYPE}\n"
+      "Output: north-up planetocentric east-positive -180..180 equirectangular\n")
+  endif()
+endforeach()
+
 if(GLOBTOO_BUILD_APP AND NOT GLOBTOO_EARTH_TEXTURE AND NOT GLOBTOO_IMAGERY_TEXTURE)
   message(STATUS "No Earth image configured; globe will use solid color unless --texture is specified")
 endif()
@@ -360,6 +424,17 @@ if(GLOBTOO_BUILD_APP)
         "${CMAKE_BINARY_DIR}/generated-relief" "$<TARGET_FILE_DIR:globtoo>/relief"
       VERBATIM)
   endif()
+  foreach(body IN LISTS PLANET_TEXTURE_OUTPUTS)
+    add_dependencies(globtoo ${body}_texture)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_BINARY_DIR}/generated-planetary/${body}.jpg"
+        "$<TARGET_FILE_DIR:globtoo>/assets/${body}.jpg"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_BINARY_DIR}/generated-planetary/${body}.source.txt"
+        "$<TARGET_FILE_DIR:globtoo>/assets/${body}.source.txt"
+      VERBATIM)
+  endforeach()
   if(GLOBTOO_EARTH_TEXTURE)
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -413,6 +488,12 @@ if(GLOBTOO_BUILD_APP)
     install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-relief/"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/relief")
   endif()
+  foreach(body IN LISTS PLANET_TEXTURE_OUTPUTS)
+    install(FILES
+      "${CMAKE_BINARY_DIR}/generated-planetary/${body}.jpg"
+      "${CMAKE_BINARY_DIR}/generated-planetary/${body}.source.txt"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
+  endforeach()
   if(GLOBTOO_EARTH_TEXTURE)
     install(FILES "${GLOBTOO_EARTH_TEXTURE}"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets"
@@ -531,6 +612,8 @@ if(BUILD_TESTING)
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/elevation_tiles_compiler_test.py")
     endif()
     if(_globtoo_test_pillow EQUAL 0)
+      add_test(NAME planetary_texture_orientation
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/planet_texture_test.py")
       add_test(NAME raster_tiles_compiler
         COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/raster_tiles_compiler_test.py")

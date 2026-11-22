@@ -25,6 +25,16 @@ bool globe_init(Globe& g, const char* texture_path,
     }
     if (texture_path && g.body_textures[0].empty())
         g.body_textures[0] = texture_path;
+    // Packagers may install normalized, attributed planetary mosaics without
+    // requiring an explicit --body-texture for each launch. CLI always wins.
+    for (const BodyInfo& body : body_catalog) {
+        if (body.id == BodyId::Earth) continue;
+        auto& path = g.body_textures[static_cast<std::size_t>(body.id)];
+        if (path.empty()) {
+            const std::string installed = resource_path(body.default_texture_resource);
+            if (std::filesystem::is_regular_file(installed)) path = installed;
+        }
+    }
     globe_select_body(g, g.body);
     raster_cache_init(g.imagery, imagery_manifest_path ? imagery_manifest_path :
                                          resource_path("imagery/manifest.txt"));

@@ -168,5 +168,11 @@ silently download large maps or satellite data on an existing installation.
 - [x] Select Earth, Moon, Mars, or Io by CLI (`--body`) and cycle using M or NEXT BODY.
 - [x] Optional per-body equirectangular texture (`--body-texture body=FILE`).
 - [x] Hide Earth country, city and river layers on non-Earth bodies; scale bar uses body radius.
-- [ ] Verify and package rights-cleared planetary raster maps, pole orientation and longitude direction per source.
+- [x] Add test-covered normalization for externally supplied planet maps:
+      west/east-positive longitude, 0/180 left boundary, seam-safe mirroring
+      and half-turn, bounded single GLES2 texture size.
+- [x] Support optional source-attributed CMake installation of Moon, Mars and
+      Io imagery, with packaged fallback discovery and explicit CLI overrides.
+- [ ] Verify and package rights-cleared planetary raster maps, pole orientation
+      and longitude direction per **actual** source, with pinned download hashes.
 - [ ] Body-specific coordinate conventions and scientific landmarks.

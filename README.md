@@ -295,5 +295,10 @@ with `nix develop -c reuse lint`).
 (repeatable) to assign a north-up, east-positive equirectangular texture;
 `--texture FILE` sets the initial body's texture. Without one, non-Earth
 bodies appear as neutral-colored spheres. Earth political, city and river
-features are hidden on the others. Planet textures are **not bundled** yet;
-verify source coordinate conventions before importing planetary images.
+features are hidden on the others. Optional, externally supplied and
+source-attributed planetary textures can be normalized and installed by CMake;
+use `GLOBTOO_MOON_TEXTURE`, `GLOBTOO_MARS_TEXTURE` or
+`GLOBTOO_IO_TEXTURE` together with their required source license, longitude
+axis, planetocentric latitude and image-origin settings. See [planetary map guide](docs/PLANETARY_MAPS.md)
+for the preprocessing tool, source catalogs, caveats, and packaging example.
+No unverified planetary images are downloaded or bundled by default.

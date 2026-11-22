@@ -23,6 +23,10 @@ int main() {
     std::ofstream(base / "share" / "globtoo" / "shaders" / "installed.vert") << "installed";
     std::ofstream(base / "bin" / "assets" / "earth.jpg") << "real-build-texture";
     std::ofstream(base / "share" / "globtoo" / "assets" / "earth.jpg") << "real-installed-texture";
+    // Planetary images are optional, but when packaged their standard
+    // resource paths must work independently of the current directory.
+    std::ofstream(base / "share" / "globtoo" / "assets" / "moon.jpg") << "lunar-map";
+    std::ofstream(base / "bin" / "assets" / "mars.jpg") << "martian-map";
     std::ofstream(base / "cwd" / "assets" / "earth.jpg") << "obsolete-placeholder";
     const auto original_cwd = fs::current_path();
     fs::current_path(base / "cwd");
@@ -40,6 +44,12 @@ int main() {
     assert(fs::equivalent(resource_path("assets/earth.jpg"),
                           base / "share" / "globtoo" / "assets" / "earth.jpg"));
 #endif
+#ifdef GLOBTOO_INSTALL_DATADIR
+    assert(fs::equivalent(resource_path("assets/moon.jpg"),
+                          base / "share" / "globtoo" / "assets" / "moon.jpg"));
+#endif
+    assert(fs::equivalent(resource_path("assets/mars.jpg"),
+                          base / "bin" / "assets" / "mars.jpg"));
     assert(resource_path("/tmp/absolute.txt") == "/tmp/absolute.txt");
     fs::create_directories(base / "custom" / "assets");
     std::ofstream(base / "custom" / "assets" / "earth.jpg") << "override";

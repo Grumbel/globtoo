@@ -141,12 +141,16 @@ int main(int argc, char** argv) {
 
     Camera cam{};
     const auto home = options.center.value_or([&] {
+        // The timezone is an Earth location, not a meaningful reference for
+        // another body. Start non-Earth bodies on their prime meridian.
+        if (globe.body != BodyId::Earth) return std::make_pair(0., 0.);
         const auto tz=timezone_center();
         return std::make_pair(tz[0],tz[1]);
     }());
     camera_center_on(cam,home.first,home.second);
     fprintf(stderr, "Startup center: %.2f E, %.2f N%s\n",
-            home.first,home.second,options.center ? " (command line)" : " (timezone)");
+            home.first,home.second,options.center ? " (command line)" :
+            globe.body == BodyId::Earth ? " (timezone)" : " (prime meridian)");
     MapView map{};
     InputState input{};
     input.viewport_w = width;
