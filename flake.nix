@@ -194,7 +194,7 @@
           nativeBuildInputs = with pkgs; [
             cmake
             pkg-config
-            (if includePlanetaryTextures then pythonWithPillow else python3)
+            (if activeBodies != [] then pythonWithPillow else python3)
           ];
 
           buildInputs = (with pkgs; [
@@ -229,18 +229,15 @@
             cp ${rivers10m} assets/rivers_10m.geojson
           '';
 
-          # An install lacking a body's preview would display a flat sphere at
-          # distant zoom levels, even though its tiles were installed. Fail
-          # the package build if the resource layout is incomplete.
-          postInstall = pkgs.lib.concatMapStringsSep "\n" (body: ''
-            test -s "$out/share/globtoo/imagery/${body}/manifest.txt"
-            test -s "$out/share/globtoo/imagery/${body}/preview-small.jpg"
-            test -s "$out/share/globtoo/assets/${body}.jpg"
-            cmp "$out/share/globtoo/assets/${body}.jpg" \
-                "$out/share/globtoo/imagery/${body}/preview-small.jpg"
-            test -s "$out/share/globtoo/imagery/${body}/source.txt" || \
-              test -s "$out/share/globtoo/imagery/${body}/source.json"
-          '') activeBodies;
+          # A manifest/preview existence check is not enough: a single bad
+          # tile or mismatched base texture can silently break close zoom.
+          # Validate the actual installed JPEGs, entire tile grid, attribution
+          # and (for prepared maps) recorded SHA-256 before admitting the
+          # output into the Nix store. No runtime Pillow dependency.
+          postInstall = pkgs.lib.optionalString (activeBodies != []) ''
+            PYTHONPATH=${./.} python3 ${./tools/verify_packaged_planets.py} \
+              "$out" ${pkgs.lib.concatMapStringsSep " " (body: "--body ${body}") activeBodies}
+          '';
 
           meta = with pkgs.lib; {
             description = "Interactive 3D Earth and planetary globe with animated 2D projections";

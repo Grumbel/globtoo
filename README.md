@@ -88,6 +88,11 @@ including in Nix installs; per-user maps override the bundled texture and
 tiles together. Packagers can instead supply
 `-DGLOBTOO_MARS_PREPARED_MAP=/path/to/mars-tiles` at CMake configure time,
 or compose a Nix build with `globtoo.lib.${system}.withPlanetaryMaps`.
+The Nix installation runs an offline post-install audit on every included
+planet: it checks image decoding, manifest/grid consistency, attribution,
+complete tile coverage, and byte-identical preview/base textures. Prepared
+maps retain their SHA-256 audit. This catches missing/corrupt packaging
+outputs but does **not** validate scientific coordinate registration.
 The full/default flake package already fetches the three pinned sources;
 `withPlanetaryMaps` replaces only the bodies explicitly specified in the
 argument set. `withPlanetaryMapsLite` adds only the specified prebuilt maps to

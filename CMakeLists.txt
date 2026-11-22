@@ -756,6 +756,9 @@ if(BUILD_TESTING)
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/elevation_tiles_compiler_test.py")
     endif()
     if(_globtoo_test_pillow EQUAL 0)
+      add_test(NAME planetary_package_audit
+        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+          ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/verify_packaged_planets_test.py")
       add_test(NAME prepare_planetary_map
         COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/prepare_planetary_map_test.py")

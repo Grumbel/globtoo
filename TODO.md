@@ -160,6 +160,10 @@ silently download large maps or satellite data on an existing installation.
       low-resolution previews; keep a planetary-free `globtoo-earth` variant.
       Published checksum records are used; live fetch/Nix build and landmark
       orientation are still pending verification.
+- [x] Audit installed Moon/Mars/Io raster bundles during Nix builds: decoded
+      tile sizes, complete manifest grids, preview/base identity, attribution
+      and SHA-256 of audited prepared maps; include corrupt-asset fixtures.
+      This does not independently validate fetched source hashes or map datums.
 - [ ] Expand verified asset catalog to licensed Moon/Mars/Io data and
       high-resolution tiled sources; support resumable multi-part downloads
       and interactive UI consent/progress as appropriate.
