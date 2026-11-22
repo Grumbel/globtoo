@@ -74,6 +74,9 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
         } else if (e.key.key == SDLK_B) {
             countries.borders_visible = !countries.borders_visible;
             fprintf(stderr, "Borders: %s\n", countries.borders_visible ? "on" : "off");
+        } else if (e.key.key == SDLK_V) {
+            globe.texture_visible = !globe.texture_visible;
+            fprintf(stderr, "Texture: %s\n", globe.texture_visible ? "on" : "off");
         } else if (e.key.key == SDLK_P) {
             countries.fill_visible = !countries.fill_visible;
             fprintf(stderr, "Political fill: %s\n", countries.fill_visible ? "on" : "off");

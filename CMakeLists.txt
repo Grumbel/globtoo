@@ -99,6 +99,10 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(layer_composition_test tests/layer_composition_test.cpp)
+  target_include_directories(layer_composition_test PRIVATE src)
+  target_compile_options(layer_composition_test PRIVATE -Wall -Wextra -UNDEBUG)
+  add_test(NAME layer_composition COMMAND layer_composition_test)
   # ES 2.0 precision is part of the shader interface: mismatched vertex/
   # fragment defaults can compile separately yet fail at program link time.
   add_executable(shader_interface_test tests/shader_interface_test.cpp)

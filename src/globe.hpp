@@ -10,10 +10,11 @@ struct Globe {
     Shader  shader;
     Texture texture;
     bool    shading = true;
+    bool    texture_visible = true;  // Independent of political country colors
 };
 
 bool globe_init(Globe& g, const char* texture_path);
 void globe_shutdown(Globe& g);
-// textured=false → solid ocean (political desk-globe base)
+// When texture is disabled, render the solid ocean base instead.
 void globe_draw(const Globe& g, const Camera& cam, float aspect,
-                const MapView& map, bool textured = true);
+                const MapView& map);

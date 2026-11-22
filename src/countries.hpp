@@ -31,4 +31,4 @@ struct Countries {
 bool countries_init(Countries& c, const char* geojson_path);
 void countries_shutdown(Countries& c);
 void countries_draw(Countries& c, const Camera& cam, float aspect,
-                    const MapView& map, bool shading);
+                    const MapView& map, bool shading, float fill_opacity);

@@ -29,7 +29,8 @@ void globe_shutdown(Globe& g) {
 }
 
 void globe_draw(const Globe& g, const Camera& cam, float aspect,
-                const MapView& map, bool textured) {
+                const MapView& map) {
+    const bool textured = g.texture_visible && g.texture.id != 0;
     Mat4 model = Mat4::identity();
 
     use_shader(g.shader);

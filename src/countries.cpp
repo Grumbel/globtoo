@@ -166,7 +166,7 @@ void countries_shutdown(Countries& c) {
 }
 
 void countries_draw(Countries& c, const Camera& cam, float aspect,
-                    const MapView& map, bool shading) {
+                    const MapView& map, bool shading, float fill_opacity) {
     c.using_high = country_use_high_detail(
         map.flat_goal > .5f ? std::clamp(3.2f / map.zoom, 1.2f, 3.2f) : cam.distance,
         c.using_high, c.high.available(), c.low.available());
@@ -189,6 +189,13 @@ void countries_draw(Countries& c, const Camera& cam, float aspect,
     for (int copy=(copies ? -1 : 0);copy<=(copies ? 1 : 0);copy++) {
         const float wrap=static_cast<float>(copy);
         if (c.fill_visible && c.fill_shader.program) {
+            // Blend political colors over imagery. Only this pass blends:
+            // borders remain fully opaque, and globe depth/stencil still
+            // occlude country geometry on the far side of the sphere.
+            if (fill_opacity < 1.f) {
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            }
             use_shader(c.fill_shader);
             scene_uniforms(c.fill_shader,cam,aspect,map,wrap);
             const GLint u_light=glGetUniformLocation(c.fill_shader.program,"u_light_dir");
@@ -198,6 +205,8 @@ void countries_draw(Countries& c, const Camera& cam, float aspect,
                 glUniform3f(u_light,light.x,light.y,light.z);
             }
             if (u_shading>=0) glUniform1f(u_shading,shading ? 1.f : 0.f);
+            const GLint u_opacity=glGetUniformLocation(c.fill_shader.program,"u_fill_opacity");
+            if (u_opacity>=0) glUniform1f(u_opacity,fill_opacity);
             glBindBuffer(GL_ARRAY_BUFFER,gpu.fill_vbo);
             glEnableVertexAttribArray(0);
             glEnableVertexAttribArray(1);
@@ -209,6 +218,7 @@ void countries_draw(Countries& c, const Camera& cam, float aspect,
             glDisableVertexAttribArray(0);
             glDisableVertexAttribArray(1);
             glDisableVertexAttribArray(3);
+            if (fill_opacity < 1.f) glDisable(GL_BLEND);
         }
         if (c.borders_visible && c.border_shader.program) {
             use_shader(c.border_shader);

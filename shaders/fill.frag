@@ -3,6 +3,7 @@ varying mediump vec3 v_color;
 varying mediump vec3 v_normal;
 uniform vec3 u_light_dir;
 uniform float u_shading;
+uniform mediump float u_fill_opacity;
 
 varying mediump float v_map_lon;
 uniform mediump float u_morph;
@@ -15,5 +16,5 @@ void main() {
     float diffuse = 0.52 * ndotl;
     float lit = ambient + diffuse;
     vec3 c = mix(v_color, v_color * lit, (u_shading * (1.0 - u_morph)));
-    gl_FragColor = vec4(c, 1.0);
+    gl_FragColor = vec4(c, u_fill_opacity);
 }

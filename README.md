@@ -55,10 +55,12 @@ Globtoo now has a small on-screen toolbar; keyboard shortcuts remain optional.
 - **Hammer**: equal-area oval.
 - **− / +**: zoom out / in.
 - **Shading**: toggle directional shading (flat maps automatically fade to unlit).
-- **Countries**: toggle political color overlays.
+- **Countries**: toggle the political color overlay independently of the texture.
 - **Borders**: toggle national boundary outlines.
 - **Names**: toggle English country names; labels are omitted when overlapping.
-- **Texture**: switch to textured Earth instead of political country fills.
+- **Texture**: toggle the Earth imagery independently of the country colors. When both
+  are enabled (the default), translucent country colors mix with the texture
+  so terrain remains visible beneath the colors. Either layer can be shown alone.
 - **Grab mode**: switch between Grab and Arcball in globe mode.
 - **Compass (upper-right)**: live geographic N/E/S/W heading for the globe and every 2D projection.
 - **North Up**: click the button or compass rose to straighten the view without panning or changing zoom (also works after a polar crossing).
@@ -79,7 +81,7 @@ at close range. The 10m country mesh is selected automatically at these scales;
 the raster Earth texture still has its original resolution.
 Shift+drag rolls the globe or rotates the flat map around the screen center.
 Optional shortcuts: `1..5` select projection, `Space` shading, `B` borders,
-`N` names, `P` political coloring, `Tab` Grab/Arcball, `T` trackball,
+`N` names, `P` political coloring, `V` texture, `Tab` Grab/Arcball, `T` trackball,
 `Esc` quit (or release trackball).
 
 The default view is centered on the **representative city of the system's IANA

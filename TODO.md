@@ -13,6 +13,7 @@
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Independently toggle country colors and Earth imagery; blend both when enabled
 - [x] Interactive geographic compass, North-up alignment, and relocated full Reset (including roll)
 - [x] Geographic reprojection from a full 3D rotating frame for north/south pole crossings (no mirrored map copies)
 - [x] Shift+drag rotation for flat maps and preservation through globe folding

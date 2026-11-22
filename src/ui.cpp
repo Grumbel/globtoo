@@ -202,7 +202,7 @@ bool command_active(int id, const Camera& cam, const MapView& m,
     case 8: return c.fill_visible;
     case 9: return c.borders_visible;
     case 10: return c.names_visible;
-    case 11: return !c.fill_visible;
+    case 11: return g.texture_visible;
     case 12: return cam.mode == ControlMode::Grab;
     }
     return false;
@@ -221,7 +221,7 @@ void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState
     case 8: c.fill_visible = !c.fill_visible; break;
     case 9: c.borders_visible = !c.borders_visible; break;
     case 10: c.names_visible = !c.names_visible; break;
-    case 11: c.fill_visible = false; break;
+    case 11: g.texture_visible = !g.texture_visible; break;
     case 12:
         cam.mode = cam.mode == ControlMode::Grab ? ControlMode::Arcball : ControlMode::Grab;
         camera_grab_end(cam); camera_grab_kill_inertia(cam); break;
