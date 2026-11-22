@@ -16,8 +16,11 @@
 // Moon: planetographic latitude, east-positive longitude (-180..180).
 // Mars: planetocentric latitude, east-positive longitude (0..360).
 // Io:   planetographic latitude, west-positive longitude (0..360).
-// Io and Moon planetographic latitudes are displayed without spheroid-to-
-// sphere reprojection. This is an approximate location, not a precise datum.
+// The USGS/IAU Gazetteer uses a spherical reference for the Moon and Io,
+// where planetographic == planetocentric latitude by definition. Mars uses
+// planetocentric coordinates in this catalog. Real mosaic control networks
+// and elevation-dependent geolocation can still differ from these centers.
+// https://planetarynames.wr.usgs.gov/Page/Website
 enum class FeatureLongitude { EastPositive, WestPositive };
 enum class FeatureLatitude { Planetocentric, Planetographic };
 

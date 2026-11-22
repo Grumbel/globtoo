@@ -131,9 +131,13 @@ silently download large maps or satellite data on an existing installation.
 - [ ] Support body-specific base maps and optional shaded elevation; provide
       selector in UI and CLI, without showing Earth countries, cities, rivers,
       population, or Earth-based kilometer scale on other bodies.
-- [ ] Verify planetocentric versus planetographic coordinates and IAU longitude
-      direction (do not assume all bodies use Earth's east-positive frame);
-      identify reliable NASA/USGS sources and per-asset licenses/checksums.
+- [x] Document USGS/IAU Gazetteer coordinate conventions for Moon, Mars and Io;
+      convert older Mars planetographic full-globe plate carrée rasters onto
+      the planetocentric sphere before importing tiles; keep longitude axes
+      separate from latitude assumptions.
+- [ ] Validate actual source raster coordinate/reference metadata (including
+      control networks, positive-east/positive-west and prime meridian) and
+      verify planetocentric alignment using external scientific datasets.
 
 ### Stage 5 — optional on-demand downloads and Nix split
 - [x] Add an opt-in libcurl CLI downloader for the pinned Earth base map:
@@ -188,6 +192,7 @@ silently download large maps or satellite data on an existing installation.
 - [x] Source a small cross-body IAU Gazetteer feature-center catalog with
       original longitude/latitude conventions, non-Earth marker overlay and
       command-line --list-features / --focus navigation.
-- [ ] Import the full IAU planetary gazetteer, handle planetographic-to-
-      planetocentric latitude and datums accurately, and validate feature
-      alignment against real raster sources.
+- [x] Document that the Gazetteer's Moon and Io planetographic latitudes
+      use spherical cartographic coordinates and require no latitude warp.
+- [ ] Import the full IAU planetary gazetteer, handle source map datums/control
+      networks and validate feature alignment against real raster sources.

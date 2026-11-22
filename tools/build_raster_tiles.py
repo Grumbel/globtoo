@@ -11,6 +11,13 @@ import math
 from pathlib import Path
 from PIL import Image, ImageOps
 
+if __package__:
+    from .planetary_latitudes import (row_indices, reproject_latitude_rows,
+                                      validate_latitude_type)
+else:
+    from planetary_latitudes import (row_indices, reproject_latitude_rows,
+                                     validate_latitude_type)
+
 # NASA's 21600x10800 global image is 233 million pixels, above Pillow's
 # default decompression-bomb warning/error threshold. This known use case is
 # intentional; impose our own finite input limit before decompressing.
@@ -64,7 +71,8 @@ def _oriented_preview(image, positive, left):
 
 
 def build(source, destination, tile_size=1024, gutter=4,
-          positive='east', left=180):
+          positive='east', left=180, latitude='planetocentric', body=None):
+    validate_latitude_type(body, latitude)
     if positive not in ('east', 'west') or left not in (0, 180):
         raise ValueError('longitude must be east|west with left boundary 0|180')
     if tile_size & (tile_size - 1) or tile_size < 64 or tile_size > 2048:
@@ -98,14 +106,33 @@ def build(source, destination, tile_size=1024, gutter=4,
                 x_begin, x_end = tile_left - gutter, tile_left + cell_w + gutter
                 y_begin, y_end = top - gutter, top + cell_h + gutter
                 y0, y1 = max(0, y_begin), min(height, y_end)
-                if y0 < y1:
+                if latitude == 'planetographic' and body == 'mars':
+                    # Geodetic Mars maps have nonlinear Y spacing relative
+                    # to the viewer's centric sphere. Sample each canonical
+                    # output scanline from at most two source scanlines, never
+                    # allocating a second full-resolution mosaic. Longitude
+                    # reorientation still uses the seam-aware strip copier.
+                    valid_w, valid_h = cell_w + 2*gutter, cell_h + 2*gutter
+                    for dst_y in range(valid_h):
+                        a, b, fraction = row_indices(y_begin + dst_y, height,
+                                                     body, latitude)
+                        first = Image.new('RGB', (valid_w, 1))
+                        _oriented_strip(image, first, x_begin, x_end,
+                                        a, a+1, a, positive, left)
+                        if b != a and fraction > 0:
+                            second = Image.new('RGB', (valid_w, 1))
+                            _oriented_strip(image, second, x_begin, x_end,
+                                            b, b+1, b, positive, left)
+                            first = Image.blend(first, second, fraction)
+                        tile.paste(first, (0, dst_y))
+                elif y0 < y1:
                     _oriented_strip(image, tile, x_begin, x_end, y0, y1,
                                     y_begin, positive, left)
                 valid_w, valid_h = cell_w+2*gutter, cell_h+2*gutter
-                if y_begin < 0:
+                if y_begin < 0 and not (latitude == 'planetographic' and body == 'mars'):
                     edge = tile.crop((0, -y_begin, valid_w, -y_begin+1))
                     tile.paste(edge.resize((valid_w, -y_begin)), (0, 0))
-                if y_end > height:
+                if y_end > height and not (latitude == 'planetographic' and body == 'mars'):
                     from_y = height - y_begin
                     edge = tile.crop((0, from_y-1, valid_w, from_y))
                     tile.paste(edge.resize((valid_w, valid_h-from_y)), (0, from_y))
@@ -122,11 +149,13 @@ def build(source, destination, tile_size=1024, gutter=4,
                           quality=93, subsampling=0)
         # Use a small preview for zoomed-out views; loading its full resolution
         # cannot exceed GLES2's ubiquitous 2048x2048 limit.
-        preview = _oriented_preview(
-            image.resize((2048, 1024), Image.Resampling.LANCZOS), positive, left)
+        preview = reproject_latitude_rows(_oriented_preview(
+            image.resize((2048, 1024), Image.Resampling.LANCZOS), positive, left),
+            body, latitude)
         preview.save(destination / 'preview.jpg', quality=90)
-        preview_small = _oriented_preview(
-            image.resize((1024, 512), Image.Resampling.LANCZOS), positive, left)
+        preview_small = reproject_latitude_rows(_oriented_preview(
+            image.resize((1024, 512), Image.Resampling.LANCZOS), positive, left),
+            body, latitude)
         preview_small.save(destination / 'preview-small.jpg', quality=90)
         (destination / 'manifest.txt').write_text(
             f'GLOBTOO_RASTER_TILES 1\n{width} {height} {tile_size} {gutter} {columns} {rows}\n',
@@ -144,10 +173,17 @@ def main():
                     help='source longitude-positive direction (default east)')
     ap.add_argument('--left', type=int, choices=(0, 180), default=180,
                     help='source left longitude boundary (default 180)')
+    ap.add_argument('--latitude', choices=('planetocentric', 'planetographic'),
+                    default='planetocentric', help='source latitude convention')
+    ap.add_argument('--body', choices=('moon', 'mars', 'io'),
+                    help='required for planetographic input; only Mars needs resampling')
     args = ap.parse_args()
+    if args.latitude == 'planetographic' and args.body is None:
+        ap.error('planetographic latitude requires --body moon|mars|io')
     print('Created %d x %d raster tiles' % build(args.source, args.output,
                                                   args.tile_size, args.gutter,
-                                                  args.positive, args.left))
+                                                  args.positive, args.left,
+                                                  args.latitude, args.body))
 
 
 if __name__ == '__main__':

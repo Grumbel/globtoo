@@ -124,7 +124,7 @@ foreach(body moon mars io)
   set(GLOBTOO_${upper}_LONGITUDE_POSITIVE "" CACHE STRING "Source direction: east or west")
   set(GLOBTOO_${upper}_LONGITUDE_LEFT "" CACHE STRING "Source left boundary: 0 or 180 degrees")
   set(GLOBTOO_${upper}_SOURCE "" CACHE STRING "Source publication/URL for ${body} map")
-  set(GLOBTOO_${upper}_LATITUDE_TYPE "" CACHE STRING "Source latitude: must be planetocentric")
+  set(GLOBTOO_${upper}_LATITUDE_TYPE "" CACHE STRING "Source latitude: planetocentric or planetographic")
   set(GLOBTOO_${upper}_LICENSE "" CACHE STRING "Verified redistributable license for ${body} map")
   if(GLOBTOO_${upper}_TEXTURE OR GLOBTOO_${upper}_IMAGERY_TEXTURE)
     foreach(variable TEXTURE IMAGERY_TEXTURE)
@@ -133,10 +133,10 @@ foreach(body moon mars io)
       endif()
     endforeach()
     if(NOT GLOBTOO_${upper}_SOURCE OR NOT GLOBTOO_${upper}_LICENSE OR
-       NOT GLOBTOO_${upper}_LATITUDE_TYPE STREQUAL "planetocentric" OR
+       NOT GLOBTOO_${upper}_LATITUDE_TYPE MATCHES "^(planetocentric|planetographic)$" OR
        NOT GLOBTOO_${upper}_LONGITUDE_POSITIVE MATCHES "^(east|west)$" OR
        NOT GLOBTOO_${upper}_LONGITUDE_LEFT MATCHES "^(0|180)$")
-      message(FATAL_ERROR "${body} texture requires SOURCE, LICENSE, LATITUDE_TYPE=planetocentric, LONGITUDE_POSITIVE=east|west and LONGITUDE_LEFT=0|180")
+      message(FATAL_ERROR "${body} texture requires SOURCE, LICENSE, LATITUDE_TYPE=planetocentric|planetographic, LONGITUDE_POSITIVE=east|west and LONGITUDE_LEFT=0|180")
     endif()
     if(GLOBTOO_${upper}_TEXTURE AND
        (NOT GLOBTOO_PLANET_MAX_WIDTH MATCHES "^[0-9]+$" OR
@@ -160,9 +160,12 @@ foreach(body moon mars io)
           "${GLOBTOO_${upper}_TEXTURE}" "${_planet_output}"
           --positive "${GLOBTOO_${upper}_LONGITUDE_POSITIVE}"
           --left "${GLOBTOO_${upper}_LONGITUDE_LEFT}"
+          --latitude "${GLOBTOO_${upper}_LATITUDE_TYPE}"
+          --body "${body}"
           --max-width "${GLOBTOO_PLANET_MAX_WIDTH}"
         DEPENDS "${GLOBTOO_${upper}_TEXTURE}"
           "${CMAKE_SOURCE_DIR}/tools/normalize_planet_texture.py"
+          "${CMAKE_SOURCE_DIR}/tools/planetary_latitudes.py"
         COMMENT "Normalizing ${body} global raster" VERBATIM)
       add_custom_target(${body}_texture ALL DEPENDS "${_planet_output}")
       list(APPEND PLANET_TEXTURE_OUTPUTS "${body}")
@@ -175,7 +178,8 @@ foreach(body moon mars io)
       "Original longitude direction: ${GLOBTOO_${upper}_LONGITUDE_POSITIVE}\n"
       "Original left longitude: ${GLOBTOO_${upper}_LONGITUDE_LEFT} degrees\n"
       "Source latitude type: ${GLOBTOO_${upper}_LATITUDE_TYPE}\n"
-      "Output: north-up planetocentric east-positive -180..180 equirectangular\n")
+      "Output: north-up planetocentric east-positive -180..180 equirectangular\n"
+      "Latitude conversion: ${body} reference surface, when applicable\n")
     if(GLOBTOO_${upper}_IMAGERY_TEXTURE)
       set(_planet_tiles_dir "${CMAKE_BINARY_DIR}/generated-imagery/${body}")
       file(MAKE_DIRECTORY "${_planet_tiles_dir}")
@@ -187,8 +191,11 @@ foreach(body moon mars io)
           "${GLOBTOO_${upper}_IMAGERY_TEXTURE}" "${_planet_tiles_dir}"
           --positive "${GLOBTOO_${upper}_LONGITUDE_POSITIVE}"
           --left "${GLOBTOO_${upper}_LONGITUDE_LEFT}"
+          --latitude "${GLOBTOO_${upper}_LATITUDE_TYPE}"
+          --body "${body}"
         DEPENDS "${GLOBTOO_${upper}_IMAGERY_TEXTURE}"
           "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+          "${CMAKE_SOURCE_DIR}/tools/planetary_latitudes.py"
         COMMENT "Preparing oriented high-resolution ${body} GLES2 tiles" VERBATIM)
       add_custom_target(${body}_imagery_tiles ALL DEPENDS "${_planet_tiles_manifest}")
       list(APPEND PLANET_IMAGERY_OUTPUTS "${body}")
@@ -680,6 +687,9 @@ if(BUILD_TESTING)
       add_test(NAME raster_tiles_compiler
         COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/raster_tiles_compiler_test.py")
+      add_test(NAME planetary_latitudes
+        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+          ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/planetary_latitudes_test.py")
     endif()
   endif()
   add_executable(planetary_features_test tests/planetary_features_test.cpp)

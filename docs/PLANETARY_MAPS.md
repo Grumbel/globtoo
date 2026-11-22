@@ -44,11 +44,14 @@ entries are planetographic latitude, east-positive longitude in −180–180;
 the selected Martian entries are planetocentric latitude, east-positive
 longitude in 0–360; the Io entries are planetographic latitude and
 **west-positive** longitude in 0–360. Globtoo flips Io's longitude sign and
-wraps all source longitudes to [−180°, 180°) east-positive, but the spherical
-renderer does **not** transform planetographic latitude to planetocentric
-latitude. Feature positions on the Moon and Io are therefore **approximate**;
-errors from actual mosaic datum/projection and shape modeling have not been
-quantified. This catalog is deliberately separate from source-texture
+wraps all source longitudes to [−180°, 180°) east-positive. According to
+[USGS Gazetteer coordinate guidance](https://planetarynames.wr.usgs.gov/Page/Website),
+the Gazetteer uses a **spherical cartographic reference for the Moon and Io**,
+so planetographic and planetocentric **latitude are numerically identical**
+for these entries; their labels need no latitude correction. Mars Gazetteer
+entries in our catalog already use planetocentric latitude. Differences from
+an actual mosaic's control network, underlying shape and projection are still
+possible and have not been quantified. This catalog is deliberately separate from source-texture
 longitude normalization. The IAU feature center is not guaranteed to equal
 a feature's visually brightest or highest point.
 
@@ -59,8 +62,11 @@ image, with exactly 2:1 dimensions (uniform longitude and latitude spacing),
 no added map borders or legend. TIFF/GeoTIFF support depends on Pillow's
 installed codecs; other supported raster formats include PNG and JPEG. The
 script **does not reproject** Mercator, polar stereographic, regional mosaics,
-planetographic latitude, or an arbitrary geographic TIFF. Inspect the input's
-original map metadata and crop/reproject with appropriate GIS software first.
+or arbitrary geographic TIFF georeferencing. The optional Mars
+planetographic-to-planetocentric conversion handles **latitude only**, on a
+biaxial reference ellipsoid; other map projections still require planetary-aware
+GIS preprocessing. Inspect the product's original projection and control-network
+metadata first.
 
 Normalize an east-positive map whose left boundary is at longitude 0°:
 
@@ -74,6 +80,15 @@ Normalize a west-positive map whose left boundary is at 0°W:
 ```sh
 python3 tools/normalize_planet_texture.py io_source.tif io.jpg \
   --positive west --left 0 --max-width 2048
+```
+
+If your **Mars** source is in the older west-positive **planetographic**
+system (common on pre-2002 imagery), both the longitude and latitude need
+conversion:
+
+```sh
+python3 tools/normalize_planet_texture.py mars_source.tif mars.jpg \
+  --positive west --left 0 --body mars --latitude planetographic
 ```
 
 For ±180° maps, use `--left 180`, regardless of positive direction. The
@@ -97,16 +112,28 @@ reducing the whole map to 2048 pixels. The tile preparer understands the
 source longitude convention directly: it mirrors/rotates **per tile** and
 normalizes the overview without allocating a second full-size mosaic.
 
-For example, given a locally obtained **planetocentric, north-up, 2:1,
+For example, given a locally obtained **planetographic, north-up, 2:1,
 full-world** Io color mosaic that has west-positive longitudes and a 0°W
 left boundary (verify these claims against the actual product metadata):
 
 ```sh
 python3 tools/build_raster_tiles.py /data/io-source.tif /data/io-tiles \
-  --positive west --left 0
+  --positive west --left 0 --body io --latitude planetographic
 
 globtoo --body io --body-imagery-dir io=/data/io-tiles
 ```
+
+For a full-resolution **Mars planetographic** mosaic, add
+`--body mars --latitude planetographic` to the tile converter. Each tile
+resamples its north/south scanlines using Mars's reference ellipsoid
+(equatorial radius 3396.2 km, polar radius 3376.2 km), without materializing
+a second copy of the large image. The output preview uses the same conversion.
+The test suite checks tile/single-texture agreement on a synthetic mosaic.
+Longitude conversion also applies when the source is west-positive.
+
+The Moon and Io Gazetteer spherical reference uses numerically equal
+planetographic/planetocentric latitude; `--latitude planetographic` with
+`--body moon|io` records that fact without changing their pixel rows.
 
 `--body-imagery-dir moon=DIR`, `mars=DIR`, and `earth=DIR` can be repeated,
 so the `M` key and NEXT BODY button retain separate tile sources. The legacy
@@ -124,12 +151,17 @@ cmake -S . -B build \
   -DGLOBTOO_IO_IMAGERY_TEXTURE=/data/io-source.tif \
   -DGLOBTOO_IO_LONGITUDE_POSITIVE=west \
   -DGLOBTOO_IO_LONGITUDE_LEFT=0 \
-  -DGLOBTOO_IO_LATITUDE_TYPE=planetocentric \
+  -DGLOBTOO_IO_LATITUDE_TYPE=planetographic \
   '-DGLOBTOO_IO_SOURCE=Exact product identifier and URL' \
   '-DGLOBTOO_IO_LICENSE=Verified redistribution terms'
 cmake --build build
 cmake --install build
 ```
+
+Set `GLOBTOO_MARS_LATITUDE_TYPE=planetographic` for an older
+planetographic Mars raster; CMake converts it to the planetocentric viewer
+frame and records the source convention. Set `planetocentric` for sources
+already in that frame (do not apply the warp twice).
 
 Equivalent `GLOBTOO_MOON_IMAGERY_TEXTURE` and
 `GLOBTOO_MARS_IMAGERY_TEXTURE` inputs are available, including when a small
@@ -139,11 +171,11 @@ convention. CMake rejects missing source metadata, unsupported longitude
 orientation or absent input files. The default packages do **not** bundle
 unverified source mosaics.
 
-This is **longitude-axis normalization**, not a general cartographic
-reprojection. Planetographic latitudes, global maps with displaced seams,
-regional swaths, positive-south latitudes, 360° endpoint duplication and
-non-equirectangular projections need conversion with planetary-aware GIS
-tools before tiling. The input's width must equal exactly twice its height.
+This is longitude-axis normalization with **optional Mars latitude**
+reprojection, **not** a general cartographic transformation. Global maps with
+shifted prime meridians, regional swaths, positive-south latitudes, 360°
+endpoint duplication and non-equirectangular projections still require
+planetary-aware GIS tools before tiling. The input's width must equal exactly twice its height.
 
 ## CMake packaging with provenance
 
@@ -192,8 +224,9 @@ subsequent Nix fetch.
 - The rendering model uses a **sphere of mean radius**, not an ellipsoid or
   detailed shape model. It reports approximate surface distances, not
   elevation-aware paths.
-- Longitude mirroring/rotation does **not** correct planetographic vs.
-  planetocentric latitude or shifted scientific prime meridians.
+- Planetographic Mars latitudes can be reprojected using the declared
+  biaxial reference ellipsoid. Longitude normalization does **not** repair
+  shifted scientific prime meridians, control networks, or arbitrary datums.
 - Planetary high-resolution tiling and a small sourced landmark catalog exist.
   A complete gazetteer import and body-specific terrain relief remain future
   work. Existing measured elevation, population, cities, rivers and country
