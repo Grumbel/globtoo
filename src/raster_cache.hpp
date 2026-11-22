@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "tiled_raster.hpp"
+#include "raster_legend.hpp"
 #include "mesh.hpp"
 #include "shader.hpp"
 #include "texture.hpp"
@@ -21,6 +22,7 @@ struct RasterCache {
     RasterTiles layout{};
     std::string root;
     Texture preview{};
+    RasterLegend legend{};
     std::vector<RasterGpuCell> cells;
     std::uint64_t frame = 0;
     int loaded_count = 0;

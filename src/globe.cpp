@@ -9,7 +9,8 @@
 
 
 bool globe_init(Globe& g, const char* texture_path,
-                const char* relief_manifest_path) {
+                const char* relief_manifest_path,
+                const char* elevation_manifest_path) {
     // Extra tessellation keeps the texture/silhouette smooth at close zoom.
     // 257 * 129 vertices still fit GLES2 16-bit element indices.
     static_assert(257 * 129 <= 65536);
@@ -22,6 +23,12 @@ bool globe_init(Globe& g, const char* texture_path,
     g.texture = load_texture(texture_path);
     raster_cache_init(g.relief, relief_manifest_path ? relief_manifest_path :
                                          resource_path("relief/manifest.txt"));
+    if (raster_cache_init(g.elevation, elevation_manifest_path ? elevation_manifest_path :
+                                         resource_path("elevation/manifest.txt")) &&
+        !g.elevation.legend.valid()) {
+        fprintf(stderr,"Elevation layer missing valid measurement legend; ignoring it.\n");
+        raster_cache_shutdown(g.elevation);
+    }
     if (!g.texture.id) {
         fprintf(stderr, "Failed to load earth texture – using solid color fallback\n");
     }
@@ -34,12 +41,16 @@ void globe_shutdown(Globe& g) {
     destroy_shader(g.shader);
     destroy_texture(g.texture);
     raster_cache_shutdown(g.relief);
+    raster_cache_shutdown(g.elevation);
 }
 
 void globe_draw(Globe& g, const Camera& cam, float aspect,
                 const MapView& map) {
-    const bool relief = g.texture_visible && g.surface==SurfaceLayer::Relief && g.relief.valid();
-    const bool textured = g.texture_visible && (g.texture.id != 0 || relief);
+    RasterCache* raster = g.surface==SurfaceLayer::Relief ? &g.relief :
+                         g.surface==SurfaceLayer::Elevation ? &g.elevation : nullptr;
+    if (raster && !raster->valid()) raster=nullptr;
+    const bool thematic = g.texture_visible && raster!=nullptr;
+    const bool textured = g.texture_visible && (g.texture.id != 0 || thematic);
     Mat4 model = Mat4::identity();
 
     use_shader(g.shader);
@@ -79,10 +90,10 @@ void globe_draw(Globe& g, const Camera& cam, float aspect,
     // Reproject a single rotated Earth, not mirrored north/south map bands.
     // Additional horizontal copies are required only for wide flat views.
     bool detailed=false;
-    if (relief) detailed=raster_cache_draw(g.relief,cam,map,aspect,g.shader);
+    if (thematic) detailed=raster_cache_draw(*raster,cam,map,aspect,g.shader);
     if (!detailed) {
         if (textured) {
-            if (relief) bind_texture(g.relief.preview,0);
+            if (thematic) bind_texture(raster->preview,0);
             else bind_texture(g.texture,0);
         }
         const bool copies=flat && scene_map_seam_visible(map,aspect);

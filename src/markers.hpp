@@ -26,6 +26,7 @@ struct CommandLine {
     std::string texture_path;
     std::string surface_layer = "imagery";
     std::string relief_dir;
+    std::string elevation_dir;
     std::vector<Marker> markers;
     // Explicit initial viewpoint, [longitude, latitude]; otherwise timezone.
     std::optional<std::pair<double,double>> center;

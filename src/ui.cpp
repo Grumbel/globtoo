@@ -39,6 +39,10 @@ Bounds scale_panel(const Ui& ui) {
     const auto c=compass_panel(ui);
     return {std::max(8.f,c.x+c.w-264.f),c.y+c.h+8.f,264.f,83.f};
 }
+Bounds legend_panel(const Ui& ui) {
+    const auto s=scale_panel(ui);
+    return {s.x, s.y+s.h+8.f, s.w, 257.f};
+}
 bool contains(Bounds b, float x,float y) {
     return x>=b.x && x<b.x+b.w && y>=b.y && y<b.y+b.h;
 }
@@ -50,8 +54,8 @@ bool overlaps(Bounds a, Bounds b) {
 
 struct Button { const char* label; int x,y,w,h; int command; };
 // All hit rectangles and draw positions derive from the same layout.
-std::array<Button,17> buttons(const Ui& ui) {
-    std::array<Button,17> out{};
+std::array<Button,18> buttons(const Ui& ui) {
+    std::array<Button,18> out{};
     std::size_t k=0;
     const char* top[] = {"3D GLOBE", "PLATE", "MERCATOR", "MOLLWEIDE", "HAMMER", "-", "+"};
     const int topw[] = {103,72,108,121,88,30,30};
@@ -63,10 +67,10 @@ std::array<Button,17> buttons(const Ui& ui) {
     for (int i=0;i<7;i++) { out[k++] = {top[i],x,static_cast<int>(panel.y+26),topw[i],30,i}; x += topw[i]+5; }
     x = static_cast<int>(panel.x+6);
     for (int i=0;i<6;i++) { out[k++] = {bottom[i],x,static_cast<int>(panel.y+62),botw[i],30,botcmd[i]}; x += botw[i]+5; }
-    const char* features[] = {"CAPITALS", "CITIES", "RIVERS", "RELIEF"};
-    const int widths[] = {112,90,90,100};
+    const char* features[] = {"CAPITALS", "CITIES", "RIVERS", "RELIEF", "ELEV"};
+    const int widths[] = {112,90,90,100,85};
     x=static_cast<int>(panel.x+6);
-    for (int i=0;i<4;i++) {
+    for (int i=0;i<5;i++) {
         out[k++] = {features[i],x,static_cast<int>(panel.y+98),widths[i],30,17+i};
         x+=widths[i]+5;
     }
@@ -242,6 +246,7 @@ bool command_active(int id, const Camera& cam, const MapView& m,
     case 10: return c.names_visible;
     case 11: return g.texture_visible;
     case 20: return g.surface==SurfaceLayer::Relief && g.relief.valid();
+    case 21: return g.surface==SurfaceLayer::Elevation && g.elevation.valid();
     case 12: return cam.mode == ControlMode::Grab;
     case 15: return false; // GRID uses the Ui state, handled by the caller
     }
@@ -336,8 +341,9 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
     const bool on_toolbar=contains(toolbar_panel(ui),x,y);
     const bool on_compass=contains(cp,x,y);
     const bool on_scale=contains(scale_panel(ui),x,y);
+    const bool on_legend=ui.elevation_legend_visible && contains(legend_panel(ui),x,y);
     ui.hover=-1;
-    if (!on_toolbar && !on_compass && !on_scale) return false;
+    if (!on_toolbar && !on_compass && !on_scale && !on_legend) return false;
     if (e.type==SDL_EVENT_MOUSE_BUTTON_UP && e.button.button==SDL_BUTTON_LEFT) {
         input.dragging=false;
         input.drag_button=0;
@@ -346,7 +352,7 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
     // All visible control surfaces consume input, including the compass
     // needle and the spaces between buttons, so no globe drag can begin.
     // Wheel zoom should still work with the pointer over the passive ruler.
-    if (on_scale) return e.type!=SDL_EVENT_MOUSE_WHEEL;
+    if (on_scale || on_legend) return e.type!=SDL_EVENT_MOUSE_WHEEL;
     if (on_compass) {
         const Bounds north{cp.x+7,cp.y+107,106,24};
         const Bounds reset{cp.x+7,cp.y+135,106,24};
@@ -378,12 +384,14 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
             else if (b.command == 17) ui.capitals_visible = !ui.capitals_visible;
             else if (b.command == 18) ui.cities_visible = !ui.cities_visible;
             else if (b.command == 19) ui.rivers_visible = !ui.rivers_visible;
-            else if (b.command == 20) {
-                if (globe.relief.valid()) {
-                    globe.surface = globe.surface==SurfaceLayer::Relief ?
-                        SurfaceLayer::Imagery : SurfaceLayer::Relief;
+            else if (b.command == 20 || b.command == 21) {
+                const bool elevation = b.command==21;
+                const auto layer = elevation ? SurfaceLayer::Elevation : SurfaceLayer::Relief;
+                const auto& cache = elevation ? globe.elevation : globe.relief;
+                if (cache.valid()) {
+                    globe.surface = globe.surface==layer ? SurfaceLayer::Imagery : layer;
                     globe.texture_visible=true;
-                } else fprintf(stderr,"Relief layer is not installed.\n");
+                } else fprintf(stderr,"%s layer is not installed.\n", elevation ? "Elevation" : "Relief");
             }
             else execute(b.command,cam,map,globe,countries,input);
         }
@@ -544,6 +552,49 @@ void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspe
     });
 }
 
+namespace {
+Color legend_color(const RasterLegend& legend, float metres) {
+    const auto& stops=legend.stops;
+    if (stops.empty()) return muted;
+    const RasterLegendStop* lo=&stops.front();
+    const RasterLegendStop* hi=&stops.back();
+    for (size_t i=1; i<stops.size();++i) {
+        if (metres<=stops[i].value) {hi=&stops[i]; lo=&stops[i-1]; break;}
+    }
+    const float fraction = lo==hi ? 0.f : std::clamp(
+        (metres-lo->value)/float(hi->value-lo->value),0.f,1.f);
+    return {(lo->red+(hi->red-lo->red)*fraction)/255.f,
+            (lo->green+(hi->green-lo->green)*fraction)/255.f,
+            (lo->blue+(hi->blue-lo->blue)*fraction)/255.f,1.f};
+}
+void draw_elevation_legend(Ui& ui, const RasterLegend& legend) {
+    if (!legend.valid()) return;
+    const auto box=legend_panel(ui);
+    rect(ui,box.x,box.y,box.w,box.h,panel);
+    draw_text(ui,box.x+8,box.y+8,legend.title,1,text);
+    draw_text(ui,box.x+8,box.y+21,legend.units,1,muted);
+    const int range_low=legend.stops.front().value;
+    const int range_high=legend.stops.back().value;
+    constexpr int bar_height=170;
+    const float bar_x=box.x+10.f,bar_y=box.y+38.f;
+    for (int i=0;i<bar_height;i++) {
+        const float metres=range_high-(i+.5f)*float(range_high-range_low)/bar_height;
+        rect(ui,bar_x,bar_y+i,18,1,legend_color(legend,metres));
+    }
+    // Signed metres: 0 is sea level, negative is ocean depth. These ticks
+    // are actual physical values, not an arbitrary image brightness scale.
+    for (int value : {8000,4000,0,-2000,-6000,-10000}) {
+        if (value<range_low || value>range_high) continue;
+        const float y=bar_y+(range_high-value)*bar_height/float(range_high-range_low);
+        stroke(ui,bar_x+20,y,bar_x+29,y,1.f,muted);
+        draw_text(ui,bar_x+35,y-3,std::to_string(value),1,text);
+    }
+    // Metadata travels with the asset and is supplied by the converter.
+    draw_text(ui,box.x+8,box.y+220,legend.attribution,1,muted);
+    draw_text(ui,box.x+8,box.y+235,"MAGENTA: NO DATA",1,muted);
+}
+} // namespace
+
 void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
              const Countries& countries) {
     if (!ui.visible) return;
@@ -566,9 +617,13 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
     const char* mode = map.selected==MapProjection::Globe ? "SPHERE" : "FLAT MAP";
     draw_text(ui,toolbar.x+205.f,toolbar.y+9.f,mode,1,muted);
     if (globe.surface==SurfaceLayer::Relief && globe.relief.valid())
-        draw_text(ui,toolbar.x+320.f,toolbar.y+9.f,"NASA RELIEF",1,muted);
+        draw_text(ui,toolbar.x+320.f,toolbar.y+9.f,"RELIEF",1,muted);
+    if (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid())
+        draw_text(ui,toolbar.x+320.f,toolbar.y+9.f,"ELEVATION",1,muted);
     draw_compass(ui,cam,map);
     draw_scale_bar(ui);
+    if (ui.elevation_legend_visible)
+        draw_elevation_legend(ui,globe.elevation.legend);
 }
 
 void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam,
@@ -588,7 +643,8 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         const float y=(1.f-ny)*ui.viewport_h*.5f;
         if (x<10 || y<10 || x>ui.viewport_w-10 || y>ui.viewport_h-10 ||
             (ui.visible && (contains(toolbar_panel(ui),x,y) || contains(compass_panel(ui),x,y) ||
-                            contains(scale_panel(ui),x,y)))) continue;
+                            contains(scale_panel(ui),x,y) ||
+                             (ui.elevation_legend_visible && contains(legend_panel(ui),x,y))))) continue;
         candidates.push_back({x,y,nx*nx+ny*ny,&l});
     }
     std::sort(candidates.begin(), candidates.end(), [](const auto& a,const auto& b) {
@@ -607,7 +663,8 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         if (b.l<1 || b.r>ui.viewport_w-1 || b.t<1 || b.b>ui.viewport_h-1 ||
             (ui.visible && (overlaps({b.l,b.t,b.r-b.l,b.b-b.t},toolbar_panel(ui)) ||
                             overlaps({b.l,b.t,b.r-b.l,b.b-b.t},compass_panel(ui)) ||
-                            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},scale_panel(ui))))) continue;
+                            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},scale_panel(ui)) ||
+                            (ui.elevation_legend_visible && overlaps({b.l,b.t,b.r-b.l,b.b-b.t},legend_panel(ui)))))) continue;
         bool clash=false;
         for (const auto& other: occupied) {
             if (b.l<other.r+3 && b.r>other.l-3 && b.t<other.b+3 && b.b>other.t-3) {
@@ -641,7 +698,8 @@ void ui_draw_places(Ui& ui, const GeographicFeatures& geography, const Camera& c
         if (x<6 || y<6 || x>ui.viewport_w-6 || y>ui.viewport_h-6) continue;
         if (ui.visible && (contains(toolbar_panel(ui),x,y) ||
                            contains(compass_panel(ui),x,y) ||
-                           contains(scale_panel(ui),x,y))) continue;
+                           contains(scale_panel(ui),x,y) ||
+                           (ui.elevation_legend_visible && contains(legend_panel(ui),x,y)))) continue;
         visible.push_back({x,y,&p});
     }
     // Avoid engulfing the globe in pins at global scale. Prefer the
@@ -680,7 +738,8 @@ void ui_draw_places(Ui& ui, const GeographicFeatures& geography, const Camera& c
         if (x<3 || y<3 || x+w>=ui.viewport_w-3 || y+h>=ui.viewport_h-3) continue;
         const Bounds r{x,y,w,h};
         if (ui.visible && (overlaps(r,toolbar_panel(ui)) || overlaps(r,compass_panel(ui)) ||
-                           overlaps(r,scale_panel(ui)))) continue;
+                           overlaps(r,scale_panel(ui)) ||
+                           (ui.elevation_legend_visible && overlaps(r,legend_panel(ui))))) continue;
         bool collision=false;
         for (const auto& other:ui.label_boxes) {
             if (overlaps({r.x-3,r.y-3,r.w+6,r.h+6},
@@ -740,7 +799,8 @@ void ui_draw_markers(Ui& ui, const std::vector<Marker>& markers, const Camera& c
         if (lx<4.f || lx+w>ui.viewport_w-4.f ||
             (ui.visible && (overlaps({lx,ly,w,h},toolbar_panel(ui)) ||
                             overlaps({lx,ly,w,h},compass_panel(ui)) ||
-                            overlaps({lx,ly,w,h},scale_panel(ui))))) continue;
+                            overlaps({lx,ly,w,h},scale_panel(ui)) ||
+                            (ui.elevation_legend_visible && overlaps({lx,ly,w,h},legend_panel(ui)))))) continue;
         bool overlap=false;
         for (const auto& other : occupied)
             if (overlaps({lx-4,ly-4,w+8,h+8}, {other.x,other.y,other.w,other.h})) {

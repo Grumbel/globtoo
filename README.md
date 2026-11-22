@@ -114,8 +114,9 @@ Use `--marker` / `-m` repeatedly, `--label` / `-l` for the previous pin,
 `--marker-color #RRGGBB` and `--marker-size 2..32` for subsequent pins,
 `--marker-file` for bulk input, `--center` for the starting viewpoint, and
 `--texture` (or the legacy positional filename) for a custom Earth image.
-`--layer imagery|relief` selects the starting raster, and `--relief-dir DIR`
-loads an external preprocessed relief tile set without rebuilding the app.
+`--layer imagery|relief|elevation` selects the starting raster; `--relief-dir DIR`
+loads a visual relief tile set, while `--elevation-dir DIR` uses a measured
+elevation/bathymetry tile set with a physical-unit legend.
 By default the starting viewpoint still follows the local timezone.
 
 The coordinate parser understands signed decimal degrees (latitude first),
@@ -141,11 +142,17 @@ on-demand local tile loading at close zoom. The optional layer has its own
 visibility, independently of political colors. On builds without relief tiles,
 the button reports that the optional data is absent.
 
-The current build intentionally does not silently fetch or ship a new large
+An optional **ELEV** layer displays numerical land elevation and ocean depth,
+with a signed **metres** legend and source/year attribution. It converts NOAA
+ETOPO1-style signed 16-bit raster values into the same GLES2 tile format,
+without treating brightness as measured height. See
+[elevation preparation instructions](docs/ELEVATION.md) for the source format,
+`--elevation-dir`, and `-DGLOBTOO_ELEVATION_RAW=...` build option.
+
+The default package intentionally does not silently fetch or ship a new large
 raster. See [raster preparation instructions](docs/RASTER_LAYERS.md) for a
-NASA source URL, Pillow tile preprocessing, `--relief-dir` and the optional
-`-DGLOBTOO_RELIEF_TEXTURE=...` CMake install flag. Future stages will add
-numerical bathymetry, population-density legends, and verified Nix downloads.
+NASA source URL, Pillow tile preprocessing, and relief setup. Population
+density and verified large Nix downloads remain future work.
 
 ## Controls
 

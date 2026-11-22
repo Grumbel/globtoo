@@ -112,6 +112,18 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.surface==SurfaceLayer::Imagery);
 
+    // Measured elevation is independent of the photographic Relief layer.
+    event.button.x=453.f;
+    event.button.y=772.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Imagery); // missing optional dataset
+    globe.elevation.preview.id=1;
+    globe.elevation.cells.resize(1);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Elevation);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.surface==SurfaceLayer::Imagery);
+
     // Ruler has moved to the right, just below the compass; it consumes clicks.
     event.button.x = 1100.f;
     event.button.y = 245.f;

@@ -92,9 +92,12 @@ silently download large maps or satellite data on an existing installation.
       `--layer`, preserving independent political-color blending and shading.
       Support external tile directories with `--relief-dir`; absent datasets
       do not change default imagery. Document the source and limitations.
-- [ ] Extend the layer catalog to actual numerical elevation, population
-      density and bathymetry with legends, years and units (rather than
-      treating a colorized relief visualization as measured elevation).
+- [x] Add optional measured land elevation and bathymetry from NOAA ETOPO1
+      signed 16-bit metres data. Convert grid-registered height posts to
+      cell centers, with source/year metadata and a signed metres legend;
+      keep visual NASA Relief distinctly unmeasured.
+- [ ] Add measured population density with year, resolution and legend
+      rather than deriving numbers from visual imagery.
 - [x] Implement optional build-time GLES2 JPEG tile generation and local
       close-up tile cache with power-of-two mipmapping and preview fallback.
       Validate dateline gutters and source/image resolution metadata.
@@ -104,9 +107,9 @@ silently download large maps or satellite data on an existing installation.
       as one giant GPU texture; choose visible/LOD tiles at zoom.
       NASA Blue Marble Next Generation 21600×10800 topography/bathymetry:
       https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/
-- [ ] Add explicit ocean relief/bathymetry as a texture or separate overlay,
-      with land/ocean color mapping, a legend and documented depth units;
-      evaluate NOAA ETOPO1 tiles:
+- [x] Add numerical ocean relief/bathymetry together with land elevation,
+      including separate land/sea color ramps and documented depth units;
+      source NOAA ETOPO1:
       https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO1/tiled/
 - [ ] Add population density with year/resolution/legend metadata; consider
       NASA/CIESIN GPWv4. Verify each layer's download terms and attribution.
@@ -136,6 +139,8 @@ silently download large maps or satellite data on an existing installation.
       cache hit/miss/corrupt cases, and `reuse lint` for new metadata.
 
 ## Next
+- [ ] Test optional NOAA ETOPO1 grid with the complete 21601x10801 dataset,
+      including signed colour range, poles, and source attribution.
 - [ ] Pin and verify the optional NASA relief source hash for Nix; test the
       complete fat package and visually check tile seams against the preview.
 - [ ] Benchmark upload stutter, LRU size and visual transitions on real GLES2

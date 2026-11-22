@@ -13,6 +13,10 @@ Relief is unavailable until a tile set is installed or supplied explicitly.
 `TEXTURE` still independently controls whether raster imagery is visible,
 including when country colors are enabled at 60% opacity.
 
+Measured elevation and bathymetry now have a **separate** ELEV layer using
+signed 16-bit source rasters; see [ELEVATION.md](ELEVATION.md). The original
+RELIEF layer remains a photographic visualization without physical units.
+
 No images are downloaded at runtime. The standard Nix package still ships its
 pinned 4K image, **not** an unverified large download. The 21,600×10,800 NASA
 image is an optional build input in this increment. This is a *colorized

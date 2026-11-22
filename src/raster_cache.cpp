@@ -34,7 +34,7 @@ bool raster_cache_init(RasterCache& r,const std::string& path) {
     std::string error;
     if (!std::filesystem::is_regular_file(path)) return false;
     if (!raster_tiles_read(path,r.layout,error)) {
-        fprintf(stderr,"Invalid relief tile manifest: %s\n",error.c_str());
+        fprintf(stderr,"Invalid raster tile manifest: %s\n",error.c_str());
         return false;
     }
     r.root=std::filesystem::path(path).parent_path().string();
@@ -42,8 +42,13 @@ bool raster_cache_init(RasterCache& r,const std::string& path) {
     if (!r.preview.id)
         r.preview=load_texture((std::filesystem::path(r.root)/"preview-small.jpg").string().c_str(),false);
     if (!r.preview.id) { raster_cache_shutdown(r); return false; }
+    std::string legend_error;
+    // Optional for older, purely visual relief tiles. Required for measured
+    // elevation layers, where users must see the physical units and source.
+    raster_legend_read((std::filesystem::path(r.root)/"legend.txt").string(),
+                       r.legend, legend_error);
     r.cells.resize(static_cast<size_t>(r.layout.tile_count()));
-    fprintf(stderr,"Relief: %dx%d source, %d tiles (lazy GLES2 upload)\n",
+    fprintf(stderr,"Raster: %dx%d source, %d tiles (lazy GLES2 upload)\n",
             r.layout.width,r.layout.height,r.layout.tile_count());
     return true;
 }
@@ -116,7 +121,7 @@ bool raster_cache_ready(RasterCache& r,const Camera& cam,const MapView& map,
         cell.image=load_texture(path.string().c_str(),false);
         if (!cell.image.id) {
             // Leave preview displayed; avoid infinite repeated disk/GPU attempts.
-            fprintf(stderr,"Relief tile unavailable: %s\n",path.string().c_str());
+            fprintf(stderr,"Raster tile unavailable: %s\n",path.string().c_str());
             cell.failed=true;
             return false;
         }

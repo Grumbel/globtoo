@@ -57,6 +57,15 @@ set(GLOBTOO_EARTH_TEXTURE "" CACHE FILEPATH "Real equirectangular Earth image to
 # Optional full-world topographic/bathymetric source, converted to GLES2-safe
 # 1024px tiles at build time. Never package the untiled source image.
 set(GLOBTOO_RELIEF_TEXTURE "" CACHE FILEPATH "NASA Blue Marble topography/bathymetry raster (north-up equirectangular)")
+# NOAA ETOPO1 signed 16-bit, metre-valued elevation/bathymetry, optionally
+# supplied by the packager. Unlike the visual Relief, the source is numeric.
+set(GLOBTOO_ELEVATION_RAW "" CACHE FILEPATH "Headerless signed i16 little-endian worldwide elevation in metres")
+set(GLOBTOO_ELEVATION_WIDTH 21601 CACHE STRING "Elevation source columns (ETOPO1 grid-registered default)")
+set(GLOBTOO_ELEVATION_HEIGHT 10801 CACHE STRING "Elevation source rows (ETOPO1 grid-registered default)")
+if(GLOBTOO_ELEVATION_RAW AND NOT EXISTS "${GLOBTOO_ELEVATION_RAW}")
+  message(FATAL_ERROR "GLOBTOO_ELEVATION_RAW does not exist: ${GLOBTOO_ELEVATION_RAW}")
+endif()
+
 if(GLOBTOO_RELIEF_TEXTURE AND NOT EXISTS "${GLOBTOO_RELIEF_TEXTURE}")
   message(FATAL_ERROR "GLOBTOO_RELIEF_TEXTURE does not exist: ${GLOBTOO_RELIEF_TEXTURE}")
 endif()
@@ -97,6 +106,7 @@ add_executable(globtoo
   src/geographic_overlay.cpp
   src/tiled_raster.cpp
   src/raster_cache.cpp
+  src/raster_legend.cpp
 )
 
 target_include_directories(globtoo PRIVATE
@@ -203,6 +213,30 @@ if(GLOBTOO_RELIEF_TEXTURE)
   endif()
 endif()
 
+# Numeric signed-height source -> colorized tiles with physical-unit legend.
+# Both numpy and Pillow are needed only for this optional preprocessing step.
+set(ELEVATION_OUTPUT "")
+if(GLOBTOO_ELEVATION_RAW)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  execute_process(COMMAND ${Python3_EXECUTABLE} -c "import numpy; from PIL import Image"
+    RESULT_VARIABLE _globtoo_numeric_result ERROR_QUIET)
+  if(NOT _globtoo_numeric_result EQUAL 0)
+    message(FATAL_ERROR "GLOBTOO_ELEVATION_RAW requires numpy and Pillow at build time")
+  endif()
+  set(ELEVATION_OUTPUT "${CMAKE_BINARY_DIR}/generated-elevation/manifest.txt")
+  add_custom_command(OUTPUT "${ELEVATION_OUTPUT}"
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/build_elevation_tiles.py"
+      "${GLOBTOO_ELEVATION_RAW}" "${CMAKE_BINARY_DIR}/generated-elevation"
+      --width ${GLOBTOO_ELEVATION_WIDTH} --height ${GLOBTOO_ELEVATION_HEIGHT}
+    DEPENDS "${GLOBTOO_ELEVATION_RAW}" "${CMAKE_SOURCE_DIR}/tools/build_elevation_tiles.py"
+    COMMENT "Preparing numeric elevation/bathymetry tiles with a metre legend"
+    VERBATIM)
+  add_custom_target(elevation_tiles ALL DEPENDS "${ELEVATION_OUTPUT}")
+  if(GLOBTOO_BUILD_APP)
+    add_dependencies(globtoo elevation_tiles)
+  endif()
+endif()
+
 # Stage only explicitly approved runtime assets beside a build-tree binary.
 # Never copy all of assets/: that could reintroduce an old placeholder image
 # or ship bulky GeoJSON source data by accident.
@@ -216,6 +250,12 @@ if(GLOBTOO_BUILD_APP)
     # Also clear a leftover placeholder after reconfiguring an old build tree.
     COMMAND ${CMAKE_COMMAND} -E rm -f "$<TARGET_FILE_DIR:globtoo>/assets/earth.jpg"
     VERBATIM)
+  if(ELEVATION_OUTPUT)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/generated-elevation" "$<TARGET_FILE_DIR:globtoo>/elevation"
+      VERBATIM)
+  endif()
   if(RELIEF_OUTPUT)
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -259,6 +299,10 @@ if(GLOBTOO_BUILD_APP)
     DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
   # Only the explicitly configured real Earth image may be installed as
   # earth.jpg. In particular, never package a source-tree placeholder.
+  if(ELEVATION_OUTPUT)
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-elevation/"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/elevation")
+  endif()
   if(RELIEF_OUTPUT)
     install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-relief/"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/relief")
@@ -343,6 +387,15 @@ if(BUILD_TESTING)
     add_test(NAME geographic_features_compilation
       COMMAND geographic_features_test "${GEOGRAPHIC_FEATURE_OUTPUT}")
   endif()
+  add_executable(raster_legend_test tests/raster_legend_test.cpp src/raster_legend.cpp)
+  target_include_directories(raster_legend_test PRIVATE src)
+  target_compile_options(raster_legend_test PRIVATE -Wall -Wextra -UNDEBUG)
+  add_test(NAME raster_legend COMMAND raster_legend_test)
+  if(ELEVATION_OUTPUT)
+    add_test(NAME raster_elevation_manifest COMMAND raster_tiles_test "${ELEVATION_OUTPUT}")
+    add_test(NAME raster_elevation_legend
+      COMMAND raster_legend_test "${CMAKE_BINARY_DIR}/generated-elevation/legend.txt")
+  endif()
   add_executable(raster_tiles_test tests/raster_tiles_test.cpp src/tiled_raster.cpp)
   target_include_directories(raster_tiles_test PRIVATE src)
   target_compile_options(raster_tiles_test PRIVATE -Wall -Wextra -UNDEBUG)
@@ -353,6 +406,13 @@ if(BUILD_TESTING)
   if(Python3_Interpreter_FOUND)
     execute_process(COMMAND ${Python3_EXECUTABLE} -c "from PIL import Image"
       RESULT_VARIABLE _globtoo_test_pillow ERROR_QUIET)
+    execute_process(COMMAND ${Python3_EXECUTABLE} -c "import numpy; from PIL import Image"
+      RESULT_VARIABLE _globtoo_test_numpy ERROR_QUIET)
+    if(_globtoo_test_numpy EQUAL 0)
+      add_test(NAME elevation_tiles_compiler
+        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+          ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/elevation_tiles_compiler_test.py")
+    endif()
     if(_globtoo_test_pillow EQUAL 0)
       add_test(NAME raster_tiles_compiler
         COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}

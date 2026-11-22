@@ -105,12 +105,19 @@ int main(int argc, char** argv) {
     Globe globe{};
     const std::string relief_manifest=options.relief_dir.empty() ? "" :
         (std::filesystem::path(options.relief_dir)/"manifest.txt").string();
+    const std::string elevation_manifest=options.elevation_dir.empty() ? "" :
+        (std::filesystem::path(options.elevation_dir)/"manifest.txt").string();
     if (!globe_init(globe, texture.c_str(),
-                    relief_manifest.empty() ? nullptr : relief_manifest.c_str())) {
+                    relief_manifest.empty() ? nullptr : relief_manifest.c_str(),
+                    elevation_manifest.empty() ? nullptr : elevation_manifest.c_str())) {
         fprintf(stderr, "globe_init failed\n");
         return 1;
     }
 
+    if (options.surface_layer=="elevation") {
+        if (globe.elevation.valid()) globe.surface=SurfaceLayer::Elevation;
+        else fprintf(stderr,"Elevation/bathymetry layer not installed; using imagery.\n");
+    }
     if (options.surface_layer=="relief") {
         if (globe.relief.valid()) globe.surface=SurfaceLayer::Relief;
         else fprintf(stderr,"Relief layer not installed; using imagery.\n");
@@ -187,8 +194,12 @@ int main(int argc, char** argv) {
         // Preserve globe depth: it occludes political geometry behind the horizon.
         countries_draw(countries, cam, aspect, map, globe.shading,
                        country_fill_opacity(globe.texture_visible,
-                           (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) || globe.texture.id != 0));
+                           (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) ||
+                           (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid()) ||
+                           globe.texture.id != 0));
         geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
+        ui.elevation_legend_visible = globe.surface==SurfaceLayer::Elevation &&
+            globe.texture_visible && globe.elevation.valid() && globe.elevation.legend.valid();
         ui.label_boxes.clear();
         ui_draw_graticule(ui,cam,map,aspect);
         ui_draw_country_names(ui,countries,cam,map,aspect);
