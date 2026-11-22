@@ -48,6 +48,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
 
 option(GLOBTOO_BUILD_APP "Build the SDL3 + GLES2 globe viewer" ON)
+# Nix supplies the pinned fetchurl output here. Keep imagery out of the source
+# tree and never infer an Earth texture from a random file in assets/.
+set(GLOBTOO_EARTH_TEXTURE "" CACHE FILEPATH "Real equirectangular Earth image to package (e.g. a Nix fetchurl output)")
+if(GLOBTOO_EARTH_TEXTURE AND NOT EXISTS "${GLOBTOO_EARTH_TEXTURE}")
+  message(FATAL_ERROR "GLOBTOO_EARTH_TEXTURE does not exist: ${GLOBTOO_EARTH_TEXTURE}")
+endif()
+if(GLOBTOO_BUILD_APP AND NOT GLOBTOO_EARTH_TEXTURE)
+  message(STATUS "No Earth image configured; globe will use solid color unless --texture is specified")
+endif()
 find_path(GEOS_INCLUDE_DIR geos_c.h REQUIRED)
 find_library(GEOS_C_LIB geos_c REQUIRED)
 
@@ -130,19 +139,37 @@ if(COUNTRY_MESH_OUTPUTS)
   endif()
 endif()
 
-# Copy assets next to binary for development
+# Stage only explicitly approved runtime assets beside a build-tree binary.
+# Never copy all of assets/: that could reintroduce an old placeholder image
+# or ship bulky GeoJSON source data by accident.
 if(GLOBTOO_BUILD_APP)
-add_custom_command(TARGET globtoo POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:globtoo>/assets
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:globtoo>/shaders
-)
-if(COUNTRY_MESH_OUTPUTS)
   add_custom_command(TARGET globtoo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:globtoo>/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/assets/globtoo-icon.png" "$<TARGET_FILE_DIR:globtoo>/assets/globtoo-icon.png"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-      ${CMAKE_BINARY_DIR}/generated-assets $<TARGET_FILE_DIR:globtoo>/assets)
-endif()
+      "${CMAKE_SOURCE_DIR}/shaders" "$<TARGET_FILE_DIR:globtoo>/shaders"
+    # Also clear a leftover placeholder after reconfiguring an old build tree.
+    COMMAND ${CMAKE_COMMAND} -E rm -f "$<TARGET_FILE_DIR:globtoo>/assets/earth.jpg"
+    VERBATIM)
+  if(GLOBTOO_EARTH_TEXTURE)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${GLOBTOO_EARTH_TEXTURE}" "$<TARGET_FILE_DIR:globtoo>/assets/earth.jpg"
+      VERBATIM)
+  endif()
+  if(EXISTS "${CMAKE_SOURCE_DIR}/assets/countries.geojson")
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/assets/countries.geojson" "$<TARGET_FILE_DIR:globtoo>/assets/countries.geojson"
+      VERBATIM)
+  endif()
+  if(COUNTRY_MESH_OUTPUTS)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/generated-assets" "$<TARGET_FILE_DIR:globtoo>/assets"
+      VERBATIM)
+  endif()
 endif()
 
 # Standard installation: no current-working-directory assumptions or Nix-only
@@ -152,10 +179,19 @@ if(GLOBTOO_BUILD_APP)
   install(TARGETS globtoo RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
   install(DIRECTORY "${CMAKE_SOURCE_DIR}/shaders/"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/shaders")
-  install(DIRECTORY "${CMAKE_SOURCE_DIR}/assets/"
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets"
-    FILES_MATCHING PATTERN "*.jpg" PATTERN "*.jpeg" PATTERN "*.png"
-      PATTERN "*.gmesh" PATTERN "countries.geojson")
+  install(FILES "${CMAKE_SOURCE_DIR}/assets/globtoo-icon.png"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
+  # Only the explicitly configured real Earth image may be installed as
+  # earth.jpg. In particular, never package a source-tree placeholder.
+  if(GLOBTOO_EARTH_TEXTURE)
+    install(FILES "${GLOBTOO_EARTH_TEXTURE}"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets"
+      RENAME "earth.jpg")
+  endif()
+  if(EXISTS "${CMAKE_SOURCE_DIR}/assets/countries.geojson")
+    install(FILES "${CMAKE_SOURCE_DIR}/assets/countries.geojson"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
+  endif()
   if(COUNTRY_MESH_OUTPUTS)
     install(FILES ${COUNTRY_MESH_OUTPUTS}
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
@@ -185,6 +221,8 @@ include(CTest)
 if(BUILD_TESTING)
   add_executable(resources_test tests/resources_test.cpp src/resources.cpp)
   target_include_directories(resources_test PRIVATE src)
+  # These tests use assert(); keep the checks enabled in Release builds.
+  target_compile_options(resources_test PRIVATE -UNDEBUG)
   target_compile_definitions(resources_test PRIVATE
     GLOBTOO_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
   add_test(NAME resources COMMAND resources_test)

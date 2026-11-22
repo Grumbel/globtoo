@@ -95,12 +95,18 @@
             mesa
           ]) ++ sdl3PcDeps;
 
-          cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" "-DPROJECT_VERSION_FULL=${version}" ];
+          cmakeFlags = [
+            "-DCMAKE_BUILD_TYPE=Release"
+            "-DPROJECT_VERSION_FULL=${version}"
+            # Install the pinned, fetched image itself; never a source-tree
+            # placeholder or a file that happened to be named earth.jpg.
+            "-DGLOBTOO_EARTH_TEXTURE=${earthTexture}"
+          ];
 
-          # Inject the fetched texture so the binary always has a real map
+          # Only GeoJSON is needed at source/configure time (mesh generation).
+          # The image is installed directly from its immutable fetchurl path.
           postPatch = ''
             mkdir -p assets
-            cp ${earthTexture} assets/earth.jpg
             cp ${countries50m} assets/countries_50m.geojson
             cp ${countries10m} assets/countries_10m.geojson
           '';
@@ -126,8 +132,9 @@
             echo "Dev shell ready."
             echo "Texture is fetched by the flake at build time (see flake.nix earthTexture)."
             echo "For a local high-res texture without rebuilding the flake:"
-            echo "  curl -L -o assets/earth.jpg \\"
+            echo "  curl -L -o /tmp/globtoo-earth.jpg \\"
             echo "    https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg"
+            echo "  cmake -S . -B build -DGLOBTOO_EARTH_TEXTURE=/tmp/globtoo-earth.jpg"
           '';
         };
 

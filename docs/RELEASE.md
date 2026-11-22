@@ -12,7 +12,7 @@ The CMake `install` target is the canonical installer for both ordinary Linux
 builds and the Nix flake. Installed files include:
 
 - `bin/globtoo`: normal ELF executable, not a wrapper script
-- `share/globtoo/assets/`: Earth texture, icon, and precompiled 50m/10m country meshes
+- `share/globtoo/assets/`: the explicitly configured real Earth texture (when present), icon, and precompiled 50m/10m country meshes
 - `share/globtoo/shaders/`: GLES2 shader source files
 - `share/applications/io.github.Grumbel.globtoo.desktop`: desktop launcher
 - `share/metainfo/io.github.Grumbel.globtoo.metainfo.xml`: AppStream metadata
@@ -24,6 +24,14 @@ Compiled `.gmesh` files are installed instead of the much larger original
 GeoJSON files. The build needs those original data files to regenerate the
 compiled meshes; the Nix derivation fetches both and pins their hashes.
 
+The Earth image is **not tracked in Git**. The Nix derivation fetches its
+pinned image and passes that store path directly as
+`-DGLOBTOO_EARTH_TEXTURE=...`; the CMake installer renames that file to
+`share/globtoo/assets/earth.jpg`. It must not copy a placeholder from
+`assets/`. For standalone CMake builds, pass the same option with an actual
+texture file (or use `--texture` at runtime). Without it, no `earth.jpg` is
+installed and rendering falls back to a solid-color Earth base.
+
 The executable finds assets beside a build-tree binary, or relative to its
 installation `bin` directory (no `chdir` needed); `GLOBE_ASSET_DIR` takes
 precedence. If installing under a nonstandard directory hierarchy, the CMake
@@ -32,7 +40,8 @@ configured resource path is a final fallback.
 ## Quick checks
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DGLOBTOO_EARTH_TEXTURE=/path/to/real-earth-texture.jpg
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 cmake --install build --prefix /tmp/globtoo-stage
@@ -46,6 +55,8 @@ appstreamcli validate /tmp/globtoo-stage/share/metainfo/*.xml
 
 Test `globtoo` from outside the build/install directory as well: the Earth
 texture, shader includes, both mesh LODs, and the window icon should load.
+Confirm that `share/globtoo/assets/earth.jpg` is byte-identical to the
+configured fetched source and is not the removed placeholder.
 Confirm that a `.desktop` launch shows the Globtoo icon on your desktop and
 that keyboard and mouse controls work in 3D and 2D.
 

@@ -25,11 +25,14 @@ build, use `find result -type f` or `man -l result/share/man/man1/globtoo.1`.
 Dependencies: C++20 compiler, CMake 3.16+, SDL3, OpenGL ES 2.0/EGL, GEOS
 and pkg-config. For a complete political map, provide the Natural Earth
 50m/10m GeoJSON inputs under `assets/` before configuring (Nix downloads them
-automatically). A plain source build otherwise uses the small development
-texture placeholder and can run without country polygons.
+automatically). For a textured standalone build, supply a real image with
+`-DGLOBTOO_EARTH_TEXTURE=/absolute/path/to/earth.jpg`. Without that option,
+Globtoo uses the solid-color globe (or accepts `--texture FILE` at runtime).
+No placeholder Earth image is distributed or installed.
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DGLOBTOO_EARTH_TEXTURE=/path/to/real-earth-texture.jpg
 cmake --build build -j
 cmake --install build --prefix "$HOME/.local"
 "$HOME/.local/bin/globtoo" --version
@@ -54,11 +57,10 @@ Or development shell:
 ```bash
 nix develop
 mkdir build && cd build
-cmake ..
-make -j
-# optional: drop a real texture next to the binary
-curl -L -o assets/earth.jpg \
+curl -L -o /tmp/globtoo-earth.jpg \
   https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg
+cmake .. -DGLOBTOO_EARTH_TEXTURE=/tmp/globtoo-earth.jpg
+make -j
 # Optional: provide assets/countries_50m.geojson and/or
 # assets/countries_10m.geojson, then re-run cmake to precompile their meshes.
 # Legacy assets/countries.geojson is still supported as runtime fallback.

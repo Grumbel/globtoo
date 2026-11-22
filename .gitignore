@@ -4,3 +4,6 @@ assets/countries.geojson
 assets/countries_50m.geojson
 assets/countries_10m.geojson
 assets/*.gmesh
+
+# Real Earth imagery is fetched by Nix or explicitly provided to CMake.
+assets/earth.jpg

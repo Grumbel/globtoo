@@ -32,9 +32,6 @@ std::string resource_path(std::string_view relative_path) {
         if (*override_dir) return path_string(fs::path(override_dir) / relative);
     }
 
-    // From the source tree (including `cmake --build` run from the repo).
-    if (regular_file(relative)) return path_string(relative);
-
     if (!executable_dir.empty()) {
         const fs::path bin = fs::path(executable_dir);
         // Build-tree layout: POST_BUILD copies shaders/assets beside the app.
@@ -53,6 +50,10 @@ std::string resource_path(std::string_view relative_path) {
     const fs::path configured = fs::path(GLOBTOO_INSTALL_RESOURCE_DIR) / relative;
     if (regular_file(configured)) return path_string(configured);
 #endif
+
+    // Development fallback only. Never allow a stale source-tree asset to
+    // shadow a real packaged texture, even with a nonstandard bindir.
+    if (regular_file(relative)) return path_string(relative);
 
     return path_string(relative); // Diagnostic from caller shows missing file.
 }
