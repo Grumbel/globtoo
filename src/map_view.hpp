@@ -33,6 +33,7 @@ struct MapView {
     double center_lon = 0.0; // radians, projection's central meridian
     double center_lat = 0.0; // radians; initial orientation / current geographic latitude
     double roll = 0.0;       // radians, counterclockwise on screen
+    bool north_locked = false; // Prevent roll drift during geographic navigation
     // An active frame captures the full 3D orientation after drag. Euler
     // lon/lat alone lose a degree of freedom and fail to pan at the poles.
     MapFrame navigation_frame{};
@@ -71,6 +72,8 @@ void map_apply_roll(MapView& map, float dx_pixels, float sensitivity = .005f);
 double map_north_heading(const MapView& map, const Camera& cam);
 // Straighten the current view without changing its geographic center or zoom.
 void map_align_north(MapView& map, Camera& cam);
+// Apply North-up after navigation/inertia when the user enables the lock.
+void map_enforce_north(MapView& m, Camera& cam);
 
 void camera_center_on(Camera& cam, double longitude_degrees, double latitude_degrees);
 // Approximate a location from the actual system timezone entry (zone.tab);

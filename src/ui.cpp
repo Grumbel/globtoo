@@ -26,14 +26,18 @@ constexpr Color needle_south{.43f,.67f,.86f,1.f};
 constexpr float pi = 3.14159265358979323846f;
 
 struct Bounds { float x,y,w,h; };
-constexpr Bounds toolbar{8,8,605,100};
+Bounds toolbar_panel(const Ui& ui) {
+    // Reserve the bottom edge for the mode/projection controls.
+    return {8.f, std::max(8.f,static_cast<float>(ui.viewport_h)-108.f),605.f,100.f};
+}
 Bounds compass_panel(const Ui& ui) {
     const float x = std::max(8.f, static_cast<float>(ui.viewport_w) - 128.f);
-    // At narrow window widths, do not cover the main toolbar.
-    return {x, x < toolbar.x+toolbar.w+8 ? 116.f : 8.f, 120.f, 193.f};
+    return {x,8.f,120.f,221.f};
 }
 Bounds scale_panel(const Ui& ui) {
-    return {8.f,std::max(124.f,static_cast<float>(ui.viewport_h)-91.f),264.f,83.f};
+    // Put the ruler directly below the compass, right aligned to its edge.
+    const auto c=compass_panel(ui);
+    return {std::max(8.f,c.x+c.w-264.f),c.y+c.h+8.f,264.f,83.f};
 }
 bool contains(Bounds b, float x,float y) {
     return x>=b.x && x<b.x+b.w && y>=b.y && y<b.y+b.h;
@@ -46,17 +50,19 @@ bool overlaps(Bounds a, Bounds b) {
 
 struct Button { const char* label; int x,y,w,h; int command; };
 // All hit rectangles and draw positions derive from the same layout.
-std::vector<Button> buttons() {
-    std::vector<Button> out;
+std::array<Button,13> buttons(const Ui& ui) {
+    std::array<Button,13> out{};
+    std::size_t k=0;
     const char* top[] = {"3D GLOBE", "PLATE", "MERCATOR", "MOLLWEIDE", "HAMMER", "-", "+"};
     const int topw[] = {103,72,108,121,88,30,30};
     const char* bottom[] = {"SHADING", "COUNTRIES", "BORDERS", "NAMES", "TEXTURE", "GRID"};
     const int botw[] = {93,116,94,73,94,72};
     const int botcmd[] = {7,8,9,10,11,15};
-    int x = 14;
-    for (int i=0;i<7;i++) { out.push_back({top[i],x,34,topw[i],30,i}); x += topw[i]+5; }
-    x = 14;
-    for (int i=0;i<6;i++) { out.push_back({bottom[i],x,70,botw[i],30,botcmd[i]}); x += botw[i]+5; }
+    const auto panel=toolbar_panel(ui);
+    int x = static_cast<int>(panel.x+6);
+    for (int i=0;i<7;i++) { out[k++] = {top[i],x,static_cast<int>(panel.y+26),topw[i],30,i}; x += topw[i]+5; }
+    x = static_cast<int>(panel.x+6);
+    for (int i=0;i<6;i++) { out[k++] = {bottom[i],x,static_cast<int>(panel.y+62),botw[i],30,botcmd[i]}; x += botw[i]+5; }
     return out;
 }
 
@@ -145,15 +151,22 @@ unsigned char normalize_ascii(std::string_view input, std::size_t& i) {
 }
 
 void draw_text(Ui& ui, float x,float y, std::string_view str, int scale, Color color) {
+    // Country/city labels contain hundreds of characters per frame. Replace
+    // the per-character linear scan over the bitmap font with a 128-slot table.
+    static const auto glyphs = [] {
+        std::array<const Glyph*,128> out{};
+        for (const auto& glyph : font)
+            out[static_cast<unsigned char>(glyph.ch)] = &glyph;
+        return out;
+    }();
     for (std::size_t i=0;i<str.size(); ++i) {
-        unsigned char ch = normalize_ascii(str,i);
-        for (const auto& glyph : font) {
-            if (static_cast<unsigned char>(glyph.ch) != ch) continue;
+        const unsigned char ch = normalize_ascii(str,i);
+        if (ch < glyphs.size() && glyphs[ch]) {
+            const auto& glyph = *glyphs[ch];
             for (int row=0;row<7;row++) for (int col=0;col<5;col++) {
                 if (glyph.pixels[row] & (1u << (4-col)))
                     rect(ui,x+col*scale,y+row*scale,scale,scale,color);
             }
-            break;
         }
         x += 6*scale;
     }
@@ -199,11 +212,16 @@ void draw_compass(Ui& ui, const Camera& cam, const MapView& map) {
     const Button mode{cam.mode == ControlMode::Grab ? "GRAB" : "ARCBALL",
                       static_cast<int>(box.x+7),static_cast<int>(box.y+163),
                       106,24,12};
-    for (auto b : {north,reset,mode}) {
+    const Button lock{map.north_locked ? "NORTH LOCK ON" : "NORTH LOCK OFF",
+                      static_cast<int>(box.x+7),static_cast<int>(box.y+191),
+                      106,24,16};
+    for (auto b : {north,reset,mode,lock}) {
         rect(ui,b.x,b.y,b.w,b.h,ui.hover==b.command ? hover :
-             (b.command==12 && cam.mode==ControlMode::Grab ? active : inactive));
-        draw_text(ui,b.x+(b.w-12.f*std::char_traits<char>::length(b.label))*.5f,
-                  b.y+6,b.label,2,text);
+             ((b.command==12 && cam.mode==ControlMode::Grab) ||
+              (b.command==16 && map.north_locked) ? active : inactive));
+        const int font_scale = b.command==16 ? 1 : 2;
+        draw_text(ui,b.x+(b.w-6.f*font_scale*std::char_traits<char>::length(b.label))*.5f,
+                  b.y+(b.command==16 ? 9.f : 6.f),b.label,font_scale,text);
     }
 }
 
@@ -257,6 +275,11 @@ void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState
         camera_grab_end(cam);
         map_align_north(m,cam);
         break;
+    case 16:
+        m.north_locked = !m.north_locked;
+        camera_grab_kill_inertia(cam);
+        map_enforce_north(m,cam);
+        break;
     }
 }
 
@@ -269,6 +292,7 @@ bool ui_init(Ui& ui) {
     ui.shader = load_shader("shaders/ui.vert","shaders/ui.frag");
     if (!ui.shader.program) return false;
     glGenBuffers(1,&ui.vbo);
+    ui.triangles.reserve(4096); // reuse storage for the dynamic overlay mesh
     return ui.vbo!=0;
 }
 void ui_shutdown(Ui& ui) {
@@ -301,7 +325,7 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
     } else SDL_GetMouseState(&x,&y);
 
     const auto cp=compass_panel(ui);
-    const bool on_toolbar=contains(toolbar,x,y);
+    const bool on_toolbar=contains(toolbar_panel(ui),x,y);
     const bool on_compass=contains(cp,x,y);
     const bool on_scale=contains(scale_panel(ui),x,y);
     ui.hover=-1;
@@ -319,10 +343,12 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         const Bounds north{cp.x+7,cp.y+107,106,24};
         const Bounds reset{cp.x+7,cp.y+135,106,24};
         const Bounds mode{cp.x+7,cp.y+163,106,24};
+        const Bounds lock{cp.x+7,cp.y+191,106,24};
         // Clicking the compass rose itself is also a North-up shortcut.
         const bool rose=contains({cp.x+13,cp.y+4,94,94},x,y);
         const int command=contains(reset,x,y) ? 13 :
                           contains(mode,x,y) ? 12 :
+                          contains(lock,x,y) ? 16 :
                           (contains(north,x,y) || rose ? 14 : -1);
         ui.hover=command;
         if (command>=0 && e.type==SDL_EVENT_MOUSE_BUTTON_DOWN &&
@@ -333,7 +359,7 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         }
         return true;
     }
-    for (const auto& b:buttons()) {
+    for (const auto& b:buttons(ui)) {
         if (!inside(b,x,y)) continue;
         ui.hover=b.command;
         if (e.type==SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button==SDL_BUTTON_LEFT) {
@@ -503,9 +529,10 @@ void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspe
 void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
              const Countries& countries) {
     if (!ui.visible) return;
+    const Bounds toolbar=toolbar_panel(ui);
     rect(ui,toolbar.x,toolbar.y,toolbar.w,toolbar.h,panel);
-    draw_text(ui,14,15,"GLOBTOO   VIEW",2,text);
-    for (const auto& b : buttons()) {
+    draw_text(ui,toolbar.x+6,toolbar.y+7,"GLOBTOO   VIEW",2,text);
+    for (const auto& b : buttons(ui)) {
         Color color = (b.command==15 ? ui.grid_visible :
             command_active(b.command,cam,map,globe,countries)) ? active : inactive;
         if (ui.hover==b.command) color=hover;
@@ -514,16 +541,8 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
         const int scale=2;
         draw_text(ui,b.x+(b.w-namewidth*scale)*.5f,b.y+8,b.label,scale,text);
     }
-    // Avoid overlapping the compass at narrow window widths.
-    const bool compact = compass_panel(ui).x < toolbar.x+toolbar.w+230.f;
-    const float info_x = compact ? 14.f : toolbar.x+toolbar.w+14.f;
-    const float info_y = compact ? 116.f : 15.f;
     const char* mode = map.selected==MapProjection::Globe ? "SPHERE" : "FLAT MAP";
-    draw_text(ui,info_x,info_y,mode,2,muted);
-    if (map.flat_goal > .5f) {
-        draw_text(ui,info_x,info_y+26.f,"SHIFT DRAG: ROTATE",1,muted);
-        draw_text(ui,info_x,info_y+40.f,"DRAG THROUGH POLES",1,muted);
-    }
+    draw_text(ui,toolbar.x+205.f,toolbar.y+9.f,mode,1,muted);
     draw_compass(ui,cam,map);
     draw_scale_bar(ui);
 }
@@ -544,7 +563,7 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         const float x=(nx+1.f)*ui.viewport_w*.5f;
         const float y=(1.f-ny)*ui.viewport_h*.5f;
         if (x<10 || y<10 || x>ui.viewport_w-10 || y>ui.viewport_h-10 ||
-            (ui.visible && (contains(toolbar,x,y) || contains(compass_panel(ui),x,y) ||
+            (ui.visible && (contains(toolbar_panel(ui),x,y) || contains(compass_panel(ui),x,y) ||
                             contains(scale_panel(ui),x,y)))) continue;
         candidates.push_back({x,y,nx*nx+ny*ny,&l});
     }
@@ -562,7 +581,7 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         const Bounds b{candidate.x-tw*.5f-3,candidate.y-th*.5f-2,
                        candidate.x+tw*.5f+3,candidate.y+th*.5f+2};
         if (b.l<1 || b.r>ui.viewport_w-1 || b.t<1 || b.b>ui.viewport_h-1 ||
-            (ui.visible && (overlaps({b.l,b.t,b.r-b.l,b.b-b.t},toolbar) ||
+            (ui.visible && (overlaps({b.l,b.t,b.r-b.l,b.b-b.t},toolbar_panel(ui)) ||
                             overlaps({b.l,b.t,b.r-b.l,b.b-b.t},compass_panel(ui)) ||
                             overlaps({b.l,b.t,b.r-b.l,b.b-b.t},scale_panel(ui))))) continue;
         bool clash=false;
@@ -619,7 +638,7 @@ void ui_draw_markers(Ui& ui, const std::vector<Marker>& markers, const Camera& c
         const float ly=std::clamp(y-h*.5f,4.f,std::max(4.f,ui.viewport_h-h-4.f));
         const LabelBounds box{lx,ly,w,h};
         if (lx<4.f || lx+w>ui.viewport_w-4.f ||
-            (ui.visible && (overlaps({lx,ly,w,h},toolbar) ||
+            (ui.visible && (overlaps({lx,ly,w,h},toolbar_panel(ui)) ||
                             overlaps({lx,ly,w,h},compass_panel(ui)) ||
                             overlaps({lx,ly,w,h},scale_panel(ui))))) continue;
         bool overlap=false;
@@ -644,7 +663,7 @@ void ui_flush(Ui& ui) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     use_shader(ui.shader);
-    GLint loc=glGetUniformLocation(ui.shader.program,"u_viewport");
+    const GLint loc=ui.shader.u_viewport;
     if (loc>=0) glUniform2f(loc,static_cast<float>(ui.viewport_w),static_cast<float>(ui.viewport_h));
     glBindBuffer(GL_ARRAY_BUFFER,ui.vbo);
     glBufferData(GL_ARRAY_BUFFER,ui.triangles.size()*sizeof(UiVertex),ui.triangles.data(),GL_DYNAMIC_DRAW);

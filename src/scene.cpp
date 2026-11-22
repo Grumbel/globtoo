@@ -7,17 +7,14 @@
 #include <cmath>
 
 namespace {
-void setf(GLuint p, const char* name, float value) {
-    GLint loc=glGetUniformLocation(p,name);
+void setf(GLint loc, float value) {
     if (loc>=0) glUniform1f(loc,value);
 }
-void setvec(GLuint p, const char* name, const std::array<double,3>& v) {
-    GLint loc=glGetUniformLocation(p,name);
+void setvec(GLint loc, const std::array<double,3>& v) {
     if (loc>=0) glUniform3f(loc,static_cast<float>(v[0]),
                           static_cast<float>(v[1]),static_cast<float>(v[2]));
 }
-void setmat(GLuint p, const char* name, const Mat4& m) {
-    GLint loc=glGetUniformLocation(p,name);
+void setmat(GLint loc, const Mat4& m) {
     if (loc>=0) glUniformMatrix4fv(loc,1,GL_FALSE,m.m);
 }
 Mat4 scene_projection(const Camera& camera, float aspect, const MapView& map) {
@@ -36,27 +33,27 @@ Vec4 mul(const Mat4& a, Vec4 p) {
 
 void scene_uniforms(const Shader& shader, const Camera& camera, float aspect,
                     const MapView& map, float wrap) {
-    setmat(shader.program,"u_view",camera.view_matrix());
-    setmat(shader.program,"u_projection",scene_projection(camera,aspect,map));
-    setf(shader.program,"u_morph",map.globe_to_flat);
-    setf(shader.program,"u_projection_from",static_cast<float>(static_cast<int>(map.from)));
-    setf(shader.program,"u_projection_to",static_cast<float>(static_cast<int>(map.to)));
-    setf(shader.program,"u_projection_blend",map.projection_blend);
+    const auto& u=shader.scene;
+    setmat(u.view,camera.view_matrix());
+    setmat(u.projection,scene_projection(camera,aspect,map));
+    setf(u.morph,map.globe_to_flat);
+    setf(u.projection_from,static_cast<float>(static_cast<int>(map.from)));
+    setf(u.projection_to,static_cast<float>(static_cast<int>(map.to)));
+    setf(u.projection_blend,map.projection_blend);
     const auto frame=map_frame(map);
-    setvec(shader.program,"u_map_east",frame.east);
-    setvec(shader.program,"u_map_north",frame.north);
-    setvec(shader.program,"u_map_center",frame.center);
-    setf(shader.program,"u_map_zoom",map.zoom);
-    setf(shader.program,"u_map_distance",map.map_distance);
-    setf(shader.program,"u_wrap",wrap);
+    setvec(u.map_east,frame.east);
+    setvec(u.map_north,frame.north);
+    setvec(u.map_center,frame.center);
+    setf(u.map_zoom,map.zoom);
+    setf(u.map_distance,map.map_distance);
+    setf(u.wrap,wrap);
     const auto oval=[](MapProjection p) {
         return p==MapProjection::Mollweide || p==MapProjection::Hammer;
     };
-    setf(shader.program,"u_bounded_projection",oval(map.from)||oval(map.to) ? 1.f : 0.f);
-    setf(shader.program,"u_map_roll",static_cast<float>(map.roll));
-    const GLint pan=glGetUniformLocation(shader.program,"u_map_pan");
-    if (pan>=0) glUniform2f(pan,static_cast<float>(map.pan_x),
-                           static_cast<float>(map.pan_y));
+    setf(u.bounded_projection,oval(map.from)||oval(map.to) ? 1.f : 0.f);
+    setf(u.map_roll,static_cast<float>(map.roll));
+    if (u.map_pan>=0) glUniform2f(u.map_pan,static_cast<float>(map.pan_x),
+                                   static_cast<float>(map.pan_y));
 }
 
 bool scene_project(const Camera& camera, float aspect, const MapView& map,

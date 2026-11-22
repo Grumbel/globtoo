@@ -101,12 +101,16 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
             break;
         }
         if (in.dragging) break;
-        if (e.button.button == SDL_BUTTON_MIDDLE && map.flat_goal > .5f) {
+        if (e.button.button == SDL_BUTTON_MIDDLE) {
             in.dragging = true;
             in.drag_button = SDL_BUTTON_MIDDLE;
-            in.rotation_drag = false;
+            // Keep middle-drag grab/pan in flat maps. Shift+middle-drag
+            // rotates there; on the globe middle-drag is a roll gesture.
+            in.rotation_drag = map.flat_goal < .5f || in.shift_down ||
+                               (SDL_GetModState() & SDL_KMOD_SHIFT);
             in.last_x = e.button.x;
             in.last_y = e.button.y;
+            camera_grab_kill_inertia(cam);
             break;
         }
         if (e.button.button == SDL_BUTTON_LEFT) {
@@ -159,13 +163,14 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
 
         if (map.flat_goal > .5f) {
             if (in.dragging) {
-                if (in.drag_button == SDL_BUTTON_MIDDLE)
+                if (in.rotation_drag) {
+                    if (!map.north_locked) map_apply_roll(map,dx);
+                } else if (in.drag_button == SDL_BUTTON_MIDDLE) {
                     map_grab_pan(map,dx,dy,in.viewport_h);
-                else if (in.rotation_drag) map_apply_roll(map,dx);
-                else map_pan(map,dx,dy,in.viewport_h);
+                } else map_pan(map,dx,dy,in.viewport_h);
             }
         } else if (in.rotation_drag || in.shift_down) {
-            camera_apply_roll(cam, dx, 0.005f);
+            if (!map.north_locked) camera_apply_roll(cam, dx, 0.005f);
         } else if (in.trackball) {
             // Continuous arcball-style orbit while mouse is grabbed
             camera_apply_drag_arcball(cam, dx, dy, 0.004f);

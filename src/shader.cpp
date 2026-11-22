@@ -93,6 +93,26 @@ Shader load_shader(const char* vert_path, const char* frag_path) {
         s.u_tex = glGetUniformLocation(s.program, "u_tex");
         s.u_shading = glGetUniformLocation(s.program, "u_shading");
         s.u_light_dir = glGetUniformLocation(s.program, "u_light_dir");
+        s.u_textured = glGetUniformLocation(s.program, "u_textured");
+        s.u_fill_opacity = glGetUniformLocation(s.program, "u_fill_opacity");
+        s.u_color = glGetUniformLocation(s.program, "u_color");
+        s.u_viewport = glGetUniformLocation(s.program, "u_viewport");
+        auto& u=s.scene;
+        u.view=glGetUniformLocation(s.program,"u_view");
+        u.projection=glGetUniformLocation(s.program,"u_projection");
+        u.morph=glGetUniformLocation(s.program,"u_morph");
+        u.projection_from=glGetUniformLocation(s.program,"u_projection_from");
+        u.projection_to=glGetUniformLocation(s.program,"u_projection_to");
+        u.projection_blend=glGetUniformLocation(s.program,"u_projection_blend");
+        u.map_east=glGetUniformLocation(s.program,"u_map_east");
+        u.map_north=glGetUniformLocation(s.program,"u_map_north");
+        u.map_center=glGetUniformLocation(s.program,"u_map_center");
+        u.map_zoom=glGetUniformLocation(s.program,"u_map_zoom");
+        u.map_distance=glGetUniformLocation(s.program,"u_map_distance");
+        u.wrap=glGetUniformLocation(s.program,"u_wrap");
+        u.bounded_projection=glGetUniformLocation(s.program,"u_bounded_projection");
+        u.map_roll=glGetUniformLocation(s.program,"u_map_roll");
+        u.map_pan=glGetUniformLocation(s.program,"u_map_pan");
     }
 
     glDeleteShader(vs);

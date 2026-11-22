@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
     Ui ui{};
     if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
 
-    fprintf(stderr, "Controls: on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D sheet, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
+    fprintf(stderr, "Controls: on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
@@ -158,6 +158,7 @@ int main(int argc, char** argv) {
 
         if (map.flat_goal < .5f) camera_update(cam, dt);
         map_update(map,dt);
+        map_enforce_north(map,cam);
 
         glViewport(0, 0, input.viewport_w, input.viewport_h);
         glClearColor(0.02f, 0.02f, 0.05f, 1.f);

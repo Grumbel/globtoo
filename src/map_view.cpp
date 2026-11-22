@@ -315,6 +315,11 @@ void map_align_north(MapView& m, Camera& cam) {
     }
 }
 
+void map_enforce_north(MapView& m, Camera& cam) {
+    if (m.north_locked && std::abs(map_north_heading(m,cam)) > 1e-6)
+        map_align_north(m,cam);
+}
+
 void camera_center_on(Camera& cam, double lon, double lat) {
     const Quat yaw = Quat::from_axis_angle({0.f,1.f,0.f},
                                            static_cast<float>((90.0+lon)*geo::to_rad));
@@ -448,7 +453,8 @@ void map_grab_pan(MapView& m, float dx_pixels, float dy_pixels, int height) {
 }
 
 void map_zoom(MapView& m, float wheel) {
-    m.zoom = std::clamp(m.zoom * std::pow(1.15f, wheel), .6f, MapView::max_zoom);
+    // Smaller reciprocal wheel increments, matching the globe's sensitivity.
+    m.zoom = std::clamp(m.zoom * std::pow(1.075f, wheel), .6f, MapView::max_zoom);
 }
 
 std::array<double, 2> timezone_center() {

@@ -58,6 +58,8 @@ the SDL window icon. Run `man globtoo` after installing to a prefix on your
 manpage search path.
 
 See [Release and packaging](docs/RELEASE.md) for version tagging and checks.
+For upcoming map, planet, and downloadable-layer features, see the ordered
+[development roadmap](TODO.md).
 
 Or development shell:
 
@@ -133,7 +135,7 @@ NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
 
 ## Controls
 
-Globtoo has an on-screen toolbar. Press **Tab** to hide or restore the
+Globtoo has an on-screen toolbar along the **bottom** edge. Press **Tab** to hide or restore the
 GUI (toolbar, compass, and scale bar) for an unobstructed map view. Country
 names, markers, and the optional geographic grid remain visible.
 
@@ -155,7 +157,7 @@ names, markers, and the optional geographic grid remain visible.
   follow the actual geographic meridians/parallels, including polar rotation;
   these are angles and **not** equally spaced kilometer lines, particularly
   near the geographic poles.
-- **Scale bar (lower-left)**: local great-circle distance measured at the
+- **Scale bar (right, below compass)**: local great-circle distance measured at the
   view center, automatically displayed in km or m. The graduated bar updates
   with zoom, projection, and globe/map transitions. Its value applies at the
   **center**; on projections, distortion increases away from the center.
@@ -163,12 +165,14 @@ names, markers, and the optional geographic grid remain visible.
   The button shows the currently selected mode; `G` is its shortcut.
 - **Compass (upper-right)**: live geographic N/E/S/W heading for the globe and every 2D projection.
 - **North Up**: click the button or compass rose to straighten the view without panning or changing zoom (also works after a polar crossing).
+- **North Lock**: toggle continuous North-up correction while turning the globe or reprojecting the map. When locked, manual roll gestures are disabled; click again to unlock.
 - **Reset**: below the compass; restore the timezone-relative viewpoint, North-up orientation, and default zoom without changing the selected projection.
 
 Mouse: **left-drag** spins the globe or rotates/reprojects the Earth in 2D;
-**middle-drag** grabs and slides the 2D map like a paper sheet (no geographic
-rotation); wheel zooms. **Shift+left-drag** rolls the map around the viewport
-center, just as it rolls the 3D globe. The rotation is retained when unfolding or folding.
+**middle-drag** grabs and slides a 2D map like a paper sheet, while on the
+3D globe it rolls the view. **Shift+middle-drag** or **Shift+left-drag** rolls a
+flat map around the viewport center (unless North Lock is enabled). Mouse
+wheel zooms with smaller, reciprocal increments. The rotation is retained when unfolding or folding.
 The geographic grid and distance ruler track the point beneath screen center
 after middle-drag; folding to 3D centers that same point.
 Flat maps can be dragged north or south **through the poles**. Rather than
@@ -181,7 +185,7 @@ distance 1.08 Earth radii versus 1.15 previously). Flat-map zoom reaches
 **80×** instead of 60×. The globe sphere uses a finer mesh to stay smooth
 at close range. The 10m country mesh is selected automatically at these scales;
 the raster Earth texture still has its original resolution.
-Shift+drag rolls the globe or rotates the flat map around the screen center.
+Roll gestures rotate the globe or flat map around the screen center when North Lock is off.
 Optional shortcuts: `1..5` select projection, `Space` shading, `B` borders,
 `N` names, `P` political coloring, `V` texture, `Tab` toggle GUI,
 `G` Grab/Arcball, `T` trackball,

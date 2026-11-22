@@ -345,7 +345,7 @@ void stars_draw(const Stars& s, const Camera& cam, float aspect) {
     Mat4 mvp = Mat4::multiply(proj, view_rot);
 
     use_shader(s.shader);
-    GLint u_mvp = glGetUniformLocation(s.shader.program, "u_mvp");
+    const GLint u_mvp = s.shader.u_mvp;
     glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
 
     glDisable(GL_DEPTH_TEST);

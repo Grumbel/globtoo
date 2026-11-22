@@ -5,6 +5,7 @@
 // toolbar must not consume mouse input that belongs to the map.
 #include "ui.hpp"
 #include <cassert>
+#include <cmath>
 
 int main() {
     Ui ui{};
@@ -74,12 +75,37 @@ int main() {
     input_handle_event(input,cam,map,globe,countries,event);
     assert(cam.mode == ControlMode::Grab);
 
-    // The main toolbar still toggles geographic overlays normally.
+    // The old top-left toolbar no longer intercepts map input.
     event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
     event.button.button = SDL_BUTTON_LEFT;
     event.button.x = 525.f;
     event.button.y = 85.f;
+    assert(!ui_event(ui,event,cam,map,globe,countries,input));
+
+    // Main toolbar has moved to the bottom; hit-testing follows drawing.
+    event.button.y = 777.f;
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(ui.grid_visible);
+
+    // Ruler has moved to the right, just below the compass; it consumes clicks.
+    event.button.x = 1100.f;
+    event.button.y = 245.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+
+    // North Lock is a separate button below Grab/Arcball.
+    event.button.x = 1175.f;
+    event.button.y = 207.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(map.north_locked);
+    map.flat_goal=map.globe_to_flat=1.f;
+    map.from=map.to=map.selected=MapProjection::Mercator;
+    map.roll=.8;
+    map_enforce_north(map,cam);
+    assert(std::abs(map_north_heading(map,cam))<1e-5);
+    map_pan(map,100.f,50.f,800);
+    map_enforce_north(map,cam);
+    assert(std::abs(map_north_heading(map,cam))<1e-5);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(!map.north_locked);
     return 0;
 }

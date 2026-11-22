@@ -49,6 +49,84 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - [x] Automatically select detailed borders at close zoom with LOD hysteresis
 - [x] Test binary mesh serialization and geometry-only CMake build
 
+## Development roadmap (ordered)
+
+The checkboxes below distinguish shipped functionality from planned work.
+Finish and validate one stage before making the next one the default; never
+silently download large maps or satellite data on an existing installation.
+
+### Stage 1 — interaction and low-risk rendering performance (this change)
+- [x] Halve mouse-wheel zoom increments in globe and flat modes; make
+      zoom-in/zoom-out reciprocal at ordinary distances.
+- [x] Preserve 2D middle-drag sheet panning; add Shift+middle-drag roll in 2D
+      and middle-drag roll on the 3D globe (same as Shift+left-drag).
+- [x] Add persistent North Lock toggle to the compass panel and keep North-up
+      when rotating the geographic frame; retain one-shot North Up.
+- [x] Move the toolbar to the bottom and ruler to the right, beneath compass.
+- [x] Cache GLES2 shader uniform locations once per program link.
+- [x] Draw all world copies' political fills together, then their borders,
+      reducing redundant program/VBO/vertex-format state changes.
+- [x] Avoid allocating the toolbar button vector on every input/draw event,
+      reuse UI vertex storage, and replace bitmap-glyph linear searches with
+      a lookup table.
+- [ ] Measure actual GL calls, frame time, upload bandwidth and CPU time
+      (close-up 10m mesh, grid, labels, projection morph and 3× world wrap)
+      on GLES2 hardware; avoid claiming reduced draw-call counts without data.
+- [ ] Profile and batch/cull expensive meshes and line labels where beneficial;
+      use counters and before/after benchmarks, avoid visual regressions.
+
+### Stage 2 — geographic point and line features
+- [ ] Fetch Natural Earth **10m populated places** at a pinned version/hash;
+      import capitals and major cities with name, prominence, population,
+      alternate names and overlap-aware labels. Different symbols and separate
+      toggles for capitals versus other major cities. Default to major cities
+      only beyond an appropriate zoom threshold.
+      Source: https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/
+- [ ] Add ranked major rivers and lake centerlines, with LOD and a toggle;
+      project through exactly the same rotated frame as the country borders,
+      avoiding dateline/polar seams, and cull invisible segments.
+      Source: https://www.naturalearthdata.com/downloads/10m-physical-vectors/10m-rivers-lake-centerlines/
+
+### Stage 3 — Earth surface and thematic map layers
+- [ ] Introduce a selectable texture/layer catalog (imagery, topographic
+      elevation, population density, ocean bathymetry); preserve independent
+      blending with political country colors and shading.
+- [ ] Offer higher-resolution Earth imagery using **tiled/mipmapped** textures
+      (GLES2 maximum texture sizes vary). Avoid loading a 21600×10800 image
+      as one giant GPU texture; choose visible/LOD tiles at zoom.
+      NASA Blue Marble Next Generation 21600×10800 topography/bathymetry:
+      https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/
+- [ ] Add explicit ocean relief/bathymetry as a texture or separate overlay,
+      with land/ocean color mapping, a legend and documented depth units;
+      evaluate NOAA ETOPO1 tiles:
+      https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO1/tiled/
+- [ ] Add population density with year/resolution/legend metadata; consider
+      NASA/CIESIN GPWv4. Verify each layer's download terms and attribution.
+      https://data.nasa.gov/dataset/gridded-population-of-the-world-version-4-gpwv4-population-density
+
+### Stage 4 — other planetary bodies
+- [ ] Refactor Earth-only data into a Body catalog (Earth, Moon, Mars, Io,
+      then more): sphere radius, coordinate direction, prime meridian, body
+      shape, rotation convention, map source and feature overlays.
+- [ ] Support body-specific base maps and optional shaded elevation; provide
+      selector in UI and CLI, without showing Earth countries, cities, rivers,
+      population, or Earth-based kilometer scale on other bodies.
+- [ ] Verify planetocentric versus planetographic coordinates and IAU longitude
+      direction (do not assume all bodies use Earth's east-positive frame);
+      identify reliable NASA/USGS sources and per-asset licenses/checksums.
+
+### Stage 5 — optional on-demand downloads and Nix split
+- [ ] Build opt-in libcurl texture/tiles fetcher with explicit user consent,
+      pinned manifest/checksums, XDG cache, size caps, offline behavior,
+      interruption recovery, clear attribution and meaningful errors.
+- [ ] Keep `packages.default` as the **fat**, fully functional offline install;
+      add `packages.globtoo-lite` using the same executable but smaller
+      packaged data and optional runtime downloads. Keep strict dependency
+      separation: no libcurl requirement for the fat/offline build unless
+      download functionality was explicitly enabled at compile time.
+- [ ] Add end-to-end Nix checks for each package, launch without networking,
+      cache hit/miss/corrupt cases, and `reuse lint` for new metadata.
+
 ## Next
 - [ ] Optional proper Unicode/vector typeface with zoom-dependent country labeling
 - [ ] More seamless antimeridian clipping while globe is mid-morph

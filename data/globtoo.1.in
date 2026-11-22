@@ -79,13 +79,13 @@ ISO 6709 signed coordinate pair.
 Rotate the globe, or rotate and reproject Earth in a flat map.
 .TP
 .B Middle-drag
-Pan the 2D map like a paper sheet, without rotating geography.
+Pan the 2D map like a paper sheet; on the 3D globe, roll the view.
 .TP
-.B Shift + left-drag
-Roll the map around the view center.
+.B Shift + left-drag or Shift + middle-drag
+Roll the map around the view center (unless North Lock is enabled).
 .TP
 .B Mouse wheel
-Zoom in or out.
+Zoom in or out with small, reciprocal increments.
 .SH KEYBOARD CONTROLS
 .TP
 .B Tab
@@ -94,7 +94,8 @@ Country names, markers and the optional geographic grid remain visible.
 .TP
 .B G
 Toggle Grab / Arcball control mode for the 3D globe. The same toggle
-is available below Reset in the compass panel.
+is available below Reset in the compass panel. North Lock, also in the
+compass panel, keeps the geographic north direction pointing up during drags.
 .TP
 .B 1, 2, 3, 4, 5
 Choose globe, Plate Carree, Mercator, Mollweide, or Hammer projection.

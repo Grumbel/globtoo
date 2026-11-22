@@ -186,55 +186,55 @@ void countries_draw(Countries& c, const Camera& cam, float aspect,
     }
 
     const bool copies=flat && scene_map_seam_visible(map,aspect);
-    for (int copy=(copies ? -1 : 0);copy<=(copies ? 1 : 0);copy++) {
-        const float wrap=static_cast<float>(copy);
-        if (c.fill_visible && c.fill_shader.program) {
-            // Blend political colors over imagery. Only this pass blends:
-            // borders remain fully opaque, and globe depth/stencil still
-            // occlude country geometry on the far side of the sphere.
-            if (fill_opacity < 1.f) {
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            }
-            use_shader(c.fill_shader);
-            scene_uniforms(c.fill_shader,cam,aspect,map,wrap);
-            const GLint u_light=glGetUniformLocation(c.fill_shader.program,"u_light_dir");
-            const GLint u_shading=glGetUniformLocation(c.fill_shader.program,"u_shading");
-            if (u_light>=0) {
-                const Vec3 light=camera_headlight_dir(cam);
-                glUniform3f(u_light,light.x,light.y,light.z);
-            }
-            if (u_shading>=0) glUniform1f(u_shading,shading ? 1.f : 0.f);
-            const GLint u_opacity=glGetUniformLocation(c.fill_shader.program,"u_fill_opacity");
-            if (u_opacity>=0) glUniform1f(u_opacity,fill_opacity);
-            glBindBuffer(GL_ARRAY_BUFFER,gpu.fill_vbo);
-            glEnableVertexAttribArray(0);
-            glEnableVertexAttribArray(1);
-            glEnableVertexAttribArray(3);
-            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)0);
-            glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)(3*sizeof(float)));
-            glVertexAttribPointer(3,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)(6*sizeof(float)));
+    const int first=copies ? -1 : 0, last=copies ? 1 : 0;
+    if (c.fill_visible && c.fill_shader.program) {
+        // Bind the fill pipeline once for all horizontal wraps. Changing
+        // programs and vertex arrays for every copy was avoidable overhead.
+        if (fill_opacity < 1.f) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+        use_shader(c.fill_shader);
+        const Vec3 light=camera_headlight_dir(cam);
+        if (c.fill_shader.u_light_dir>=0)
+            glUniform3f(c.fill_shader.u_light_dir,light.x,light.y,light.z);
+        if (c.fill_shader.u_shading>=0)
+            glUniform1f(c.fill_shader.u_shading,shading ? 1.f : 0.f);
+        if (c.fill_shader.u_fill_opacity>=0)
+            glUniform1f(c.fill_shader.u_fill_opacity,fill_opacity);
+        glBindBuffer(GL_ARRAY_BUFFER,gpu.fill_vbo);
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)0);
+        glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)(3*sizeof(float)));
+        glVertexAttribPointer(3,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)(6*sizeof(float)));
+        for (int copy=first;copy<=last;copy++) {
+            scene_uniforms(c.fill_shader,cam,aspect,map,static_cast<float>(copy));
             glDrawArrays(GL_TRIANGLES,0,gpu.fill_count);
-            glDisableVertexAttribArray(0);
-            glDisableVertexAttribArray(1);
-            glDisableVertexAttribArray(3);
-            if (fill_opacity < 1.f) glDisable(GL_BLEND);
         }
-        if (c.borders_visible && c.border_shader.program) {
-            use_shader(c.border_shader);
-            scene_uniforms(c.border_shader,cam,aspect,map,wrap);
-            const GLint u_color=glGetUniformLocation(c.border_shader.program,"u_color");
-            if (u_color>=0) glUniform4f(u_color,.12f,.10f,.08f,1.f);
-            glLineWidth(1.f);
-            glBindBuffer(GL_ARRAY_BUFFER,gpu.border_vbo);
-            glEnableVertexAttribArray(0);
-            glEnableVertexAttribArray(3);
-            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0);
-            glVertexAttribPointer(3,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float)));
+        glDisableVertexAttribArray(0);
+        glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(3);
+        if (fill_opacity < 1.f) glDisable(GL_BLEND);
+    }
+    if (c.borders_visible && c.border_shader.program) {
+        // Draw all borders after the fills, including when maps are wrapped.
+        use_shader(c.border_shader);
+        if (c.border_shader.u_color>=0)
+            glUniform4f(c.border_shader.u_color,.12f,.10f,.08f,1.f);
+        glLineWidth(1.f);
+        glBindBuffer(GL_ARRAY_BUFFER,gpu.border_vbo);
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0);
+        glVertexAttribPointer(3,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float)));
+        for (int copy=first;copy<=last;copy++) {
+            scene_uniforms(c.border_shader,cam,aspect,map,static_cast<float>(copy));
             glDrawArrays(GL_LINES,0,gpu.border_count);
-            glDisableVertexAttribArray(0);
-            glDisableVertexAttribArray(3);
         }
+        glDisableVertexAttribArray(0);
+        glDisableVertexAttribArray(3);
     }
     glDepthMask(GL_TRUE);
     glDisable(GL_STENCIL_TEST);

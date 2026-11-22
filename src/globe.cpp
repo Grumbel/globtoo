@@ -48,7 +48,7 @@ void globe_draw(const Globe& g, const Camera& cam, float aspect,
         glUniform3f(g.shader.u_light_dir, L.x, L.y, L.z);
     }
 
-    GLint u_textured = glGetUniformLocation(g.shader.program, "u_textured");
+    const GLint u_textured = g.shader.u_textured;
     if (u_textured >= 0)
         glUniform1f(u_textured, textured ? 1.f : 0.f);
 

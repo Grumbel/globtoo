@@ -163,8 +163,9 @@ void camera_grab_end(Camera& cam) {
 }
 
 void camera_apply_zoom(Camera& cam, float delta) {
-    float factor = 1.f - delta * 0.12f;
-    cam.distance *= factor;
+    // Half-size, reciprocal wheel steps: zooming in then out returns to the
+    // same distance instead of accumulating the old asymmetric 12% steps.
+    cam.distance *= std::pow(1.065f, -delta);
     cam.distance = std::clamp(cam.distance, cam.min_dist, cam.max_dist);
 }
 

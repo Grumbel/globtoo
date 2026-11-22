@@ -72,6 +72,9 @@ for cylindrical projections the horizontal translation wraps continuously.
 The graticule and distance ruler follow the location beneath screen center,
 and folding a panned map back into the globe centers that visible location.
 Globe↔map mode switches preserve the map roll and geographic orientation.
+On the 3D globe, middle-drag rolls the view; Shift+middle-drag rolls a
+flat map rather than panning its sheet. North Lock suppresses deliberate
+roll gestures until switched off.
 
 ## Compass, North-up and Reset
 
@@ -91,13 +94,16 @@ the globe preserves that bearing and geographical center through the fold. **RES
 restores the timezone-derived center, default zoom, and North-up orientation
 without changing the chosen projection. The **GRAB / ARCBALL** button
 below Reset selects the 3D globe mouse mode; `G` toggles it from the keyboard.
+**NORTH LOCK** keeps geographic north pointing upward automatically as the
+map or globe moves; **NORTH UP** remains an independent one-shot action.
+The map toolbar is anchored to the bottom of the window, and the scale bar
+is right aligned immediately beneath the compass.
 
 Press **Tab** to hide or show the UI controls, compass, and scale bar. The
 geographic grid, country names, and markers remain visible, and mouse drags
 work even where the hidden controls were previously located.
 
-The compass repositions below the main toolbar on small windows. UI hit
-testing uses the same bounds as drawing, so compass clicks cannot initiate a
+UI hit testing uses the same viewport-relative bounds as drawing, so compass clicks cannot initiate a
 map drag, and map labels are kept out of both control panels.
 
 In spherical mode, depth is written only by the base globe and a stencil mask

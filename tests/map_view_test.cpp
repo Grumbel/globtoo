@@ -26,6 +26,18 @@ int main() {
         assert(std::isfinite(pole[0]) && std::isfinite(pole[1]));
     }
     Camera cam{};
+    // Reciprocal zooms: one up + one down should cancel, with roughly half
+    // the prior step size. This also catches accidental zoom-limit changes.
+    cam.distance=3.f;
+    camera_apply_zoom(cam,1.f);
+    assert(near(cam.distance,3.f/1.065f,1e-5));
+    camera_apply_zoom(cam,-1.f);
+    assert(near(cam.distance,3.f,1e-5));
+    MapView wheel{};
+    map_zoom(wheel,1.f);
+    assert(near(wheel.zoom,1.075,1e-5));
+    map_zoom(wheel,-1.f);
+    assert(near(wheel.zoom,1.,1e-5));
     camera_center_on(cam, 13.4,52.5);
     auto facing = camera_view_to_world(cam,{0,0,1});
     const auto coords = geo::xyz_to_lonlat(facing.x,facing.y,facing.z);

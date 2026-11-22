@@ -10,7 +10,7 @@
 
 struct InputState {
     bool  dragging = false;
-    int   drag_button = 0; // left: geographic rotation, middle: 2D sheet grab
+    int   drag_button = 0; // left: geographic rotation, middle: 2D sheet grab / globe roll
     bool  shift_down = false;
     bool  rotation_drag = false;
     bool  trackball = false; // T: relative mouse, continuous orbit

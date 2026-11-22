@@ -67,9 +67,64 @@ int main() {
     input_handle_event(in,cam,map,globe,countries,event);
     assert(!in.dragging && in.drag_button==0);
 
-    // Middle clicks on the 3D globe are ignored, not interpreted as spins.
-    map.flat_goal=map.globe_to_flat=0.f;
+    // Shift+middle rolls a flat map; ordinary middle still pans the sheet.
+    map.flat_goal=map.globe_to_flat=1.f;
+    const double pan_before=std::hypot(map.pan_x,map.pan_y);
+    const double roll_before=map.roll;
+    in.shift_down=true;
     event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button=SDL_BUTTON_MIDDLE;
+    event.button.x=400;
+    event.button.y=300;
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(in.dragging && in.rotation_drag);
+    event.type=SDL_EVENT_MOUSE_MOTION;
+    event.motion.x=445;
+    event.motion.y=300;
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(std::abs(map.roll-roll_before)>.1);
+    assert(std::abs(std::hypot(map.pan_x,map.pan_y)-pan_before)<1e-6);
+    event.type=SDL_EVENT_MOUSE_BUTTON_UP;
+    event.button.button=SDL_BUTTON_MIDDLE;
+    input_handle_event(in,cam,map,globe,countries,event);
+    in.shift_down=false;
+
+    // North Lock blocks manual roll without disabling ordinary sheet grab.
+    map.north_locked=true;
+    const double locked_roll=map.roll;
+    event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button=SDL_BUTTON_MIDDLE;
+    event.button.x=400;
+    event.button.y=300;
+    in.shift_down=true;
+    input_handle_event(in,cam,map,globe,countries,event);
+    event.type=SDL_EVENT_MOUSE_MOTION;
+    event.motion.x=470;
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(map.roll==locked_roll);
+    event.type=SDL_EVENT_MOUSE_BUTTON_UP;
+    event.button.button=SDL_BUTTON_MIDDLE;
+    input_handle_event(in,cam,map,globe,countries,event);
+    in.shift_down=false;
+
+    // Middle-drag on the globe is a roll, equivalent to Shift+left-drag.
+    map.flat_goal=map.globe_to_flat=0.f;
+    map.north_locked=false;
+    event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button=SDL_BUTTON_MIDDLE;
+    event.button.x=400;
+    event.button.y=300;
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(in.dragging && in.rotation_drag);
+    const Quat old_cam=cam.orientation;
+    event.type=SDL_EVENT_MOUSE_MOTION;
+    event.motion.x=450;
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(std::abs(cam.orientation.x-old_cam.x)+
+           std::abs(cam.orientation.y-old_cam.y)+
+           std::abs(cam.orientation.z-old_cam.z)+
+           std::abs(cam.orientation.w-old_cam.w)>1e-4f);
+    event.type=SDL_EVENT_MOUSE_BUTTON_UP;
     event.button.button=SDL_BUTTON_MIDDLE;
     input_handle_event(in,cam,map,globe,countries,event);
     assert(!in.dragging);
