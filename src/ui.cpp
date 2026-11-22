@@ -235,6 +235,7 @@ void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState
         m.center_lon = home[0]*pi/180.;
         m.center_lat = home[1]*pi/180.;
         m.roll=0.;
+        map_reset_navigation(m);
         m.zoom=1.f;
         break;
     }

@@ -8,8 +8,8 @@ east longitude -> -Z). The same GLES2 geometry is used for all five modes:
 - **Globe**: perspective-projected sphere with occlusion and country depth/stencil
 - **Equirectangular (Plate Carrée)**: longitude x, latitude y
 - **Mercator**: longitude x, 0.65 × ln(tan(π/4 + latitude/2)); above
-  ±85° the curve extends along its tangent to give the otherwise infinite
-  poles a finite coordinate in the wrapped navigation sheet
+  ±85° the curve extends along its tangent to keep projection coordinates
+  finite at the rotated poles
 - **Mollweide equal-area**: solved iteratively for the auxiliary latitude
 - **Hammer equal-area**: closed elliptical/oval representation of a whole Earth
 
@@ -25,36 +25,38 @@ rather than fading between two images. Switching flat projections interpolates
 between their vertex coordinates independently of the sphere-morph parameter.
 Animations use interruptible exponential interpolation in `src/map_view.cpp`.
 
-`src/scene.cpp` sets the same projection uniforms for the textured sphere,
-country fill triangles and border strips. Country meshes retain **unwrapped
-longitude/latitude coordinates** in addition to original 3D positions. This
-is essential to project the 180° seam without making long triangles across
-continents. In completed flat mode, longitude-periodic mesh copies are rendered when
-needed at the antimeridian, with the displayed ±180° range clipped by the
-fragment shaders. The seam test accounts for the longitude shift of each
-pole-reflected band even at close zoom.
-The transitional intermediate uses one mesh copy, so seams can temporarily
-show at the far edge of the unfolding surface.
+`src/scene.cpp` supplies the same rotated geographic tangent frame to the
+textured sphere, country fills, border segments, and country-name placement.
+For every geographic 3D vertex, the shader computes **local longitude and
+latitude in this frame**, then applies the selected map projection. As the
+map center moves, the whole world is reprojected; it is **not** a translated,
+mirrored or repeated north/south sheet.
+
+Country fills and the globe's projected surface use **per-triangle anchor
+vectors**; borders are rendered as independent line segments with shared
+per-segment anchors. The shader unwraps each primitive's longitude about
+its anchor, so a moving ±180° seam cannot stretch an otherwise small triangle
+or line across the whole map. Equirectangular and Mercator are horizontally
+periodic, while Mollweide and Hammer are bounded and are clipped at their
+new ±180° seam. Extra longitude passes are made only when the screen reaches
+that seam. The old 3D globe still uses its cheaper indexed mesh; only the
+projected/transitioning globe uses the deindexed, anchored vertices.
 
 ## Flat navigation across the poles and rotation
 
-Latitude is stored as a continuous *unwrapped* angular coordinate. It is not
-clamped to ±85° when panning. The map is rendered in successive north/south
-bands: geographic latitude alternately reflects around the poles and
-longitude shifts 180° with each crossing. The inverse of this mapping is
-used when returning from the map to the 3D globe. All layers (textured
-surface, country fills, outlines, labels) use the same bands, so colors and
-borders remain registered. Only the bands intersecting the visible viewport
-are drawn. Longitude and latitude center coordinates are periodically
-normalized to keep shader arguments numerically bounded.
+`MapView` stores a complete orthonormal 3D tangent frame after the first pan.
+Each regular drag applies a great-circle rotation to **all three frame axes**,
+with the local projection derivative determining the angular travel. This
+avoids the pole singularity of storing a map location as only Euler
+longitude/latitude. North/south navigation crosses the poles naturally:
+once on the other side, geography appears from the opposite direction because
+the entire Earth was rotated before it was reprojected. Sideways panning at
+the pole also works. There are no mirrored polar bands or duplicate countries.
 
-The coordinate transforms have to distort or cut somewhere: no flat
-projection can cover the sphere seamlessly. In particular, Plate Carrée has
-a polar edge along which reflected copies need not match point-for-point;
-Mollweide and Hammer meet at a projection tip. This is a convenient,
-geographically correct navigation convention, not an undistorted global
-continuous map. The finite Mercator polar continuation is not conformal
-above ±85°.
+The globe and flat maps still have intrinsic topological differences. A global
+2D projection cannot be completely free of cuts or distortion; the
+reprojection puts its cut opposite the current viewing center. Mercator's
+finite continuation above ±85° is intentionally not conformal at the pole.
 
 Shift+left-drag rotates the flat map around its center. Regular dragging
 applies the inverse roll before updating the map's geographic center,
@@ -67,17 +69,15 @@ The upper-right compass rotates its N/E/S/W markings and north-pointing
 needle to show **geographic north at the center of the view**. In the 3D
 sphere, direction comes from the latitude-increasing tangent in the globe's
 right-handed geographic frame projected into camera-right and camera-up
-coordinates; in flat maps it follows the map's roll and the sign of the
-current pole-reflected band. The bearing is clockwise from screen-up, so
+coordinates; in flat maps it follows the rotated world-north tangent in the current
+3D map frame, accounting for any Shift+drag screen roll. The bearing is clockwise from screen-up, so
 `N 000 DEG` indicates North-up. Near the geographic poles, the compass uses
 the current meridian as a reference because true north is undefined exactly
 at a pole.
 
 Click **NORTH UP** (or the compass rose) to straighten the current map or
-globe without moving the center or changing zoom. On an odd reflected band,
-North-up means 180 degrees of map-sheet roll. Returning to the globe
-compensates for this reflection, keeping the compass direction continuous
-through the fold. **RESET**, now below the compass instead of in the toolbar,
+globe without moving the center or changing zoom. North-up rotates the screen to the actual local north tangent. Returning to
+the globe preserves that bearing and geographical center through the fold. **RESET**, now below the compass instead of in the toolbar,
 restores the timezone-derived center, default zoom, and North-up orientation
 without changing the chosen projection.
 
@@ -115,8 +115,8 @@ actual physical position of the user.
 
 - No native runtime GUI/font dependency is required. Country label glyphs are
   intentionally compact instead of using full Unicode outline fonts.
-- A longitude seam may be briefly exposed while a sphere is unfolding; the
-  three periodic copies are used only at the end to avoid ghost globes.
+- A longitude seam can briefly appear during the sphere-to-map morph; extra
+  longitude passes are applied only in completed flat mode to avoid ghost globes.
 - The 2D map projections are rendered with GLES2 vertex geometry, not
   high-resolution raster map tiles. Very close views may still need an
   optional finer-than-Natural-Earth-10m source.

@@ -10,8 +10,10 @@ uniform float u_textured; // 1 = sample texture, 0 = solid ocean
 
 varying mediump float v_map_lon;
 uniform mediump float u_morph;
+uniform mediump float u_bounded_projection;
 void main() {
-    if (u_morph > 0.999 && abs(v_map_lon) > 3.141593) discard;
+    if (u_morph > 0.999 && u_bounded_projection > 0.5 &&
+        abs(v_map_lon) > 3.141593) discard;
     vec3 albedo;
     if (u_textured > 0.5) {
         albedo = texture2D(u_tex, v_uv).rgb;

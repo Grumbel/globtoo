@@ -14,9 +14,9 @@
 
 ## Done
 - [x] Interactive geographic compass, North-up alignment, and relocated full Reset (including roll)
-- [x] North/south flat-map pole crossing with reflected latitude and 180-degree longitude shift
+- [x] Geographic reprojection from a full 3D rotating frame for north/south pole crossings (no mirrored map copies)
 - [x] Shift+drag rotation for flat maps and preservation through globe folding
-- [x] Flat-map seam detection across pole-reflected bands and zoom-aware mesh LOD
+- [x] Seam-safe triangle/segment reprojection plus horizontal wrapping and zoom-aware mesh LOD
 - [x] Extend close-up globe/map zoom limits; increase sphere tessellation and test clipping
 - [x] Match GLES2 vertex/fragment precision on map morph uniforms and all varyings; regression-test linked interfaces
 - [x] Document coordinate system (docs/COORDINATES.md)

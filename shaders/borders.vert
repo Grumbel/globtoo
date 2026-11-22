@@ -1,6 +1,6 @@
 attribute vec3 a_pos;
-attribute vec2 a_lonlat;
+attribute vec3 a_anchor;
 #include "projection.glsl"
 void main() {
-    gl_Position = scene_position(a_pos, a_lonlat);
+    gl_Position = scene_position(a_pos, a_anchor);
 }

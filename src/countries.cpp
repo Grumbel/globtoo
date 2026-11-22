@@ -6,6 +6,8 @@
 #include "geocoordinates.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -41,28 +43,55 @@ bool upload(CountryMeshGPU& gpu, const CountryGeometry& geo, const char* label) 
     if (geo.border_xyz.empty() || geo.fill_xyz_rgb.empty() ||
         geo.border_lonlat.size() != geo.border_xyz.size()/3*2 ||
         geo.fill_lonlat.size() != geo.fill_xyz_rgb.size()/6*2) return false;
-    gpu.strips.reserve(geo.border_strips.size());
-    for (const auto& strip : geo.border_strips)
-        gpu.strips.push_back({strip.first, strip.count});
     gpu.labels = geo.labels;
 
     std::vector<float> borders, fills;
     const std::size_t nb = geo.border_xyz.size()/3;
-    borders.reserve(nb*5);
-    for (std::size_t i=0;i<nb;i++) {
-        borders.insert(borders.end(), geo.border_xyz.begin()+i*3, geo.border_xyz.begin()+i*3+3);
-        borders.insert(borders.end(), geo.border_lonlat.begin()+i*2, geo.border_lonlat.begin()+i*2+2);
+    // Store every border *segment* with one shared geographic anchor. A strip
+    // cannot cross the moving reprojection seam without a discontinuity.
+    auto anchor_for = [](const auto& points, auto index, auto stride,
+                         std::size_t n) {
+        std::array<float,3> anchor{};
+        for (size_t j=0;j<n;j++)
+            for (size_t k=0;k<3;k++) anchor[k]+=points[(index+j)*stride+k];
+        const float length=std::sqrt(anchor[0]*anchor[0]+anchor[1]*anchor[1]+anchor[2]*anchor[2]);
+        if (length>1e-8f) for (float& a:anchor) a/=length;
+        else for (size_t k=0;k<3;k++) anchor[k]=points[index*stride+k];
+        return anchor;
+    };
+    borders.reserve(nb*12);
+    for (const auto& strip:geo.border_strips) {
+        for (std::size_t j=1;j<static_cast<std::size_t>(strip.count);j++) {
+            const std::size_t i=strip.first+j-1;
+            const std::array<float,3> anchor={
+                geo.border_xyz[i*3]+geo.border_xyz[(i+1)*3],
+                geo.border_xyz[i*3+1]+geo.border_xyz[(i+1)*3+1],
+                geo.border_xyz[i*3+2]+geo.border_xyz[(i+1)*3+2]};
+            const float len=std::sqrt(anchor[0]*anchor[0]+anchor[1]*anchor[1]+anchor[2]*anchor[2]);
+            const std::array<float,3> normalized=len>1e-8f ?
+                std::array<float,3>{anchor[0]/len,anchor[1]/len,anchor[2]/len} :
+                std::array<float,3>{geo.border_xyz[i*3],geo.border_xyz[i*3+1],geo.border_xyz[i*3+2]};
+            for (std::size_t k=i;k<=i+1;k++) {
+                borders.insert(borders.end(),geo.border_xyz.begin()+k*3,geo.border_xyz.begin()+k*3+3);
+                borders.insert(borders.end(),normalized.begin(),normalized.end());
+            }
+        }
     }
+    gpu.border_count=static_cast<GLsizei>(borders.size()/6);
+
     const std::size_t nf = geo.fill_xyz_rgb.size()/6;
-    fills.reserve(nf*8);
-    for (std::size_t i=0;i<nf;i++) {
-        fills.insert(fills.end(),geo.fill_xyz_rgb.begin()+i*6,geo.fill_xyz_rgb.begin()+i*6+6);
-        fills.insert(fills.end(),geo.fill_lonlat.begin()+i*2,geo.fill_lonlat.begin()+i*2+2);
+    fills.reserve(nf*9);
+    for (std::size_t i=0;i<nf;i+=3) {
+        const auto anchor=anchor_for(geo.fill_xyz_rgb,i,6,3);
+        for (std::size_t j=i;j<i+3;j++) {
+            fills.insert(fills.end(),geo.fill_xyz_rgb.begin()+j*6,geo.fill_xyz_rgb.begin()+j*6+6);
+            fills.insert(fills.end(),anchor.begin(),anchor.end());
+        }
     }
     glGenBuffers(1, &gpu.border_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, gpu.border_vbo);
     glBufferData(GL_ARRAY_BUFFER, borders.size() * sizeof(float), borders.data(), GL_STATIC_DRAW);
-    gpu.fill_count = static_cast<GLsizei>(nf);
+    gpu.fill_count = static_cast<GLsizei>(fills.size()/9);
     glGenBuffers(1, &gpu.fill_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, gpu.fill_vbo);
     glBufferData(GL_ARRAY_BUFFER, fills.size() * sizeof(float), fills.data(), GL_STATIC_DRAW);
@@ -156,56 +185,46 @@ void countries_draw(Countries& c, const Camera& cam, float aspect,
         glDisable(GL_CULL_FACE);
     }
 
-    const float wraps[] = {-static_cast<float>(2*geo::pi), 0.f, static_cast<float>(2*geo::pi)};
-    const auto bands = flat ? map_visible_bands(map, aspect) : std::vector<int>{0};
-    for (int band : bands) {
-      const int repeats = flat && scene_map_seam_visible(map, aspect, band) ? 3 : 1;
-      for (int pass=0;pass<repeats;pass++) {
-        const float wrap = repeats==3 ? wraps[pass] : 0.f;
+    const bool copies=flat && scene_map_seam_visible(map,aspect);
+    for (int copy=(copies ? -1 : 0);copy<=(copies ? 1 : 0);copy++) {
+        const float wrap=static_cast<float>(copy);
         if (c.fill_visible && c.fill_shader.program) {
             use_shader(c.fill_shader);
-            scene_uniforms(c.fill_shader, cam, aspect, map, wrap, band);
-            const GLint u_light = glGetUniformLocation(c.fill_shader.program, "u_light_dir");
-            const GLint u_shading = glGetUniformLocation(c.fill_shader.program, "u_shading");
-            if (u_light >= 0) {
-                const Vec3 light = camera_headlight_dir(cam);
-                glUniform3f(u_light, light.x, light.y, light.z);
+            scene_uniforms(c.fill_shader,cam,aspect,map,wrap);
+            const GLint u_light=glGetUniformLocation(c.fill_shader.program,"u_light_dir");
+            const GLint u_shading=glGetUniformLocation(c.fill_shader.program,"u_shading");
+            if (u_light>=0) {
+                const Vec3 light=camera_headlight_dir(cam);
+                glUniform3f(u_light,light.x,light.y,light.z);
             }
-            if (u_shading >= 0) glUniform1f(u_shading, shading ? 1.f : 0.f);
-
-            glBindBuffer(GL_ARRAY_BUFFER, gpu.fill_vbo);
+            if (u_shading>=0) glUniform1f(u_shading,shading ? 1.f : 0.f);
+            glBindBuffer(GL_ARRAY_BUFFER,gpu.fill_vbo);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
-                                  (void*)(3 * sizeof(float)));
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
-                                  (void*)(6 * sizeof(float)));
-            glDrawArrays(GL_TRIANGLES, 0, gpu.fill_count);
+            glEnableVertexAttribArray(3);
+            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)0);
+            glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)(3*sizeof(float)));
+            glVertexAttribPointer(3,3,GL_FLOAT,GL_FALSE,9*sizeof(float),(void*)(6*sizeof(float)));
+            glDrawArrays(GL_TRIANGLES,0,gpu.fill_count);
             glDisableVertexAttribArray(0);
             glDisableVertexAttribArray(1);
-            glDisableVertexAttribArray(2);
+            glDisableVertexAttribArray(3);
         }
-
         if (c.borders_visible && c.border_shader.program) {
             use_shader(c.border_shader);
-            scene_uniforms(c.border_shader, cam, aspect, map, wrap, band);
-            const GLint u_color = glGetUniformLocation(c.border_shader.program, "u_color");
-            if (u_color >= 0) glUniform4f(u_color, .12f, .10f, .08f, 1.f);
+            scene_uniforms(c.border_shader,cam,aspect,map,wrap);
+            const GLint u_color=glGetUniformLocation(c.border_shader.program,"u_color");
+            if (u_color>=0) glUniform4f(u_color,.12f,.10f,.08f,1.f);
             glLineWidth(1.f);
-            glBindBuffer(GL_ARRAY_BUFFER, gpu.border_vbo);
+            glBindBuffer(GL_ARRAY_BUFFER,gpu.border_vbo);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                                  (void*)(3 * sizeof(float)));
-            for (const auto& strip : gpu.strips)
-                glDrawArrays(GL_LINE_STRIP, strip.first, strip.count);
+            glEnableVertexAttribArray(3);
+            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0);
+            glVertexAttribPointer(3,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float)));
+            glDrawArrays(GL_LINES,0,gpu.border_count);
             glDisableVertexAttribArray(0);
-            glDisableVertexAttribArray(2);
+            glDisableVertexAttribArray(3);
         }
-      }
     }
     glDepthMask(GL_TRUE);
     glDisable(GL_STENCIL_TEST);

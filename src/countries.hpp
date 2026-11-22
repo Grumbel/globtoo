@@ -8,8 +8,7 @@
 
 struct CountryMeshGPU {
     GLuint border_vbo = 0;
-    struct Range { GLint first; GLsizei count; };
-    std::vector<Range> strips;
+    GLsizei border_count = 0;
     GLuint fill_vbo = 0;
     GLsizei fill_count = 0;
     std::vector<CountryGeometry::Label> labels;

@@ -97,7 +97,7 @@ std::array<double, 2> map_project(MapProjection projection, double relative_lon,
     switch (projection) {
     case MapProjection::Mercator: {
         // True Mercator diverges at the poles. Continue linearly above 85
-        // degrees with the same slope, making a finite continuous pole sheet.
+        // degrees with its tangent so the *rotated* pole remains finite.
         const double clipped = std::clamp(lat, -max_lat, max_lat);
         const double extra = lat - clipped;
         return {relative_lon, 0.65 * (std::asinh(std::tan(clipped)) +
@@ -124,42 +124,51 @@ std::array<double, 2> map_project(MapProjection projection, double relative_lon,
     return {relative_lon, lat};
 }
 
-int map_lat_band(double unwrapped_lat) {
-    return static_cast<int>(std::floor((unwrapped_lat + pi*.5) / pi));
+MapFrame map_frame(const MapView& m) {
+    if (m.navigation_active &&
+        std::abs(std::remainder(m.center_lon-m.navigation_lon,2*pi)) < 1e-9 &&
+        std::abs(m.center_lat-m.navigation_lat) < 1e-9)
+        return m.navigation_frame;
+    const double sl = std::sin(m.center_lon), cl = std::cos(m.center_lon);
+    const double sp = std::sin(m.center_lat), cp = std::cos(m.center_lat);
+    // Globe coordinate convention: increasing east longitude points toward -Z.
+    return {{-sl, 0., -cl},
+            {-sp*cl, cp, sp*sl},
+            {cp*cl, sp, -cp*sl}};
 }
 
-double map_sheet_y(MapProjection kind, double unwrapped_lat) {
-    const int band = map_lat_band(unwrapped_lat);
-    const double sign = band % 2 == 0 ? 1.0 : -1.0;
-    const double physical_lat = sign * (unwrapped_lat - band*pi);
-    const double height = map_project(kind, 0., pi*.5)[1];
-    return 2.0 * band * height + sign * map_project(kind, 0., physical_lat)[1];
+void map_reset_navigation(MapView& m) {
+    m.navigation_active=false;
+}
+
+std::array<double, 2> map_relative_lonlat(const MapView& m,
+                                          double lon, double lat) {
+    const auto f = map_frame(m);
+    const std::array<double,3> p{std::cos(lat)*std::cos(lon), std::sin(lat),
+                                  -std::cos(lat)*std::sin(lon)};
+    const auto dot = [&](const std::array<double,3>& v) {
+        return p[0]*v[0]+p[1]*v[1]+p[2]*v[2];
+    };
+    return {std::atan2(dot(f.east), dot(f.center)),
+            std::asin(std::clamp(dot(f.north),-1.,1.))};
+}
+
+double map_unwrap_lon(double lon, double reference) {
+    return reference + std::remainder(lon-reference,2*pi);
+}
+
+double map_world_width(MapProjection projection) {
+    switch (projection) {
+    case MapProjection::Mollweide:
+    case MapProjection::Hammer: return 4*std::sqrt(2.);
+    default: return 2*pi;
+    }
 }
 
 std::array<double, 2> map_geographic_center(const MapView& m) {
-    const int band = map_lat_band(m.center_lat);
-    const double sign = band % 2 == 0 ? 1.0 : -1.0;
-    return {std::remainder(m.center_lon + band*pi, 2*pi),
-            sign * (m.center_lat - band*pi)};
-}
-
-std::vector<int> map_visible_bands(const MapView& m, float aspect) {
-    // A rotated viewport has a larger vertical extent in map coordinates.
-    const double half_h = std::tan(.35) * m.map_distance / std::max(.6f, m.zoom);
-    const double half_w = half_h * std::max(.01f, aspect);
-    const double extent = std::abs(std::sin(m.roll))*half_w +
-                          std::abs(std::cos(m.roll))*half_h + .005;
-    const double t = m.projection_blend;
-    const double h = map_project(m.from, 0., pi*.5)[1]*(1.-t) +
-                     map_project(m.to, 0., pi*.5)[1]*t;
-    const double y = map_sheet_y(m.from, m.center_lat)*(1.-t) +
-                     map_sheet_y(m.to, m.center_lat)*t;
-    if (h < .01) return {0};
-    const int first = static_cast<int>(std::ceil((y-extent-h) / (2*h)));
-    const int last = static_cast<int>(std::floor((y+extent+h) / (2*h)));
-    std::vector<int> bands;
-    for (int band=first;band<=last;band++) bands.push_back(band);
-    return bands;
+    const auto f=map_frame(m);
+    return {std::atan2(-f.center[2], f.center[0]),
+            std::asin(std::clamp(f.center[1],-1.,1.))};
 }
 
 void map_apply_roll(MapView& m, float dx_pixels, float sensitivity) {
@@ -169,18 +178,23 @@ void map_apply_roll(MapView& m, float dx_pixels, float sensitivity) {
 
 double map_north_heading(const MapView& m, const Camera& cam) {
     if (m.flat_goal > .5f) {
-        // The screen-space sheet's +Y direction is geographic south in
-        // every odd (pole-reflected) band. A positive roll rotates the sheet
-        // CCW, thus geographic north has clockwise bearing -roll.
-        return std::remainder((map_lat_band(m.center_lat) % 2 ? pi : 0.) - m.roll,
-                              2*pi);
+        const auto f=map_frame(m);
+        const auto center=map_geographic_center(m);
+        const double lon=center[0],lat=center[1];
+        // Geographic north in world space, projected into the *rotated*
+        // local frame. It remains correct after arbitrary great-circle drags.
+        const std::array<double,3> north{-std::sin(lat)*std::cos(lon),
+                                           std::cos(lat),
+                                           std::sin(lat)*std::sin(lon)};
+        const auto dot=[&](const std::array<double,3>& v) {
+            return north[0]*v[0]+north[1]*v[1]+north[2]*v[2];
+        };
+        return std::remainder(std::atan2(dot(f.east),dot(f.north))-m.roll,2*pi);
     }
     const Vec3 facing = camera_view_to_world(cam, {0,0,1});
     const auto center = geo::xyz_to_lonlat(facing.x, facing.y, facing.z);
     const double lon = center[0]*geo::to_rad;
     const double lat = center[1]*geo::to_rad;
-    // Unit tangent of increasing latitude in the shared right-handed frame.
-    // This also provides a stable meridian reference at the polar singularity.
     const Vec3 north{static_cast<float>(-std::sin(lat)*std::cos(lon)),
                      static_cast<float>( std::cos(lat)),
                      static_cast<float>( std::sin(lat)*std::sin(lon))};
@@ -192,14 +206,12 @@ double map_north_heading(const MapView& m, const Camera& cam) {
 
 void map_align_north(MapView& m, Camera& cam) {
     if (m.flat_goal > .5f) {
-        m.roll = map_lat_band(m.center_lat) % 2 ? pi : 0.;
+        m.roll=std::remainder(m.roll+map_north_heading(m,cam),2*pi);
     } else {
-        // Camera roll changes the world-to-view bearing by the *negative*
-        // of the applied angle. Applying the current bearing straightens N.
         camera_grab_end(cam);
         camera_grab_kill_inertia(cam);
-        camera_apply_roll(cam, static_cast<float>(map_north_heading(m,cam)), 1.f);
-        camera_grab_kill_inertia(cam); // roll should not continue spinning
+        camera_apply_roll(cam,static_cast<float>(map_north_heading(m,cam)),1.f);
+        camera_grab_kill_inertia(cam);
     }
 }
 
@@ -217,24 +229,21 @@ void map_select(MapView& m, MapProjection selected, Camera& cam) {
     camera_grab_kill_inertia(cam);
     camera_grab_end(cam);
     if (selected == MapProjection::Globe) {
-        // While flat, orientation is hidden. Align the outgoing sphere with
-        // the center of the map BEFORE beginning the unfold transition.
-        const auto center = map_geographic_center(m);
-        camera_center_on(cam, center[0] * geo::to_deg, center[1] * geo::to_deg);
-        // Preserve Shift+drag map roll when folding back into the globe.
-        // An odd polar sheet has geographic north pointing toward -Y;
-        // compensate its half-turn when moving back onto the sphere.
-        const double physical_roll = m.roll +
-            (map_lat_band(m.center_lat) % 2 ? pi : 0.);
-        camera_apply_roll(cam, static_cast<float>(physical_roll), 1.f);
+        // Fold using the complete navigated frame, not the Euler angles that
+        // become singular when the user drags sideways at a geographic pole.
+        const auto center=map_geographic_center(m);
+        const double heading=map_north_heading(m,cam);
+        camera_center_on(cam,center[0]*geo::to_deg,center[1]*geo::to_deg);
+        camera_apply_roll(cam,static_cast<float>(-heading),1.f);
         camera_grab_kill_inertia(cam);
-        m.flat_goal = 0.f;
+        m.flat_goal=0.f;
     } else {
         if (m.selected == MapProjection::Globe) {
             const Vec3 facing = camera_view_to_world(cam, {0,0,1});
             const auto ll = geo::xyz_to_lonlat(facing.x, facing.y, facing.z);
             m.center_lon = ll[0] * geo::to_rad;
             m.center_lat = ll[1] * geo::to_rad;
+            map_reset_navigation(m);
             // Preserve camera roll when unfolding (do not straighten a
             // globe that the user has rotated with Shift+drag).
             Camera upright{};
@@ -269,29 +278,49 @@ void map_pan(MapView& m, float dx_pixels, float dy_pixels, int height) {
     if (height <= 0 || m.flat_goal < .5f) return;
     const double world_per_pixel = 2.0 * std::tan(.35) * m.map_distance /
                                    (static_cast<double>(height) * m.zoom);
-    // Undo flat-map roll before interpreting the drag as east/north motion.
     const double sx = dx_pixels * world_per_pixel;
-    const double sy = -dy_pixels * world_per_pixel; // screen Y points down
+    const double sy = -dy_pixels * world_per_pixel;
     const double dx = std::cos(m.roll)*sx + std::sin(m.roll)*sy;
     const double dy = -std::sin(m.roll)*sx + std::cos(m.roll)*sy;
-    m.center_lon = std::remainder(m.center_lon - dx, 2*pi);
-    // Invert the continuous pole-reflected sheet Y. Bisection avoids a
-    // singular derivative at Mercator's clamped poles and ellipse tips.
+    // Every map is now projected about the center of a rotated sphere. The
+    // local Jacobian at (0,0) is constant, even at the physical poles; pan by
+    // rotating this frame, never by translating/mirroring existing map sheets.
     const double t = m.projection_blend;
-    const auto y_of = [&](double lat) {
-        return map_sheet_y(m.from,lat)*(1.-t)+map_sheet_y(m.to,lat)*t;
+    const auto derivative = [](MapProjection p, bool east) {
+        const double h=1e-5;
+        const auto minus = map_project(p,east ? -h : 0.,east ? 0. : -h);
+        const auto plus  = map_project(p,east ?  h : 0.,east ? 0. :  h);
+        return ((east ? plus[0]-minus[0] : plus[1]-minus[1])/(2*h));
     };
-    const double desired_y = y_of(m.center_lat) - dy;
-    if (std::abs(dy) < 1e-12) return;
-    double lo = -8*pi, hi = 8*pi;
-    for (int i=0;i<50;i++) {
-        const double mid = (lo+hi)*.5;
-        if (y_of(mid)<desired_y) lo=mid;
-        else hi=mid;
-    }
-    // One full north/south circuit is 2pi and restores the same geographic
-    // orientation; bounding this number prevents indefinite drift in GLSL.
-    m.center_lat = std::remainder((lo+hi)*.5, 2*pi);
+    const double scale_x = derivative(m.from,true)*(1.-t)+derivative(m.to,true)*t;
+    const double scale_y = derivative(m.from,false)*(1.-t)+derivative(m.to,false)*t;
+    const double de=-dx/scale_x, dn=-dy/scale_y;
+    const double theta=std::hypot(de,dn);
+    if (theta<1e-12) return;
+    const auto frame=map_frame(m);
+    // Great-circle rotation of the complete local frame. This is an SO(3)
+    // operation and has no gimbal singularity at either pole.
+    std::array<double,3> tangent{};
+    for (int k=0;k<3;k++)
+        tangent[k]=(de*frame.east[k]+dn*frame.north[k])/theta;
+    const std::array<double,3> axis{
+        frame.center[1]*tangent[2]-frame.center[2]*tangent[1],
+        frame.center[2]*tangent[0]-frame.center[0]*tangent[2],
+        frame.center[0]*tangent[1]-frame.center[1]*tangent[0]};
+    const auto rotate=[&](const std::array<double,3>& v) {
+        const double c=std::cos(theta), sn=std::sin(theta);
+        const double proj=axis[0]*v[0]+axis[1]*v[1]+axis[2]*v[2];
+        return std::array<double,3>{
+            v[0]*c+(axis[1]*v[2]-axis[2]*v[1])*sn+axis[0]*proj*(1-c),
+            v[1]*c+(axis[2]*v[0]-axis[0]*v[2])*sn+axis[1]*proj*(1-c),
+            v[2]*c+(axis[0]*v[1]-axis[1]*v[0])*sn+axis[2]*proj*(1-c)};
+    };
+    m.navigation_frame={rotate(frame.east),rotate(frame.north),rotate(frame.center)};
+    m.navigation_active=true;
+    m.center_lon=std::atan2(-m.navigation_frame.center[2],m.navigation_frame.center[0]);
+    m.center_lat=std::asin(std::clamp(m.navigation_frame.center[1],-1.,1.));
+    m.navigation_lon=m.center_lon;
+    m.navigation_lat=m.center_lat;
 }
 
 void map_zoom(MapView& m, float wheel) {

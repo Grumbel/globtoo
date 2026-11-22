@@ -56,37 +56,126 @@ int main() {
     assert(map.zoom <= MapView::max_zoom);
     map_select(map,MapProjection::Globe,cam);
 
-    // A flat map is a continuous polar sheet rather than a latitude-clamped
-    // rectangle. North of 90 degrees the geographic latitude is reflected
-    // and longitude is shifted by half a turn.
-    for (auto kind : {MapProjection::Equirectangular, MapProjection::Mercator,
-                      MapProjection::Mollweide, MapProjection::Hammer}) {
-        const double h = map_project(kind,0,geo::pi*.5)[1];
-        assert(near(map_sheet_y(kind,geo::pi*.5), h));
-        assert(near(map_sheet_y(kind,geo::pi*.5-.001),
-                    map_sheet_y(kind,geo::pi*.5+.001), .03));
-        assert(near(map_sheet_y(kind,geo::pi*1.5), 3*h));
-        assert(near(map_sheet_y(kind,-geo::pi*.5),-h));
-        assert(near(map_sheet_y(kind,-geo::pi*1.5),-3*h));
-    }
+    // Reprojection rotates the geographic globe, not a map sheet. Moving
+    // across a pole must change the *positions of every country*, not create
+    // a mirrored copy of a flat 2D projection.
     MapView polar{};
     polar.flat_goal = polar.globe_to_flat = 1.f;
     polar.selected = polar.from = polar.to = MapProjection::Equirectangular;
     polar.zoom = 2.f;
     polar.center_lon = .3;
     polar.center_lat = 80*geo::to_rad;
-    map_pan(polar, 0, 200, 800); // drag downward through the North Pole
-    assert(map_lat_band(polar.center_lat)==1);
-    auto physical = map_geographic_center(polar);
-    assert(near(physical[0], std::remainder(.3+geo::pi,2*geo::pi),.001));
+    const auto starting_center=map_geographic_center(polar);
+    auto local=map_relative_lonlat(polar,starting_center[0],starting_center[1]);
+    assert(near(local[0],0.) && near(local[1],0.));
+    map_pan(polar,0,200,800); // drag downward through the north pole
+    assert(polar.navigation_active);
+    assert(polar.center_lat > 0.0 && polar.center_lat < 80*geo::to_rad);
+    auto physical=map_geographic_center(polar);
+    assert(near(physical[0],std::remainder(.3+geo::pi,2*geo::pi),.001));
     assert(physical[1]<geo::pi*.5 && physical[1]>0);
-    const auto bands_north = map_visible_bands(polar,1.6f);
-    assert(std::find(bands_north.begin(),bands_north.end(),1)!=bands_north.end());
-    polar.center_lat = -80*geo::to_rad;
-    map_pan(polar,0,-200,800); // drag upward through the South Pole
-    assert(map_lat_band(polar.center_lat)==-1);
-    physical = map_geographic_center(polar);
+    local=map_relative_lonlat(polar,physical[0],physical[1]);
+    assert(near(local[0],0.) && near(local[1],0.));
+    // Crossing the pole must preserve the visible direction of our OLD
+    // viewport center on the rotating map, not mirror its old 2D coordinate.
+    const auto old_local=map_relative_lonlat(polar,starting_center[0],starting_center[1]);
+    assert(old_local[1]<0.);
+    polar.center_lat=-80*geo::to_rad;
+    map_pan(polar,0,-200,800); // drag upward through the south pole
+    assert(polar.navigation_active);
+    assert(polar.center_lat > -geo::pi*.5);
+    physical=map_geographic_center(polar);
     assert(physical[1]<0 && physical[1]>-geo::pi*.5);
+
+    // Rotated tangent frames are orthogonal, centered, and agree with the
+    // physical globe across +/-90, +/-180 and full-circuit crossings.
+    for (auto kind : {MapProjection::Equirectangular,MapProjection::Mercator,
+                      MapProjection::Mollweide,MapProjection::Hammer}) {
+        for (double lat : {-220.,-100.,-90.,-80.,0.,45.,89.,90.,100.,220.}) {
+            MapView m{};
+            m.from=m.to=m.selected=kind;
+            m.center_lon=.9;
+            m.center_lat=lat*geo::to_rad;
+            const auto f=map_frame(m);
+            auto dot=[](const auto& a,const auto& b) {
+                return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+            };
+            assert(near(dot(f.center,f.center),1.,1e-10));
+            assert(near(dot(f.center,f.east),0.,1e-10));
+            assert(near(dot(f.center,f.north),0.,1e-10));
+            assert(near(dot(f.east,f.north),0.,1e-10));
+            const auto center=map_geographic_center(m);
+            const auto origin=map_relative_lonlat(m,center[0],center[1]);
+            assert(near(origin[0],0.,1e-10));
+            assert(near(origin[1],0.,1e-10));
+            const auto projected=map_project(kind,origin[0],origin[1]);
+            assert(near(projected[0],0.,1e-9) && near(projected[1],0.,1e-9));
+            // Any real point on Earth has one local reprojected position.
+            const auto west=map_relative_lonlat(m,-120*geo::to_rad,35*geo::to_rad);
+            assert(std::abs(west[0])<=geo::pi && std::abs(west[1])<=geo::pi*.5);
+        }
+    }
+    // The moving 180-degree seam is unwrapped per primitive; vertices near
+    // opposite sides must be adjacent, not a map-width-spanning triangle.
+    const double base=179.7*geo::to_rad;
+    const double across=-179.8*geo::to_rad;
+    assert(std::abs(map_unwrap_lon(across,base)-base)<geo::to_rad);
+    for (auto kind : {MapProjection::Equirectangular,MapProjection::Mercator,
+                      MapProjection::Mollweide,MapProjection::Hammer})
+        assert(map_world_width(kind)>=5.6);
+    // Sideways panning at exactly 90 degrees must actually move the center.
+    // An Euler longitude-only pan would spin in place at this singularity.
+    for (double pole : {-90.,90.}) {
+        MapView nav{};
+        nav.flat_goal=nav.globe_to_flat=1.f;
+        nav.center_lon=.25;
+        nav.center_lat=pole*geo::to_rad;
+        nav.zoom=4.f;
+        nav.from=nav.to=nav.selected=MapProjection::Equirectangular;
+        const auto old=map_frame(nav);
+        map_pan(nav,60.f,0.f,800);
+        const auto next=map_frame(nav);
+        const double shift=std::acos(std::clamp(
+            old.center[0]*next.center[0]+old.center[1]*next.center[1]+
+            old.center[2]*next.center[2],-1.,1.));
+        assert(shift>.01 && shift<.5);
+        const auto c=map_geographic_center(nav);
+        const auto local_origin=map_relative_lonlat(nav,c[0],c[1]);
+        assert(near(local_origin[0],0.,1e-8) && near(local_origin[1],0.,1e-8));
+        assert(near(next.east[0]*next.north[0]+next.east[1]*next.north[1]+
+                    next.east[2]*next.north[2],0.,1e-8));
+        // The compass, North-up button and 3D fold must agree after
+        // navigating sideways out of a pole.
+        map_apply_roll(nav,99.f);
+        map_align_north(nav,cam);
+        assert(near(map_north_heading(nav,cam),0.,1e-6));
+        const auto saved=map_geographic_center(nav);
+        map_select(nav,MapProjection::Globe,cam);
+        const auto cam_point=camera_view_to_world(cam,{0,0,1});
+        const auto facing_geo=geo::xyz_to_lonlat(cam_point.x,cam_point.y,cam_point.z);
+        assert(near(std::remainder(facing_geo[0]*geo::to_rad-saved[0],2*geo::pi),0.,.001));
+        assert(near(facing_geo[1]*geo::to_rad,saved[1],.001));
+        assert(near(map_north_heading(nav,cam),0.,.003));
+    }
+    // Rotations by entire great circles are periodic. After 24 equal north
+    // drags corresponding to one full revolution, the same geography must
+    // return to the center with the same map orientation.
+    {
+        MapView orbit{};
+        orbit.flat_goal=orbit.globe_to_flat=1.f;
+        orbit.center_lon=.2;
+        orbit.center_lat=.5;
+        const auto origin=map_frame(orbit);
+        const float one_circle_pixels=static_cast<float>(
+            (2*geo::pi/24.)*800./(2.*std::tan(.35)*orbit.map_distance));
+        for (int i=0;i<24;i++) map_pan(orbit,0.f,one_circle_pixels,800);
+        const auto result=map_frame(orbit);
+        for (int k=0;k<3;k++) {
+            assert(near(result.center[k],origin.center[k],.0001));
+            assert(near(result.north[k],origin.north[k],.0001));
+            assert(near(result.east[k],origin.east[k],.0001));
+        }
+    }
     // Shift+drag rolls the map, not the otherwise-hidden globe camera.
     polar.center_lon = .2;
     polar.center_lat = 0.;
@@ -147,7 +236,7 @@ int main() {
             flat.zoom=20.f;
             flat.roll=.73;
             const auto center=map_geographic_center(flat);
-            const double heading=(map_lat_band(flat.center_lat)%2 ? geo::pi : 0.)-.73;
+            const double heading=(std::cos(flat.center_lat)<0 ? geo::pi : 0.)-.73;
             assert(near(map_north_heading(flat,cam),
                         std::remainder(heading,2*geo::pi),.001));
             map_align_north(flat,cam);
