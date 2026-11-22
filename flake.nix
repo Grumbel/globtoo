@@ -91,7 +91,9 @@
           name = "ne_10m_rivers_lake_centerlines.geojson";
         };
 
-        mkPackage = { lite ? false }: pkgs.stdenv.mkDerivation {
+        # Downstream flakes can pass verified, already prepared tile trees
+        # without adding arbitrary network fetches or fake source hashes here.
+        mkPackage = { lite ? false, planetaryMaps ? {} }: pkgs.stdenv.mkDerivation {
           pname = if lite then "globtoo-lite" else "globtoo";
           inherit version;
           src = ./.;
@@ -116,7 +118,10 @@
             "-DGLOBTOO_ENABLE_DOWNLOADS=${if lite then "ON" else "OFF"}"
             # Install the pinned, fetched image itself; never a source-tree
             # placeholder or a file that happened to be named earth.jpg.
-          ] ++ pkgs.lib.optionals (!lite) [
+          ] ++ pkgs.lib.concatMap (body:
+            pkgs.lib.optional (builtins.hasAttr body planetaryMaps)
+              "-DGLOBTOO_${pkgs.lib.strings.toUpper body}_PREPARED_MAP=${builtins.getAttr body planetaryMaps}"
+          ) [ "moon" "mars" "io" ] ++ pkgs.lib.optionals (!lite) [
             "-DGLOBTOO_EARTH_TEXTURE=${earthTexture}"
             # Optional high-resolution true-color tiles are supported by
             # -DGLOBTOO_IMAGERY_TEXTURE=<verified path> from a downstream
@@ -157,6 +162,14 @@
       {
         packages.default = mkPackage { };
         packages.globtoo-lite = mkPackage { lite = true; };
+
+        # Reproducible opt-in package composition for downstream Nix flakes.
+        # Input maps must be locally prepared/pinned store paths; CMake
+        # verifies their source.json, manifest and every output SHA-256.
+        lib.withPlanetaryMaps = planetaryMaps: mkPackage { inherit planetaryMaps; };
+        lib.withPlanetaryMapsLite = planetaryMaps: mkPackage {
+          lite = true; inherit planetaryMaps;
+        };
 
         # Both build variants participate in nix flake check.
         checks.fat-build = self.packages.${system}.default;

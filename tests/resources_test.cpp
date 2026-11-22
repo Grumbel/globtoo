@@ -32,6 +32,9 @@ int main() {
     std::ofstream(base / "share" / "globtoo" / "imagery" / "mars" / "manifest.txt") << "mars-tiles";
     std::ofstream(base / "bin" / "imagery" / "moon" / "manifest.txt") << "moon-tiles";
     std::ofstream(base / "cwd" / "assets" / "earth.jpg") << "obsolete-placeholder";
+    // Give this test a private user-data root, independent of the runner's
+    // actual desktop and its installed planetary maps.
+    setenv("XDG_DATA_HOME", (base / "user-data").c_str(), 1);
     const auto original_cwd = fs::current_path();
     fs::current_path(base / "cwd");
     resources_set_executable_dir((base / "bin").string());
@@ -60,6 +63,35 @@ int main() {
     assert(fs::equivalent(resource_path("imagery/mars/manifest.txt"),
                           base / "share" / "globtoo" / "imagery" / "mars" / "manifest.txt"));
 #endif
+    // User-installed planetary maps override the binary and system defaults;
+    // they are persistent across immutable Nix package upgrades.
+    const auto user_planets = base / "user-data" / "globtoo";
+    assert(fs::path(resource_user_data_path("imagery/mars/manifest.txt")) ==
+           user_planets / "imagery" / "mars" / "manifest.txt");
+    assert(resource_user_data_path("../imagery/mars/manifest.txt").empty());
+    assert(resource_user_data_path("imagery/earth/manifest.txt").empty());
+    assert(resource_user_data_path("imagery/mars/../moon/manifest.txt").empty());
+    assert(resource_user_data_path("assets/earth.jpg").empty());
+    fs::create_directories(user_planets / "imagery" / "mars");
+    fs::create_directories(user_planets / "assets");
+    std::ofstream(user_planets / "imagery" / "mars" / "manifest.txt") << "user-mars";
+    std::ofstream(user_planets / "assets" / "moon.jpg") << "user-moon";
+    assert(fs::equivalent(resource_path("imagery/mars/manifest.txt"),
+                          user_planets / "imagery" / "mars" / "manifest.txt"));
+    assert(fs::equivalent(resource_path("assets/moon.jpg"),
+                          user_planets / "assets" / "moon.jpg"));
+    fs::remove(user_planets / "assets" / "moon.jpg");
+#ifdef GLOBTOO_INSTALL_DATADIR
+    assert(fs::equivalent(resource_path("assets/moon.jpg"),
+                          base / "share" / "globtoo" / "assets" / "moon.jpg"));
+#endif
+    // An explicit asset-dir override still wins over per-user installations.
+    fs::create_directories(base / "custom" / "imagery" / "mars");
+    std::ofstream(base / "custom" / "imagery" / "mars" / "manifest.txt") << "override";
+    setenv("GLOBE_ASSET_DIR", (base / "custom").c_str(), 1);
+    assert(fs::equivalent(resource_path("imagery/mars/manifest.txt"),
+                          base / "custom" / "imagery" / "mars" / "manifest.txt"));
+    unsetenv("GLOBE_ASSET_DIR");
     // A lite install resolves explicitly downloaded textures under XDG.
     fs::create_directories(base / "cache" / "globtoo" / "assets");
     std::ofstream(base / "cache" / "globtoo" / "assets" / "earth.jpg") << "cached";

@@ -17,7 +17,10 @@ absent. The globe, projections, and available country overlays remain usable.
 No map is downloaded when switching bodies, scrolling, zooming, or starting.
 The full package uses the installed imagery even if there is a cached copy.
 Other Earth raster layers and planetary mosaics remain optional, separately
-supplied sources, not automatic downloads.
+supplied sources, not automatic downloads. An audited planetary tile set can be installed in
+`$XDG_DATA_HOME/globtoo/imagery/<body>` with
+`tools/install_planetary_map.py`, or included in a downstream CMake/Nix
+package. See [PLANETARY_MAPS.md](PLANETARY_MAPS.md).
 
 ## Installing the smaller package
 

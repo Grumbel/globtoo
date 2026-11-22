@@ -116,11 +116,35 @@ set(GLOBTOO_PLANET_MAX_WIDTH 2048 CACHE STRING
     "Maximum width of normalized Moon/Mars/Io texture for GLES2")
 set(PLANET_TEXTURE_OUTPUTS)
 set(PLANET_IMAGERY_OUTPUTS)
+set(PLANET_PREPARED_DIRS)
 foreach(body moon mars io)
   string(TOUPPER "${body}" upper)
   set(GLOBTOO_${upper}_TEXTURE "" CACHE FILEPATH "Optional ${body} global plate-carree texture")
   set(GLOBTOO_${upper}_IMAGERY_TEXTURE "" CACHE FILEPATH
       "Optional high-resolution ${body} global mosaic to tile instead of uploading a huge GLES2 texture")
+  set(GLOBTOO_${upper}_PREPARED_MAP "" CACHE PATH
+      "Already-normalized audited ${body} tile directory (output of prepare_planetary_map.py)")
+  if(GLOBTOO_${upper}_PREPARED_MAP)
+    if(GLOBTOO_${upper}_TEXTURE OR GLOBTOO_${upper}_IMAGERY_TEXTURE)
+      message(FATAL_ERROR "${body}: PREPARED_MAP cannot be combined with TEXTURE or IMAGERY_TEXTURE")
+    endif()
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    execute_process(COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_SOURCE_DIR}/tools/install_planetary_map.py"
+        "${GLOBTOO_${upper}_PREPARED_MAP}" --verify --body "${body}"
+      RESULT_VARIABLE _planet_verified
+      OUTPUT_VARIABLE _planet_report ERROR_VARIABLE _planet_error)
+    if(NOT _planet_verified EQUAL 0)
+      message(FATAL_ERROR "Invalid prepared ${body} map: ${_planet_error}")
+    endif()
+    add_custom_target(${body}_prepared_map_verify ALL
+      COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_SOURCE_DIR}/tools/install_planetary_map.py"
+        "${GLOBTOO_${upper}_PREPARED_MAP}" --verify --body "${body}"
+      COMMENT "Verifying installed ${body} tile payload" VERBATIM)
+    set(PLANET_PREPARED_SOURCE_${body} "${GLOBTOO_${upper}_PREPARED_MAP}")
+    list(APPEND PLANET_PREPARED_DIRS "${body}")
+  endif()
   set(GLOBTOO_${upper}_LONGITUDE_POSITIVE "" CACHE STRING "Source direction: east or west")
   set(GLOBTOO_${upper}_LONGITUDE_LEFT "" CACHE STRING "Source left boundary: 0 or 180 degrees")
   set(GLOBTOO_${upper}_SOURCE "" CACHE STRING "Source publication/URL for ${body} map")
@@ -493,6 +517,14 @@ if(GLOBTOO_BUILD_APP)
         "$<TARGET_FILE_DIR:globtoo>/assets/${body}.source.txt"
       VERBATIM)
   endforeach()
+  foreach(body IN LISTS PLANET_PREPARED_DIRS)
+    add_dependencies(globtoo ${body}_prepared_map_verify)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${PLANET_PREPARED_SOURCE_${body}}"
+        "$<TARGET_FILE_DIR:globtoo>/imagery/${body}"
+      VERBATIM)
+  endforeach()
   foreach(body IN LISTS PLANET_IMAGERY_OUTPUTS)
     add_dependencies(globtoo ${body}_imagery_tiles)
     add_custom_command(TARGET globtoo POST_BUILD
@@ -560,6 +592,10 @@ if(GLOBTOO_BUILD_APP)
       "${CMAKE_BINARY_DIR}/generated-planetary/${body}.jpg"
       "${CMAKE_BINARY_DIR}/generated-planetary/${body}.source.txt"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
+  endforeach()
+  foreach(body IN LISTS PLANET_PREPARED_DIRS)
+    install(DIRECTORY "${PLANET_PREPARED_SOURCE_${body}}/"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/imagery/${body}")
   endforeach()
   foreach(body IN LISTS PLANET_IMAGERY_OUTPUTS)
     install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-imagery/${body}/"
@@ -642,6 +678,14 @@ if(BUILD_TESTING)
   if(Python3_Interpreter_FOUND)
     add_test(NAME geographic_compiler
       COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/geographic_compiler_test.py")
+    # This suite makes synthetic map tiles and verifies XDG install and rollback.
+    execute_process(COMMAND ${Python3_EXECUTABLE} -c "from PIL import Image"
+      RESULT_VARIABLE _planet_installer_pillow ERROR_QUIET)
+    if(_planet_installer_pillow EQUAL 0)
+      add_test(NAME planetary_map_install
+        COMMAND ${Python3_EXECUTABLE} -m unittest tests.install_planetary_map_test
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+    endif()
   endif()
   add_executable(geographic_features_test tests/geographic_features_test.cpp
     src/geographic_features.cpp)

@@ -63,6 +63,15 @@ The on-screen application icon is installed both for desktop launchers and as
 the SDL window icon. Run `man globtoo` after installing to a prefix on your
 manpage search path.
 
+For persistent Moon, Mars, or Io maps, run
+`python3 tools/install_planetary_map.py /path/to/prepared-tiles` after
+[preparing and auditing the source](docs/PLANETARY_MAPS.md). The viewer then
+finds the tiles under `$XDG_DATA_HOME/globtoo/imagery/<body>` automatically,
+including in Nix installs. Packagers can instead supply
+`-DGLOBTOO_MARS_PREPARED_MAP=/path/to/mars-tiles` at CMake configure time,
+or compose a Nix build with `globtoo.lib.${system}.withPlanetaryMaps`.
+Neither path downloads new imagery automatically.
+
 See [Raster layers and tiling](docs/RASTER_LAYERS.md) for high-resolution
 imagery and relief preparation and selection, and
 [planetary maps](docs/PLANETARY_MAPS.md) for converting and packaging

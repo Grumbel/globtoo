@@ -110,6 +110,16 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
         report_path.write_text(json.dumps(alignment, indent=2) + '\n', encoding='utf-8')
         if hash_file(source) != (digest, size):
             raise ValueError('source changed while map tiles were being prepared')
+        (staging / 'source.txt').write_text(
+            f'Body: {body}\nSource: {source_url}\nLicense (operator-declared): {license_text}\n'
+            f'Original filename: {source.name}\nSource SHA-256: {digest}\n'
+            f'Pin checked: {"yes" if expected_sha256 else "no (local hash only)"}\n'
+            f'Projection: plate-carree, north-up (operator-declared)\n'
+            f'Longitude: {positive}-positive, left={left} degrees (operator-declared)\n'
+            f'Latitude: {latitude} (operator-declared)\n'
+            'Output: east-positive, planetocentric, -180 degrees at left\n'
+            'Visual Gazetteer overlay is for QA; it does not certify registration.\n',
+            encoding='utf-8')
         output_hashes = {}
         for path in sorted(staging.iterdir()):
             if path.is_file():
@@ -140,16 +150,6 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
         }
         (staging / 'source.json').write_text(json.dumps(record, indent=2, sort_keys=True)
                                              + '\n', encoding='utf-8')
-        (staging / 'source.txt').write_text(
-            f'Body: {body}\nSource: {source_url}\nLicense (operator-declared): {license_text}\n'
-            f'Original filename: {source.name}\nSource SHA-256: {digest}\n'
-            f'Pin checked: {"yes" if expected_sha256 else "no (local hash only)"}\n'
-            f'Projection: plate-carree, north-up (operator-declared)\n'
-            f'Longitude: {positive}-positive, left={left} degrees (operator-declared)\n'
-            f'Latitude: {latitude} (operator-declared)\n'
-            'Output: east-positive, planetocentric, -180 degrees at left\n'
-            'Visual Gazetteer overlay is for QA; it does not certify registration.\n',
-            encoding='utf-8')
 
         if destination.exists():
             # Rename the complete previous tree out of the way.  If the new

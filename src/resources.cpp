@@ -22,6 +22,31 @@ std::string path_string(const fs::path& path) {
 }
 }
 
+std::string resource_user_data_path(std::string_view relative_path) {
+    // Do not translate arbitrary paths into the user's data directory. The
+    // installer creates a fixed imagery/<body>/manifest.txt layout.
+    bool approved=false;
+    for (const char* name : {"moon", "mars", "io"}) {
+        const std::string body(name);
+        if (relative_path == "assets/" + body + ".jpg" ||
+            relative_path == "imagery/" + body + "/manifest.txt") {
+            approved=true;
+            break;
+        }
+    }
+    if (!approved) return {};
+    fs::path root;
+    if (const char* xdg = std::getenv("XDG_DATA_HOME")) {
+        if (*xdg && fs::path(xdg).is_absolute()) root = xdg;
+    }
+    if (root.empty()) {
+        const char* home = std::getenv("HOME");
+        if (!home || !*home || !fs::path(home).is_absolute()) return {};
+        root = fs::path(home) / ".local" / "share";
+    }
+    return path_string(root / "globtoo" / relative_path);
+}
+
 std::string resource_cache_path(std::string_view relative_path) {
     // Only fixed, catalogued resources may be resolved through this cache.
     // This prevents an arbitrary user-supplied traversal path from being
@@ -51,6 +76,12 @@ std::string resource_path(std::string_view relative_path) {
     if (const char* override_dir = std::getenv("GLOBE_ASSET_DIR")) {
         if (*override_dir) return path_string(fs::path(override_dir) / relative);
     }
+
+    // User-installed maps can override the package's default imagery without
+    // attempting to modify the read-only Nix store. The map installer checks
+    // manifest integrity before publishing the entire directory.
+    const std::string user_data = resource_user_data_path(relative_path);
+    if (!user_data.empty() && regular_file(user_data)) return user_data;
 
     if (!executable_dir.empty()) {
         const fs::path bin = fs::path(executable_dir);

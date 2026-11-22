@@ -14,6 +14,11 @@ void resources_set_executable_dir(std::string directory);
 // in the source working directory. GLOBE_ASSET_DIR overrides every default.
 std::string resource_path(std::string_view relative_path);
 
+// Per-user installation location for vetted planetary imagery. Only known
+// Moon/Mars/Io texture and tile-manifest resources are accepted; files here
+// override a system package, but not an explicit GLOBE_ASSET_DIR/CLI choice.
+std::string resource_user_data_path(std::string_view relative_path);
+
 // Optional XDG cache location for a downloaded resource. Returns an empty
 // path when no suitable absolute cache root can be resolved. Does not create
 // directories or perform any I/O beyond environment lookup.

@@ -150,6 +150,11 @@ silently download large maps or satellite data on an existing installation.
       per-body caches, normalized east/west longitude at tile-preparation time,
       CLI overrides and opt-in source-attributed CMake packaging. Actual mosaic
       sources and live GLES2 alignment still require verification.
+- [x] Install audited Moon/Mars/Io tile sets persistently under XDG user data,
+      or compose them into CMake/Nix packages from prepared, validated map
+      directories. Verify manifest/checksums before publishing, use an atomic
+      replacement and preserve the original maps on failures. This is **not**
+      evidence of scientific coordinate registration or upstream hash checks.
 - [ ] Expand verified asset catalog to licensed Moon/Mars/Io data and
       high-resolution tiled sources; support resumable multi-part downloads
       and interactive UI consent/progress as appropriate.

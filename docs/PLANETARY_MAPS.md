@@ -169,6 +169,78 @@ allocating a second full-size normalized raster. The output JSON records
 operator-provided map metadata; it does not validate the source's scientific
 datum, control network, or feature alignment automatically.
 
+## Install a prepared planetary map (persistent user data)
+
+A successful `prepare_planetary_map.py` run creates a complete, audited tile
+package. Install it once, **without** rebuilding the viewer or supplying
+`--body-imagery-dir` on every run:
+
+```sh
+python3 tools/install_planetary_map.py /data/io-tiles --verify
+python3 tools/install_planetary_map.py /data/io-tiles
+# Subsequent launches, including from a Nix installation:
+globtoo --body io
+```
+
+The installer reads `source.json`, validates the declared target body and
+coordinate convention, checks the manifest's tile grid and SHA-256 of **every
+listed file**, and rejects unexpected files and symlinks. It copies the map
+into `$XDG_DATA_HOME/globtoo/imagery/io/` (normally
+`$HOME/.local/share/globtoo/imagery/io/`). Moon and Mars use equivalent
+paths. An explicit `--body-imagery-dir` or `GLOBE_ASSET_DIR` overrides the
+user installation. A user-installed map overrides an older map packaged by
+CMake/Nix, and doesn't modify a read-only Nix store. To replace a previously
+installed map, pass `--replace`; validation and the copy happen in a sibling
+staging directory before atomic publication, restoring the previous directory
+if publication fails. To uninstall a map, remove only its specific
+`$XDG_DATA_HOME/globtoo/imagery/<body>` directory.
+
+Only the **outputs from the current preparer** are accepted: `source.txt` is
+now included among the SHA-256-checked files. Older Stage 10 outputs should
+be re-prepared with the current version before installation. Source file
+hashes and coordinate claims are recorded, not independently authenticated:
+the operator must still check the publisher's map metadata and rights.
+Installing a map is offline; it does not contact NASA/JPL or download assets.
+
+## Include audited maps in a CMake/Nix installation
+
+An existing, prepared map can also be included directly in a system build,
+without re-tiling and without copying the original high-resolution mosaic:
+
+```sh
+cmake -S . -B build -DGLOBTOO_MARS_PREPARED_MAP=/data/mars-tiles
+cmake --build build
+cmake --install build --prefix "$HOME/.local"
+# share/globtoo/imagery/mars/{manifest.txt,preview.jpg,tile-*.jpg,...}
+```
+
+The same option exists for `GLOBTOO_MOON_PREPARED_MAP` and
+`GLOBTOO_IO_PREPARED_MAP`. Each must be a complete output of
+`prepare_planetary_map.py`; configuration and the build validate its full
+checksum manifest and reject an asset prepared for a different body.
+`PREPARED_MAP` cannot be combined with the older `TEXTURE` or
+`IMAGERY_TEXTURE` build option for the same body. The ordinary CMake install
+works without Nix and keeps the provenance and visual QA records with the
+asset.
+
+Downstream **Nix flakes** can provide fixed, audited store paths without
+requiring Globtoo to invent upstream hashes or commit large textures:
+
+```nix
+# In a downstream flake's outputs for the matching system:
+packages.globtoo-with-maps = globtoo.lib.${system}.withPlanetaryMaps {
+  moon = ./audited-moon-tiles;
+  mars = ./audited-mars-tiles;
+  # io = ./audited-io-tiles;
+};
+```
+
+`./audited-*-tiles` must be a reproducible, already prepared directory in the
+downstream flake or an independently checksum-pinned Nix derivation. The
+corresponding `withPlanetaryMapsLite` function packages those tiles without
+bundling the Earth image. The ordinary `packages.default` and
+`packages.globtoo-lite` remain unchanged and do not acquire unverified maps.
+
 ## Preparing an externally obtained map
 
 The input must be a color/grayscale **full 360° × 180° north-up plate carrée**
