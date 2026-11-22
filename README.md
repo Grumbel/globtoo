@@ -8,6 +8,8 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Smooth zoom down to individual small countries
 - Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
 
+![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
+
 ## Build (Nix)
 
 ```bash
