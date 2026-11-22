@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Globtoo
+GenericName=Interactive Globe and World Map
+Comment=Explore Earth with a tactile globe and animated map projections
+Exec=globtoo
+Icon=globtoo
+Terminal=false
+Categories=Education;Science;Geography;
+Keywords=Earth;globe;map;atlas;geography;projection;cartography;
+StartupNotify=true

@@ -4,6 +4,7 @@
 #include "country_mesh_io.hpp"
 #include "scene.hpp"
 #include "geocoordinates.hpp"
+#include "resources.hpp"
 
 #include <algorithm>
 #include <array>
@@ -17,13 +18,9 @@
 
 namespace {
 std::vector<std::string> asset_paths(const char* asset_name) {
-    std::vector<std::string> paths;
-    if (const char* dir = std::getenv("GLOBE_ASSET_DIR")) {
-        paths.emplace_back(std::string(dir) + "/assets/" + asset_name);
-        paths.emplace_back(std::string(dir) + "/" + asset_name);
-    }
-    paths.emplace_back(std::string("assets/") + asset_name);
-    return paths;
+    // The new install-aware resolver finds assets under GLOBE_ASSET_DIR,
+    // the source/build tree, or the installation prefix.
+    return {resource_path(std::string("assets/") + asset_name)};
 }
 
 bool read_geojson(const std::string& path, CountryGeometry& geometry) {

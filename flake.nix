@@ -17,6 +17,32 @@
           "${versionBase}.${toString (self.revCount or 0)}+g${gitRev}"
           else versionBase;
 
+        # pkg-config may inspect SDL3's Requires.private modules even when
+        # the application itself only links SDL3, GLES2, and EGL.
+        sdl3PcDeps = with pkgs; [
+          alsa-lib.dev
+          libjack2.dev
+          pipewire.dev
+          libpulseaudio.dev
+          libx11.dev
+          libxext.dev
+          libxcb.dev
+          libxdmcp.dev
+          libxcursor.dev
+          libxi.dev
+          libxfixes.dev
+          libxrandr.dev
+          libxscrnsaver
+          libxtst
+          libdrm.dev
+          libgbm
+          libffi.dev
+          wayland.dev
+          libxkbcommon.dev
+          libdecor.dev
+          libusb1.dev
+        ];
+
         # ---------------------------------------------------------------
         # Earth texture (fetched at build time – does NOT bloat the repo)
         # ---------------------------------------------------------------
@@ -61,13 +87,13 @@
             pkg-config
           ];
 
-          buildInputs = with pkgs; [
+          buildInputs = (with pkgs; [
             sdl3
             geos
             libGL
             libglvnd
             mesa
-          ];
+          ]) ++ sdl3PcDeps;
 
           cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" "-DPROJECT_VERSION_FULL=${version}" ];
 
@@ -79,38 +105,23 @@
             cp ${countries10m} assets/countries_10m.geojson
           '';
 
-          installPhase = ''
-            runHook preInstall
-            mkdir -p $out/bin $out/share/globtoo/{assets,shaders}
-            cp globtoo $out/bin/globtoo-bin
-            cp assets/earth.jpg $out/share/globtoo/assets/
-            cp generated-assets/countries_50m.gmesh $out/share/globtoo/assets/
-            cp generated-assets/countries_10m.gmesh $out/share/globtoo/assets/
-            cp -r ${./shaders}/* $out/share/globtoo/shaders/ 2>/dev/null || true
-
-            # Thin wrapper so the binary finds its assets
-            cat > $out/bin/globtoo << WRAP
-            #!${pkgs.runtimeShell}
-            export GLOBE_ASSET_DIR="$out/share/globtoo"
-            cd "$out/share/globtoo"
-            exec $out/bin/globtoo-bin "\$@"
-            WRAP
-            chmod +x $out/bin/globtoo
-            runHook postInstall
-          '';
+          # cmake --install installs binary, shared resources, launcher,
+          # hicolor icon, AppStream metadata, manual and license. The binary
+          # locates share/globtoo relative to itself; no cd/wrapper required.
 
           meta = with pkgs.lib; {
-            description = "globtoo – tactile free-spinning Earth globe (texture fetched at build time)";
+            description = "Interactive 3D Earth globe with animated 2D projections";
             license = licenses.mit;
             platforms = platforms.linux;
+            mainProgram = "globtoo";
           };
         };
 
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
+          packages = (with pkgs; [
             cmake pkg-config sdl3 geos libGL libglvnd mesa
             gdb clang-tools curl
-          ];
+          ]) ++ sdl3PcDeps;
           shellHook = ''
             echo "Dev shell ready."
             echo "Texture is fetched by the flake at build time (see flake.nix earthTexture)."

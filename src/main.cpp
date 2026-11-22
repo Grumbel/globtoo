@@ -14,6 +14,8 @@
 #include "ui.hpp"
 #include "map_view.hpp"
 #include "markers.hpp"
+#include "resources.hpp"
+#include "stb_image.h"
 
 #ifndef GLOBTOO_VERSION
 #error "GLOBTOO_VERSION must be provided by CMake"
@@ -22,7 +24,24 @@
 static SDL_Window*   window  = nullptr;
 static SDL_GLContext glctx   = nullptr;
 
+static void set_application_icon() {
+    const std::string path = resource_path("assets/globtoo-icon.png");
+    int w = 0, h = 0, source_channels = 0;
+    unsigned char* pixels = stbi_load(path.c_str(), &w, &h, &source_channels, 4);
+    if (!pixels) return; // Icon is optional for source-tree test builds.
+    SDL_Surface* surface = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_RGBA32, pixels, w * 4);
+    if (surface) {
+        SDL_SetWindowIcon(window, surface);
+        SDL_DestroySurface(surface);
+    }
+    stbi_image_free(pixels);
+}
+
+
 static bool init_sdl(int w, int h) {
+    // Used by desktop environments (notably Wayland) to associate the window
+    // with io.github.Grumbel.globtoo.desktop and its installed icon.
+    SDL_SetAppMetadata("Globtoo", GLOBTOO_VERSION, "io.github.Grumbel.globtoo");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         return false;
@@ -47,6 +66,8 @@ static bool init_sdl(int w, int h) {
         return false;
     }
 
+    resources_set_executable_dir(SDL_GetBasePath() ? SDL_GetBasePath() : "");
+    set_application_icon();
     SDL_GL_SetSwapInterval(1);
     return true;
 }
@@ -73,16 +94,11 @@ int main(int argc, char** argv) {
     if (!init_sdl(width, height))
         return 1;
 
-    const char* tex_path = "assets/earth.jpg";
-    if (!options.texture_path.empty()) {
-        tex_path = options.texture_path.c_str();
-    } else if (const char* asset_dir = std::getenv("GLOBE_ASSET_DIR")) {
-        static std::string path = std::string(asset_dir) + "/assets/earth.jpg";
-        tex_path = path.c_str();
-    }
+    const std::string texture = options.texture_path.empty()
+        ? resource_path("assets/earth.jpg") : options.texture_path;
 
     Globe globe{};
-    if (!globe_init(globe, tex_path)) {
+    if (!globe_init(globe, texture.c_str())) {
         fprintf(stderr, "globe_init failed\n");
         return 1;
     }

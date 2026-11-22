@@ -1,0 +1,58 @@
+#include "resources.hpp"
+
+#include <cstdlib>
+#include <filesystem>
+#include <string>
+#include <utility>
+
+namespace {
+namespace fs = std::filesystem;
+std::string executable_dir;
+
+bool regular_file(const fs::path& path) {
+    std::error_code ec;
+    return fs::is_regular_file(path, ec);
+}
+
+std::string path_string(const fs::path& path) {
+    return path.lexically_normal().string();
+}
+}
+
+void resources_set_executable_dir(std::string directory) {
+    executable_dir = std::move(directory);
+}
+
+std::string resource_path(std::string_view relative_path) {
+    const fs::path relative(relative_path);
+    if (relative.is_absolute()) return path_string(relative);
+
+    // Explicit asset directory: useful with portable installs and custom maps.
+    if (const char* override_dir = std::getenv("GLOBE_ASSET_DIR")) {
+        if (*override_dir) return path_string(fs::path(override_dir) / relative);
+    }
+
+    // From the source tree (including `cmake --build` run from the repo).
+    if (regular_file(relative)) return path_string(relative);
+
+    if (!executable_dir.empty()) {
+        const fs::path bin = fs::path(executable_dir);
+        // Build-tree layout: POST_BUILD copies shaders/assets beside the app.
+        if (regular_file(bin / relative)) return path_string(bin / relative);
+
+        // Installed layout. Resolve relative to executable, not process cwd;
+        // this also allows the installation prefix to be moved later.
+#ifdef GLOBTOO_INSTALL_DATADIR
+        const fs::path installed = bin / ".." / GLOBTOO_INSTALL_DATADIR / "globtoo" / relative;
+        if (regular_file(installed)) return path_string(installed);
+#endif
+    }
+
+    // The configured path also handles non-standard absolute install bindirs.
+#ifdef GLOBTOO_INSTALL_RESOURCE_DIR
+    const fs::path configured = fs::path(GLOBTOO_INSTALL_RESOURCE_DIR) / relative;
+    if (regular_file(configured)) return path_string(configured);
+#endif
+
+    return path_string(relative); // Diagnostic from caller shows missing file.
+}

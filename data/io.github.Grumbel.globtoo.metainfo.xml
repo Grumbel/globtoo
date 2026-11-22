@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.Grumbel.globtoo</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Globtoo</name>
+  <summary>Explore Earth with an interactive 3D globe and projected maps</summary>
+  <description>
+    <p>Globtoo is an interactive globe and map viewer built with SDL3 and OpenGL ES.
+    Rotate the Earth, zoom into countries, and unfold the globe into flat maps
+    using animated projections.</p>
+    <p>View English country names and borders, blend political colors with Earth
+    imagery, display an adaptive geographic grid and distance scale, or mark
+    locations using command-line coordinates.</p>
+  </description>
+  <launchable type="desktop-id">io.github.Grumbel.globtoo.desktop</launchable>
+  <categories>
+    <category>Education</category>
+    <category>Science</category>
+    <category>Geography</category>
+  </categories>
+  <content_rating type="oars-1.1" />
+</component>

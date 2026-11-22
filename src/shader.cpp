@@ -1,12 +1,14 @@
 #include "shader.hpp"
+#include "resources.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 
 static std::string read_file(const char* path) {
-    FILE* f = fopen(path, "rb");
+    const std::string location = resource_path(path);
+    FILE* f = fopen(location.c_str(), "rb");
     if (!f) {
-        fprintf(stderr, "Failed to open %s\n", path);
+        fprintf(stderr, "Failed to open %s\n", location.c_str());
         return {};
     }
     fseek(f, 0, SEEK_END);

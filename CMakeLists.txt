@@ -45,6 +45,7 @@ message(STATUS "Globtoo version: ${PROJECT_VERSION_FULL}")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+include(GNUInstallDirs)
 
 option(GLOBTOO_BUILD_APP "Build the SDL3 + GLES2 globe viewer" ON)
 find_path(GEOS_INCLUDE_DIR geos_c.h REQUIRED)
@@ -73,6 +74,7 @@ add_executable(globtoo
   src/scene.cpp
   src/ui.cpp
   src/markers.cpp
+  src/resources.cpp
 )
 
 target_include_directories(globtoo PRIVATE
@@ -91,7 +93,10 @@ target_link_libraries(globtoo PRIVATE
 )
 
 target_compile_options(globtoo PRIVATE -Wall -Wextra -O2)
-target_compile_definitions(globtoo PRIVATE GLOBTOO_VERSION="${PROJECT_VERSION_FULL}")
+target_compile_definitions(globtoo PRIVATE
+  GLOBTOO_VERSION="${PROJECT_VERSION_FULL}"
+  GLOBTOO_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}"
+  GLOBTOO_INSTALL_RESOURCE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/globtoo")
 endif()
 
 # Triangulate both Natural Earth resolutions while building, not at startup.
@@ -140,8 +145,49 @@ if(COUNTRY_MESH_OUTPUTS)
 endif()
 endif()
 
+# Standard installation: no current-working-directory assumptions or Nix-only
+# shell copy logic. The GeoJSON sources stay out of the package; only their
+# compiled, versioned binary meshes are needed at runtime.
+if(GLOBTOO_BUILD_APP)
+  install(TARGETS globtoo RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  install(DIRECTORY "${CMAKE_SOURCE_DIR}/shaders/"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/shaders")
+  install(DIRECTORY "${CMAKE_SOURCE_DIR}/assets/"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets"
+    FILES_MATCHING PATTERN "*.jpg" PATTERN "*.jpeg" PATTERN "*.png"
+      PATTERN "*.gmesh" PATTERN "countries.geojson")
+  if(COUNTRY_MESH_OUTPUTS)
+    install(FILES ${COUNTRY_MESH_OUTPUTS}
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
+  endif()
+  install(FILES "${CMAKE_SOURCE_DIR}/data/io.github.Grumbel.globtoo.desktop"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+  install(FILES "${CMAKE_SOURCE_DIR}/data/io.github.Grumbel.globtoo.metainfo.xml"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo")
+  foreach(size 32 48 64 128 256)
+    install(FILES "${CMAKE_SOURCE_DIR}/data/icons/globtoo-${size}.png"
+      RENAME "globtoo.png"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps")
+  endforeach()
+  configure_file("${CMAKE_SOURCE_DIR}/data/globtoo.1.in"
+    "${CMAKE_BINARY_DIR}/globtoo.1" @ONLY)
+  install(FILES "${CMAKE_BINARY_DIR}/globtoo.1"
+    DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
+  install(FILES "${CMAKE_SOURCE_DIR}/LICENSE" "${CMAKE_SOURCE_DIR}/README.md"
+    "${CMAKE_SOURCE_DIR}/data/CREDITS.md"
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}")
+  install(DIRECTORY "${CMAKE_SOURCE_DIR}/docs/"
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}/docs"
+    FILES_MATCHING PATTERN "*.md")
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(resources_test tests/resources_test.cpp src/resources.cpp)
+  target_include_directories(resources_test PRIVATE src)
+  target_compile_definitions(resources_test PRIVATE
+    GLOBTOO_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
+  add_test(NAME resources COMMAND resources_test)
   if(GLOBTOO_BUILD_APP)
     add_executable(input_mouse_test
       tests/input_mouse_test.cpp src/input.cpp src/map_view.cpp src/camera.cpp)

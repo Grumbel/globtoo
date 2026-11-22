@@ -15,6 +15,40 @@ nix build
 ./result/bin/globtoo
 ```
 
+The Nix build installs an ordinary executable plus the application desktop
+entry, icons, manual, AppStream metadata, and resources. It no longer requires
+a launcher that changes the process working directory. To inspect a packaged
+build, use `find result -type f` or `man -l result/share/man/man1/globtoo.1`.
+
+## Install with CMake (Linux)
+
+Dependencies: C++20 compiler, CMake 3.16+, SDL3, OpenGL ES 2.0/EGL, GEOS
+and pkg-config. For a complete political map, provide the Natural Earth
+50m/10m GeoJSON inputs under `assets/` before configuring (Nix downloads them
+automatically). A plain source build otherwise uses the small development
+texture placeholder and can run without country polygons.
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+cmake --install build --prefix "$HOME/.local"
+"$HOME/.local/bin/globtoo" --version
+```
+
+For a system-wide installation use a suitable `--prefix` (for example,
+`/usr/local`). CMake installs `bin/globtoo`,
+`share/globtoo/{assets,shaders}`, `share/applications/`, hicolor icons,
+`share/metainfo/`, `share/man/man1/globtoo.1`, and licensing information.
+You can run the binary from any directory; the executable finds its resources
+relative to its install location. Set `GLOBE_ASSET_DIR` to override that
+location, including for portable/custom texture and map installations.
+
+The on-screen application icon is installed both for desktop launchers and as
+the SDL window icon. Run `man globtoo` after installing to a prefix on your
+manpage search path.
+
+See [Release and packaging](docs/RELEASE.md) for version tagging and checks.
+
 Or development shell:
 
 ```bash

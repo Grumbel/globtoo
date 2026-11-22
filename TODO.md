@@ -13,6 +13,10 @@
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] CMake install target and Nix packaging through standard cmake install
+- [x] Desktop launcher and AppStream metadata; custom multi-size icon and SDL window icon
+- [x] Versioned man page, license and asset credits, release checklist
+- [x] Installed shader/texture/country resource lookup independent of cwd
 - [x] Middle-button screen-space grab/pan for 2D projections, separate from left-drag Earth rotation; seamless cylindrical wrap
 - [x] Repeatable CLI markers (decimal, compass, DMS, decimal minutes, Geo URI,
       ISO 6709) with optional labels, CSV import, pin colors/sizes and explicit view center

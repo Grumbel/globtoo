@@ -1,0 +1,117 @@
+.TH GLOBTOO 1 "2026-11" "Globtoo @PROJECT_VERSION_FULL@" "User Commands"
+.SH NAME
+globtoo \- interactive 3D Earth globe and projected world maps
+.SH SYNOPSIS
+.B globtoo
+.RI [ options ]
+.RI [ earth-texture.jpg ]
+.SH DESCRIPTION
+.B globtoo
+is a tactile Earth viewer with a freely rotatable 3D globe, smooth zoom,
+animated transitions to four flat projections, country borders and names,
+and an optional geographic grid and distance scale.
+The starting view is oriented to the system timezone unless overridden with
+.BR \-\-center .
+.PP
+The on-screen toolbar controls projection, shading, texture, political
+colors, borders, labels, and grid. It also includes a compass and reset control.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show full command-line help and exit without initializing graphics.
+.TP
+.BR \-V ", " \-\-version
+Print the full version (including Git metadata on development builds) and exit.
+.TP
+.BI \-m\  "COORDS" ", " \-\-marker\  "COORDS"
+Add a geographic marker. Append
+.BI "|" label
+inside the coordinate argument to label it. Repeat as needed.
+.TP
+.BI \-\-marker-lonlat\  "COORDS"
+Add a marker using longitude,latitude order (common in GIS formats).
+.TP
+.BI \-l\  "TEXT" ", " \-\-label\  "TEXT"
+Set the label of the most recently added marker.
+.TP
+.BI \-\-marker-file\  "FILE"
+Read a file containing latitude,longitude[,label] CSV records or
+coordinate | label records. Blank lines and comments are ignored.
+.TP
+.BI \-\-marker-color\  "#RRGGBB"
+Set the color of subsequently added markers (default: #FFC54B).
+.TP
+.BI \-\-marker-size\  "PIXELS"
+Set the radius in pixels (2 through 32) of subsequently added markers.
+.TP
+.BI \-\-center\  "COORDS"
+Center the startup view on the given latitude,longitude.
+.TP
+.BI \-\-texture\  "FILE"
+Load the supplied equirectangular Earth image instead of the built-in one.
+A positional file name may be used for compatibility.
+.SH COORDINATES
+By default, coordinate pairs are latitude first, longitude second, in degrees.
+North and east are positive. Accepted forms include:
+.TP
+.B "52.5200,13.4050"
+Decimal degrees (Berlin).
+.TP
+.B "51.5074 N, 0.1278 W"
+Hemisphere letters, prefixed or suffixed.
+.TP
+.B "51:30:26N, 0:07:39W"
+Degrees, minutes, seconds; symbols are accepted too.
+.TP
+.B "51\(de30.5'N, 0\(de7.25'W"
+Degrees and decimal minutes.
+.TP
+.B "geo:52.52,13.405"
+RFC 5870 Geo URI (altitude is accepted but not displayed).
+.TP
+.B "+52.52+013.405/"
+ISO 6709 signed coordinate pair.
+.SH MOUSE CONTROLS
+.TP
+.B Left-drag
+Rotate the globe, or rotate and reproject Earth in a flat map.
+.TP
+.B Middle-drag
+Pan the 2D map like a paper sheet, without rotating geography.
+.TP
+.B Shift + left-drag
+Roll the map around the view center.
+.TP
+.B Mouse wheel
+Zoom in or out.
+.SH VIEWS
+The GUI provides a globe and four projections: equirectangular (Plate
+Carr\('ee), Mercator, Mollweide, and Hammer. The map transforms smoothly
+between the views. Layers can be independently enabled, including blending
+Earth texture beneath translucent political colors.
+.SH ENVIRONMENT
+.TP
+.B GLOBE_ASSET_DIR
+Optional override for the resource directory, which should contain
+.B assets/
+and
+.B shaders/
+subdirectories. Otherwise, Globtoo searches next to a development binary
+or in its installation data directory. The executable can be launched from
+any working directory.
+.SH FILES
+.TP
+.I @CMAKE_INSTALL_FULL_DATADIR@/globtoo/
+Installed Earth imagery, compiled country meshes, and shaders.
+.TP
+.I @CMAKE_INSTALL_FULL_DATADIR@/applications/io.github.Grumbel.globtoo.desktop
+Desktop launcher.
+.SH EXAMPLES
+.nf
+.B globtoo --marker '52.52,13.405|Berlin'
+.B globtoo --marker 'geo:48.8583,2.2945' --label 'Eiffel Tower'
+.B globtoo --marker-file places.csv --center '48.8583,2.2945'
+.fi
+.SH SEE ALSO
+The Globtoo README and the included docs/MARKERS.md document further
+formats and navigation details.
