@@ -54,6 +54,62 @@ Globtoo discovers installed planetary maps when switching bodies, while an
 explicit `--body-texture` overrides the installed file. The application does
 not download any textures without user action.
 
+## High-resolution tiled Moon, Mars and Io imagery
+
+For full-world mosaics wider than a GLES2 texture limit, use the **same
+power-of-two, lazily uploaded tile pipeline** as Earth imagery instead of
+reducing the whole map to 2048 pixels. The tile preparer understands the
+source longitude convention directly: it mirrors/rotates **per tile** and
+normalizes the overview without allocating a second full-size mosaic.
+
+For example, given a locally obtained **planetocentric, north-up, 2:1,
+full-world** Io color mosaic that has west-positive longitudes and a 0°W
+left boundary (verify these claims against the actual product metadata):
+
+```sh
+python3 tools/build_raster_tiles.py /data/io-source.tif /data/io-tiles \
+  --positive west --left 0
+
+globtoo --body io --body-imagery-dir io=/data/io-tiles
+```
+
+`--body-imagery-dir moon=DIR`, `mars=DIR`, and `earth=DIR` can be repeated,
+so the `M` key and NEXT BODY button retain separate tile sources. The legacy
+`--imagery-dir DIR` remains the Earth shortcut. An explicit source directory
+must contain `manifest.txt`, `preview.jpg`, and `tile-NNN-NNN.jpg` files.
+For normal startup and mid-projection morphs the small preview is used; at
+close zoom, tiles are loaded lazily with the existing bounded GPU cache. The
+application never accesses the network while drawing or changing bodies.
+
+CMake can also package the mosaics under
+`share/globtoo/imagery/{moon,mars,io}/` for automatic detection:
+
+```sh
+cmake -S . -B build \
+  -DGLOBTOO_IO_IMAGERY_TEXTURE=/data/io-source.tif \
+  -DGLOBTOO_IO_LONGITUDE_POSITIVE=west \
+  -DGLOBTOO_IO_LONGITUDE_LEFT=0 \
+  -DGLOBTOO_IO_LATITUDE_TYPE=planetocentric \
+  '-DGLOBTOO_IO_SOURCE=Exact product identifier and URL' \
+  '-DGLOBTOO_IO_LICENSE=Verified redistribution terms'
+cmake --build build
+cmake --install build
+```
+
+Equivalent `GLOBTOO_MOON_IMAGERY_TEXTURE` and
+`GLOBTOO_MARS_IMAGERY_TEXTURE` inputs are available, including when a small
+per-body `*_TEXTURE` is not provided. The installed tiles include a
+`source.txt` record of the supplied provenance and original longitude
+convention. CMake rejects missing source metadata, unsupported longitude
+orientation or absent input files. The default packages do **not** bundle
+unverified source mosaics.
+
+This is **longitude-axis normalization**, not a general cartographic
+reprojection. Planetographic latitudes, global maps with displaced seams,
+regional swaths, positive-south latitudes, 360° endpoint duplication and
+non-equirectangular projections need conversion with planetary-aware GIS
+tools before tiling. The input's width must equal exactly twice its height.
+
 ## CMake packaging with provenance
 
 The build can prepare and install each planetary texture directly from its

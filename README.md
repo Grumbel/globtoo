@@ -13,7 +13,7 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Smooth zoom down to individual small countries
 - Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
 - Zoom-aware capitals, cities, and major rivers from Natural Earth 10m
-- Optional high-resolution tiled Earth imagery and Blue Marble relief for close-up views
+- Optional high-resolution tiled Earth, Moon, Mars and Io imagery (verified external source required for planetary maps) and Blue Marble relief for close-up views
 - Optional measured elevation/depth and population density (people/km²) layers
 
 ![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
@@ -64,7 +64,9 @@ the SDL window icon. Run `man globtoo` after installing to a prefix on your
 manpage search path.
 
 See [Raster layers and tiling](docs/RASTER_LAYERS.md) for high-resolution
-imagery and relief preparation and selection, [measured elevation and bathymetry](docs/ELEVATION.md),
+imagery and relief preparation and selection, and
+[planetary maps](docs/PLANETARY_MAPS.md) for converting and packaging
+large Moon, Mars and Io mosaics with correct longitude direction, [measured elevation and bathymetry](docs/ELEVATION.md),
 and [population-density maps](docs/POPULATION.md). The POP button and
 `--layer population --population-dir DIR` select locally compiled density
 raster tiles. Original density data and its reference year are supplied
@@ -121,7 +123,8 @@ Use `--marker` / `-m` repeatedly, `--label` / `-l` for the previous pin,
 `--texture` (or the legacy positional filename) for a custom Earth image.
 `--layer imagery|relief|elevation|population` selects the starting raster;
 `--imagery-dir DIR` supplies higher-resolution true-color close-up tiles
-for the normal Imagery mode, `--relief-dir DIR` supplies a separate visual relief
+for the normal Imagery mode, `--body-imagery-dir moon=DIR` (also Mars and Io)
+provides independent high-resolution planetary tiles, `--relief-dir DIR` supplies a separate visual relief
 layer, and `--elevation-dir DIR` uses a measured elevation/bathymetry tile set
 with a physical-unit legend.
 By default the starting viewpoint still follows the local timezone.

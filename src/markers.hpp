@@ -33,6 +33,7 @@ struct CommandLine {
     std::array<std::string,body_catalog.size()> body_textures{};
     std::string surface_layer = "imagery";
     std::string imagery_dir;
+    std::array<std::string,body_catalog.size()> body_imagery_dirs{};
     std::string relief_dir;
     std::string elevation_dir;
     std::string population_dir;

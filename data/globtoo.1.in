@@ -66,6 +66,23 @@ folder must contain a valid
 .B manifest.txt
 and the generated tiles.
 .TP
+.BI \--body\  "earth|moon|mars|io"
+Select the body whose globe or projected map is displayed. Press M or
+use NEXT BODY to cycle bodies. Earth-only country, city, river and thematic
+layers are suppressed on other bodies.
+.TP
+.BI \--body-texture\  "BODY=FILE"
+Use a normalized small equirectangular texture for the selected body;
+repeatable. See the planetary maps documentation for source longitude
+conventions.
+.TP
+.BI \--body-imagery-dir\  "BODY=DIR"
+Provide high-resolution tiles for Earth, Moon, Mars or Io. Repeatable;
+the manifest, 2048-pixel preview and power-of-two tiles are loaded from the
+specified directory. The source must be normalized to east-positive,
+north-up, 180 degrees west at the left edge. The build-time tile converter
+can perform longitude-direction and 0/180-degree seam normalization.
+.TP
 .BI \--relief-dir\  "DIR"
 Use a locally prepared high-resolution raster tile set, with
 .B manifest.txt
@@ -170,7 +187,8 @@ Optional override for the resource directory, which should contain
 .B assets/
 and
 .B shaders/
-subdirectories, and optionally \fBimagery/\fR, \fBrelief/\fR, \fBelevation/\fR and \fBpopulation/\fR directories. Otherwise,
+subdirectories, and optionally \fBimagery/\fR (with \fBimagery/moon/\fR etc.),
+\fBrelief/\fR, \fBelevation/\fR and \fBpopulation/\fR directories. Otherwise,
 Globtoo searches next to a development binary
 or in its installation data directory. The executable can be launched from
 any working directory.

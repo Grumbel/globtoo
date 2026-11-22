@@ -35,9 +35,21 @@ bool globe_init(Globe& g, const char* texture_path,
             if (std::filesystem::is_regular_file(installed)) path = installed;
         }
     }
+    // Each body's imagery has its own cache and preview; swapping bodies must
+    // never reuse Earth's raster or an unrelated planetary mosaic.
+    for (const BodyInfo& body : body_catalog) {
+        const auto index=static_cast<std::size_t>(body.id);
+        std::string path=g.body_imagery_manifests[index];
+        if (body.id==BodyId::Earth && imagery_manifest_path)
+            path=imagery_manifest_path;
+        if (path.empty()) {
+            path=resource_path(body.default_imagery_manifest);
+        }
+        raster_cache_init(g.imagery[index],path);
+    }
+    // Initial body loads after the tile caches, so missing-map warnings only
+    // appear if neither a single texture nor tiles are available.
     globe_select_body(g, g.body);
-    raster_cache_init(g.imagery, imagery_manifest_path ? imagery_manifest_path :
-                                         resource_path("imagery/manifest.txt"));
     raster_cache_init(g.relief, relief_manifest_path ? relief_manifest_path :
                                          resource_path("relief/manifest.txt"));
     if (raster_cache_init(g.elevation, elevation_manifest_path ? elevation_manifest_path :
@@ -54,7 +66,7 @@ bool globe_init(Globe& g, const char* texture_path,
         raster_cache_shutdown(g.population);
     }
     if (g.body == BodyId::Earth && !g.texture.id) {
-        fprintf(stderr, "%s\n", g.imagery.valid()
+        fprintf(stderr, "%s\n", g.imagery[0].valid()
                 ? "Base Earth texture unavailable; using imagery-tile preview"
                 : "Failed to load earth texture – using solid color fallback");
     }
@@ -70,7 +82,7 @@ void globe_select_body(Globe& g, BodyId body) {
     const std::string& path=g.body_textures[static_cast<std::size_t>(body)];
     if (!path.empty() && std::filesystem::is_regular_file(path)) {
         g.texture=load_texture(path.c_str());
-    } else if (body!=BodyId::Earth) {
+    } else if (body!=BodyId::Earth && !g.imagery[static_cast<std::size_t>(body)].valid()) {
         std::fprintf(stderr,"%.*s: no surface map installed; showing untextured sphere.\n",
                      static_cast<int>(body_info(body).name.size()),
                      body_info(body).name.data());
@@ -81,7 +93,7 @@ void globe_shutdown(Globe& g) {
     destroy_mesh(g.mesh);
     destroy_shader(g.shader);
     destroy_texture(g.texture);
-    raster_cache_shutdown(g.imagery);
+    for (auto& imagery : g.imagery) raster_cache_shutdown(imagery);
     raster_cache_shutdown(g.relief);
     raster_cache_shutdown(g.elevation);
     raster_cache_shutdown(g.population);
@@ -89,8 +101,9 @@ void globe_shutdown(Globe& g) {
 
 void globe_draw(Globe& g, const Camera& cam, float aspect,
                 const MapView& map) {
-    RasterCache* raster = g.body!=BodyId::Earth ? nullptr :
-                          g.surface==SurfaceLayer::Imagery ? &g.imagery :
+    RasterCache* raster = g.surface==SurfaceLayer::Imagery
+                         ? &g.imagery[static_cast<std::size_t>(g.body)] :
+                         g.body!=BodyId::Earth ? nullptr :
                          g.surface==SurfaceLayer::Relief ? &g.relief :
                          g.surface==SurfaceLayer::Elevation ? &g.elevation :
                          g.surface==SurfaceLayer::Population ? &g.population : nullptr;

@@ -70,6 +70,17 @@ int main() {
         assert(planetary.body_textures[static_cast<std::size_t>(BodyId::Moon)]=="moon.jpg");
         assert(planetary.body_textures[static_cast<std::size_t>(BodyId::Mars)]=="mars.jpg");
         assert(planetary.texture_path=="override.jpg");
+        const char* tiled[]={"globtoo","--body-imagery-dir","mars=/maps/mars",
+                             "--body-imagery-dir=io=/maps/io","--body-imagery-dir",
+                             "earth=/maps/earth"};
+        assert(parse_command_line(static_cast<int>(std::size(tiled)),tiled,planetary,err));
+        assert(planetary.body_imagery_dirs[static_cast<std::size_t>(BodyId::Mars)]=="/maps/mars");
+        assert(planetary.body_imagery_dirs[static_cast<std::size_t>(BodyId::Io)]=="/maps/io");
+        assert(planetary.body_imagery_dirs[static_cast<std::size_t>(BodyId::Earth)]=="/maps/earth");
+        const char* bad_tiles[]={"globtoo","--body-imagery-dir","jupiter=/maps/jupiter"};
+        assert(!parse_command_line(3,bad_tiles,planetary,err));
+        const char* empty_tiles[]={"globtoo","--body-imagery-dir=io="};
+        assert(!parse_command_line(2,empty_tiles,planetary,err));
         const char* invalid[]={"globtoo","--body","venus"};
         assert(!parse_command_line(static_cast<int>(std::size(invalid)),invalid,planetary,err));
     }

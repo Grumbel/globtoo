@@ -9,7 +9,7 @@ keep bilinear filtering and mipmaps continuous at tile borders and the dateline.
 import argparse
 import math
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageOps
 
 # NASA's 21600x10800 global image is 233 million pixels, above Pillow's
 # default decompression-bomb warning/error threshold. This known use case is
@@ -17,7 +17,56 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = 250_000_000
 
 
-def build(source, destination, tile_size=1024, gutter=4):
+def _oriented_strip(image, tile, x_begin, x_end, y0, y1, y_begin,
+                    positive, left):
+    """Paste source strips in canonical -180..180 east-positive pixel order.
+
+    Only crop strips needed by a tile. Mirroring or half-turning a 21600x10800
+    mosaic in its entirety would require another ~700 MiB of memory.
+    Pixel-center transforms match normalize_planet_texture.normalize exactly.
+    """
+    width = image.width
+    half = width // 2 if left == 0 else 0
+    reverse = positive == 'west'
+
+    def source_x(output_x):
+        x = (output_x + half) % width
+        return width - 1 - x if reverse else x
+
+    x = x_begin
+    while x < x_end:
+        start = x
+        first = source_x(x)
+        last = first
+        x += 1
+        step = -1 if reverse else 1
+        while x < x_end and source_x(x) == last + step:
+            last = source_x(x)
+            x += 1
+        patch = image.crop((min(first, last), y0, max(first, last)+1, y1))
+        if reverse:
+            patch = ImageOps.mirror(patch)
+        tile.paste(patch, (start - x_begin, y0 - y_begin))
+
+
+def _oriented_preview(image, positive, left):
+    # Apply exactly the same ordering as the full-resolution strips, but only
+    # after reducing the preview to 2048x1024 pixels.
+    if positive == 'west':
+        image = ImageOps.mirror(image)
+    if left == 0:
+        half = image.width // 2
+        result = Image.new('RGB', image.size)
+        result.paste(image.crop((half, 0, image.width, image.height)), (0, 0))
+        result.paste(image.crop((0, 0, half, image.height)), (half, 0))
+        image = result
+    return image
+
+
+def build(source, destination, tile_size=1024, gutter=4,
+          positive='east', left=180):
+    if positive not in ('east', 'west') or left not in (0, 180):
+        raise ValueError('longitude must be east|west with left boundary 0|180')
     if tile_size & (tile_size - 1) or tile_size < 64 or tile_size > 2048:
         raise ValueError("tile size must be a power of two in [64, 2048]")
     if not 2 <= gutter <= 16 or gutter * 2 >= tile_size:
@@ -25,12 +74,12 @@ def build(source, destination, tile_size=1024, gutter=4):
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
     with Image.open(source) as image:
-        image = image.convert('RGB')
         width, height = image.size
         if width * height > 250_000_000:
             raise ValueError("raster exceeds the 250-megapixel build limit")
         if width != 2 * height:
             raise ValueError("expected a north-up, full-world 2:1 equirectangular raster")
+        image = image.convert('RGB')
         content = tile_size - 2 * gutter
         columns, rows = math.ceil(width / content), math.ceil(height / content)
         if columns * rows > 8192:
@@ -39,21 +88,19 @@ def build(source, destination, tile_size=1024, gutter=4):
         # GL_LINEAR_MIPMAP_LINEAR legal even on strict GLES2 NPOT hardware.
         for row in range(rows):
             for column in range(columns):
-                left, top = column * content, row * content
-                cell_w = min(content, width - left)
+                tile_left, top = column * content, row * content
+                cell_w = min(content, width - tile_left)
                 cell_h = min(content, height - top)
                 tile = Image.new('RGB', (tile_size, tile_size))
                 # Copy contiguous strips, wrapping at the longitude seam.
                 # All operations are Pillow block copies (no Python per-pixel
                 # loops, even for a 21600x10800 NASA image).
-                x_begin, x_end = left - gutter, left + cell_w + gutter
+                x_begin, x_end = tile_left - gutter, tile_left + cell_w + gutter
                 y_begin, y_end = top - gutter, top + cell_h + gutter
                 y0, y1 = max(0, y_begin), min(height, y_end)
-                for wrap in (-width, 0, width):
-                    xa, xb = max(x_begin, wrap), min(x_end, wrap + width)
-                    if xa < xb and y0 < y1:
-                        part = image.crop((xa-wrap, y0, xb-wrap, y1))
-                        tile.paste(part, (xa-x_begin, y0-y_begin))
+                if y0 < y1:
+                    _oriented_strip(image, tile, x_begin, x_end, y0, y1,
+                                    y_begin, positive, left)
                 valid_w, valid_h = cell_w+2*gutter, cell_h+2*gutter
                 if y_begin < 0:
                     edge = tile.crop((0, -y_begin, valid_w, -y_begin+1))
@@ -75,9 +122,11 @@ def build(source, destination, tile_size=1024, gutter=4):
                           quality=93, subsampling=0)
         # Use a small preview for zoomed-out views; loading its full resolution
         # cannot exceed GLES2's ubiquitous 2048x2048 limit.
-        preview = image.resize((2048, 1024), Image.Resampling.LANCZOS)
+        preview = _oriented_preview(
+            image.resize((2048, 1024), Image.Resampling.LANCZOS), positive, left)
         preview.save(destination / 'preview.jpg', quality=90)
-        preview_small = image.resize((1024, 512), Image.Resampling.LANCZOS)
+        preview_small = _oriented_preview(
+            image.resize((1024, 512), Image.Resampling.LANCZOS), positive, left)
         preview_small.save(destination / 'preview-small.jpg', quality=90)
         (destination / 'manifest.txt').write_text(
             f'GLOBTOO_RASTER_TILES 1\n{width} {height} {tile_size} {gutter} {columns} {rows}\n',
@@ -91,9 +140,14 @@ def main():
     ap.add_argument('output')
     ap.add_argument('--tile-size', type=int, default=1024)
     ap.add_argument('--gutter', type=int, default=4)
+    ap.add_argument('--positive', choices=('east','west'), default='east',
+                    help='source longitude-positive direction (default east)')
+    ap.add_argument('--left', type=int, choices=(0, 180), default=180,
+                    help='source left longitude boundary (default 180)')
     args = ap.parse_args()
     print('Created %d x %d raster tiles' % build(args.source, args.output,
-                                                  args.tile_size, args.gutter))
+                                                  args.tile_size, args.gutter,
+                                                  args.positive, args.left))
 
 
 if __name__ == '__main__':

@@ -18,7 +18,7 @@ struct Globe {
     Mesh    mesh;
     Shader  shader;
     Texture texture;
-    RasterCache imagery;
+    std::array<RasterCache,body_catalog.size()> imagery;
     RasterCache relief;
     RasterCache elevation;
     RasterCache population;
@@ -26,6 +26,9 @@ struct Globe {
     // Earth is shipped with a default map; planetary textures are supplied
     // explicitly via CLI until reviewed source assets have been packaged.
     std::array<std::string,body_catalog.size()> body_textures{};
+    // Manifest overrides for per-body high-resolution imagery tiles.
+    // Earth also accepts the legacy --imagery-dir shorthand.
+    std::array<std::string,body_catalog.size()> body_imagery_manifests{};
     SurfaceLayer surface = SurfaceLayer::Imagery;
     bool    shading = true;
     bool    texture_visible = true;  // Independent of political country colors

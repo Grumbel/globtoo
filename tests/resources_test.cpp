@@ -19,6 +19,8 @@ int main() {
     fs::create_directories(base / "bin" / "assets");
     fs::create_directories(base / "share" / "globtoo" / "assets");
     fs::create_directories(base / "cwd" / "assets");
+    fs::create_directories(base / "share" / "globtoo" / "imagery" / "mars");
+    fs::create_directories(base / "bin" / "imagery" / "moon");
     std::ofstream(base / "bin" / "shaders" / "test.vert") << "build";
     std::ofstream(base / "share" / "globtoo" / "shaders" / "installed.vert") << "installed";
     std::ofstream(base / "bin" / "assets" / "earth.jpg") << "real-build-texture";
@@ -27,6 +29,8 @@ int main() {
     // resource paths must work independently of the current directory.
     std::ofstream(base / "share" / "globtoo" / "assets" / "moon.jpg") << "lunar-map";
     std::ofstream(base / "bin" / "assets" / "mars.jpg") << "martian-map";
+    std::ofstream(base / "share" / "globtoo" / "imagery" / "mars" / "manifest.txt") << "mars-tiles";
+    std::ofstream(base / "bin" / "imagery" / "moon" / "manifest.txt") << "moon-tiles";
     std::ofstream(base / "cwd" / "assets" / "earth.jpg") << "obsolete-placeholder";
     const auto original_cwd = fs::current_path();
     fs::current_path(base / "cwd");
@@ -50,6 +54,12 @@ int main() {
 #endif
     assert(fs::equivalent(resource_path("assets/mars.jpg"),
                           base / "bin" / "assets" / "mars.jpg"));
+    assert(fs::equivalent(resource_path("imagery/moon/manifest.txt"),
+                          base / "bin" / "imagery" / "moon" / "manifest.txt"));
+#ifdef GLOBTOO_INSTALL_DATADIR
+    assert(fs::equivalent(resource_path("imagery/mars/manifest.txt"),
+                          base / "share" / "globtoo" / "imagery" / "mars" / "manifest.txt"));
+#endif
     // A lite install resolves explicitly downloaded textures under XDG.
     fs::create_directories(base / "cache" / "globtoo" / "assets");
     std::ofstream(base / "cache" / "globtoo" / "assets" / "earth.jpg") << "cached";

@@ -115,30 +115,36 @@ endif()
 set(GLOBTOO_PLANET_MAX_WIDTH 2048 CACHE STRING
     "Maximum width of normalized Moon/Mars/Io texture for GLES2")
 set(PLANET_TEXTURE_OUTPUTS)
+set(PLANET_IMAGERY_OUTPUTS)
 foreach(body moon mars io)
   string(TOUPPER "${body}" upper)
   set(GLOBTOO_${upper}_TEXTURE "" CACHE FILEPATH "Optional ${body} global plate-carree texture")
+  set(GLOBTOO_${upper}_IMAGERY_TEXTURE "" CACHE FILEPATH
+      "Optional high-resolution ${body} global mosaic to tile instead of uploading a huge GLES2 texture")
   set(GLOBTOO_${upper}_LONGITUDE_POSITIVE "" CACHE STRING "Source direction: east or west")
   set(GLOBTOO_${upper}_LONGITUDE_LEFT "" CACHE STRING "Source left boundary: 0 or 180 degrees")
   set(GLOBTOO_${upper}_SOURCE "" CACHE STRING "Source publication/URL for ${body} map")
   set(GLOBTOO_${upper}_LATITUDE_TYPE "" CACHE STRING "Source latitude: must be planetocentric")
   set(GLOBTOO_${upper}_LICENSE "" CACHE STRING "Verified redistributable license for ${body} map")
-  if(GLOBTOO_${upper}_TEXTURE)
-    if(NOT EXISTS "${GLOBTOO_${upper}_TEXTURE}")
-      message(FATAL_ERROR "GLOBTOO_${upper}_TEXTURE does not exist: ${GLOBTOO_${upper}_TEXTURE}")
-    endif()
+  if(GLOBTOO_${upper}_TEXTURE OR GLOBTOO_${upper}_IMAGERY_TEXTURE)
+    foreach(variable TEXTURE IMAGERY_TEXTURE)
+      if(GLOBTOO_${upper}_${variable} AND NOT EXISTS "${GLOBTOO_${upper}_${variable}}")
+        message(FATAL_ERROR "GLOBTOO_${upper}_${variable} does not exist: ${GLOBTOO_${upper}_${variable}}")
+      endif()
+    endforeach()
     if(NOT GLOBTOO_${upper}_SOURCE OR NOT GLOBTOO_${upper}_LICENSE OR
        NOT GLOBTOO_${upper}_LATITUDE_TYPE STREQUAL "planetocentric" OR
        NOT GLOBTOO_${upper}_LONGITUDE_POSITIVE MATCHES "^(east|west)$" OR
        NOT GLOBTOO_${upper}_LONGITUDE_LEFT MATCHES "^(0|180)$")
       message(FATAL_ERROR "${body} texture requires SOURCE, LICENSE, LATITUDE_TYPE=planetocentric, LONGITUDE_POSITIVE=east|west and LONGITUDE_LEFT=0|180")
     endif()
-    if(NOT GLOBTOO_PLANET_MAX_WIDTH MATCHES "^[0-9]+$" OR
-       GLOBTOO_PLANET_MAX_WIDTH LESS 2)
+    if(GLOBTOO_${upper}_TEXTURE AND
+       (NOT GLOBTOO_PLANET_MAX_WIDTH MATCHES "^[0-9]+$" OR
+        GLOBTOO_PLANET_MAX_WIDTH LESS 2))
       message(FATAL_ERROR "GLOBTOO_PLANET_MAX_WIDTH must be an even integer >= 2")
     endif()
     math(EXPR _planet_width_mod "${GLOBTOO_PLANET_MAX_WIDTH} % 2")
-    if(NOT _planet_width_mod EQUAL 0)
+    if(GLOBTOO_${upper}_TEXTURE AND NOT _planet_width_mod EQUAL 0)
       message(FATAL_ERROR "GLOBTOO_PLANET_MAX_WIDTH must be even")
     endif()
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -147,18 +153,20 @@ foreach(body moon mars io)
     if(NOT _planet_pillow EQUAL 0)
       message(FATAL_ERROR "Planet texture preprocessing requires Python Pillow")
     endif()
-    set(_planet_output "${CMAKE_BINARY_DIR}/generated-planetary/${body}.jpg")
-    add_custom_command(OUTPUT "${_planet_output}"
-      COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/normalize_planet_texture.py"
-        "${GLOBTOO_${upper}_TEXTURE}" "${_planet_output}"
-        --positive "${GLOBTOO_${upper}_LONGITUDE_POSITIVE}"
-        --left "${GLOBTOO_${upper}_LONGITUDE_LEFT}"
-        --max-width "${GLOBTOO_PLANET_MAX_WIDTH}"
-      DEPENDS "${GLOBTOO_${upper}_TEXTURE}"
-        "${CMAKE_SOURCE_DIR}/tools/normalize_planet_texture.py"
-      COMMENT "Normalizing ${body} global raster" VERBATIM)
-    add_custom_target(${body}_texture ALL DEPENDS "${_planet_output}")
-    list(APPEND PLANET_TEXTURE_OUTPUTS "${body}")
+    if(GLOBTOO_${upper}_TEXTURE)
+      set(_planet_output "${CMAKE_BINARY_DIR}/generated-planetary/${body}.jpg")
+      add_custom_command(OUTPUT "${_planet_output}"
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/normalize_planet_texture.py"
+          "${GLOBTOO_${upper}_TEXTURE}" "${_planet_output}"
+          --positive "${GLOBTOO_${upper}_LONGITUDE_POSITIVE}"
+          --left "${GLOBTOO_${upper}_LONGITUDE_LEFT}"
+          --max-width "${GLOBTOO_PLANET_MAX_WIDTH}"
+        DEPENDS "${GLOBTOO_${upper}_TEXTURE}"
+          "${CMAKE_SOURCE_DIR}/tools/normalize_planet_texture.py"
+        COMMENT "Normalizing ${body} global raster" VERBATIM)
+      add_custom_target(${body}_texture ALL DEPENDS "${_planet_output}")
+      list(APPEND PLANET_TEXTURE_OUTPUTS "${body}")
+    endif()
     # These records are installed with the normalized imagery; they explicitly
     # preserve the provenance/longitude semantics of the external source.
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated-planetary")
@@ -168,6 +176,23 @@ foreach(body moon mars io)
       "Original left longitude: ${GLOBTOO_${upper}_LONGITUDE_LEFT} degrees\n"
       "Source latitude type: ${GLOBTOO_${upper}_LATITUDE_TYPE}\n"
       "Output: north-up planetocentric east-positive -180..180 equirectangular\n")
+    if(GLOBTOO_${upper}_IMAGERY_TEXTURE)
+      set(_planet_tiles_dir "${CMAKE_BINARY_DIR}/generated-imagery/${body}")
+      file(MAKE_DIRECTORY "${_planet_tiles_dir}")
+      configure_file("${CMAKE_BINARY_DIR}/generated-planetary/${body}.source.txt"
+                     "${_planet_tiles_dir}/source.txt" COPYONLY)
+      set(_planet_tiles_manifest "${_planet_tiles_dir}/manifest.txt")
+      add_custom_command(OUTPUT "${_planet_tiles_manifest}"
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+          "${GLOBTOO_${upper}_IMAGERY_TEXTURE}" "${_planet_tiles_dir}"
+          --positive "${GLOBTOO_${upper}_LONGITUDE_POSITIVE}"
+          --left "${GLOBTOO_${upper}_LONGITUDE_LEFT}"
+        DEPENDS "${GLOBTOO_${upper}_IMAGERY_TEXTURE}"
+          "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+        COMMENT "Preparing oriented high-resolution ${body} GLES2 tiles" VERBATIM)
+      add_custom_target(${body}_imagery_tiles ALL DEPENDS "${_planet_tiles_manifest}")
+      list(APPEND PLANET_IMAGERY_OUTPUTS "${body}")
+    endif()
   endif()
 endforeach()
 
@@ -453,6 +478,15 @@ if(GLOBTOO_BUILD_APP)
         "$<TARGET_FILE_DIR:globtoo>/assets/${body}.source.txt"
       VERBATIM)
   endforeach()
+  foreach(body IN LISTS PLANET_IMAGERY_OUTPUTS)
+    add_dependencies(globtoo ${body}_imagery_tiles)
+    add_custom_command(TARGET globtoo POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:globtoo>/imagery/${body}"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/generated-imagery/${body}"
+        "$<TARGET_FILE_DIR:globtoo>/imagery/${body}"
+      VERBATIM)
+  endforeach()
   if(GLOBTOO_EARTH_TEXTURE)
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -511,6 +545,10 @@ if(GLOBTOO_BUILD_APP)
       "${CMAKE_BINARY_DIR}/generated-planetary/${body}.jpg"
       "${CMAKE_BINARY_DIR}/generated-planetary/${body}.source.txt"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
+  endforeach()
+  foreach(body IN LISTS PLANET_IMAGERY_OUTPUTS)
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-imagery/${body}/"
+      DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/imagery/${body}")
   endforeach()
   if(GLOBTOO_EARTH_TEXTURE)
     install(FILES "${GLOBTOO_EARTH_TEXTURE}"

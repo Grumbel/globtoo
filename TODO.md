@@ -139,6 +139,10 @@ silently download large maps or satellite data on an existing installation.
 - [x] Add an opt-in libcurl CLI downloader for the pinned Earth base map:
       XDG cache, HTTPS/TLS checks, SHA-256, size cap, progress, atomic writes,
       safe retry and meaningful failures. No network on normal launch.
+- [x] Use the existing GLES2 tile renderer on Moon, Mars and Io with independent
+      per-body caches, normalized east/west longitude at tile-preparation time,
+      CLI overrides and opt-in source-attributed CMake packaging. Actual mosaic
+      sources and live GLES2 alignment still require verification.
 - [ ] Expand verified asset catalog to licensed Moon/Mars/Io data and
       high-resolution tiled sources; support resumable multi-part downloads
       and interactive UI consent/progress as appropriate.
@@ -177,6 +181,8 @@ silently download large maps or satellite data on an existing installation.
       and half-turn, bounded single GLES2 texture size.
 - [x] Support optional source-attributed CMake installation of Moon, Mars and
       Io imagery, with packaged fallback discovery and explicit CLI overrides.
+- [x] Accept planetocentric, full-world external high-resolution planetary mosaics
+      as normalized GLES2 tiles; use installed or CLI-supplied datasets.
 - [ ] Verify and package rights-cleared planetary raster maps, pole orientation
       and longitude direction per **actual** source, with pinned download hashes.
 - [ ] Body-specific coordinate conventions and scientific landmarks.

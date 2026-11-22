@@ -123,6 +123,12 @@ int main(int argc, char** argv) {
     Globe globe{};
     globe.body=options.body;
     globe.body_textures=options.body_textures;
+    for (const auto& body : body_catalog) {
+        const auto index=static_cast<std::size_t>(body.id);
+        if (!options.body_imagery_dirs[index].empty())
+            globe.body_imagery_manifests[index]=
+                (std::filesystem::path(options.body_imagery_dirs[index])/"manifest.txt").string();
+    }
     // The default Earth image is never reused on another body.
     if (!options.texture_path.empty()) {
         globe.body_textures[static_cast<std::size_t>(options.body)]=options.texture_path;
@@ -238,7 +244,7 @@ int main(int argc, char** argv) {
                            (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) ||
                            (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid()) ||
                            (globe.surface==SurfaceLayer::Population && globe.population.valid()) ||
-                           globe.texture.id != 0 || globe.imagery.valid()));
+                           globe.texture.id != 0 || globe.imagery[0].valid()));
         if (globe.body==BodyId::Earth)
             geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
         ui.raster_legend_visible = globe.body==BodyId::Earth && globe.texture_visible &&

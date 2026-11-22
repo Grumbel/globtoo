@@ -431,6 +431,17 @@ bool parse_command_line(int argc, const char* const* argv,
             }
             output.body_textures[static_cast<std::size_t>(id)] =
                 std::string(value->substr(sep+1));
+        } else if (!positional_done && key=="--body-imagery-dir") {
+            const auto value=next();
+            if (!value) return false;
+            const auto sep=value->find('=');
+            BodyId id=BodyId::Earth;
+            if (sep==std::string_view::npos || sep==0 || sep+1==value->size() ||
+                !parse_body(value->substr(0,sep),id)) {
+                error="--body-imagery-dir expects earth|moon|mars|io=DIR"; return false;
+            }
+            output.body_imagery_dirs[static_cast<std::size_t>(id)]=
+                std::string(value->substr(sep+1));
         } else if (!positional_done && key=="--layer") {
             const auto value=next();
             if (!value) return false;
@@ -494,6 +505,7 @@ std::string command_line_help(std::string_view program) {
     help += "                            Only available in curl-enabled (lite) builds\n";
     help += "      --layer NAME          imagery, relief, elevation, population (Earth only)\n";
     help += "      --imagery-dir DIR     High-resolution Earth imagery tiles\n";
+    help += "      --body-imagery-dir B=DIR High-resolution tiles for body B (repeatable)\n";
     help += "      --relief-dir DIR      Directory with visual relief tile data\n";
     help += "      --elevation-dir DIR   Directory with measured elevation tiles/legend\n";
     help += "      --population-dir DIR  Directory with measured density tiles/legend\n";
@@ -514,5 +526,6 @@ std::string command_line_help(std::string_view program) {
     help += "  globtoo --marker-color '#ff5555' --marker-size 10 --marker 'geo:48.8583,2.2945'\n";
     help += "  globtoo --marker-file places.csv --center '48.8583,2.2945'\n";
     help += "  globtoo --body mars --texture /maps/mars-east-positive.jpg\n";
+    help += "  globtoo --body io --body-imagery-dir io=/maps/io-tiles\n";
     return help;
 }

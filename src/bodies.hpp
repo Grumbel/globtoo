@@ -17,16 +17,17 @@ struct BodyInfo {
     BodyId id;
     std::string_view name;
     std::string_view default_texture_resource;
+    std::string_view default_imagery_manifest;
     double mean_radius_km;
     std::array<float,3> untextured_rgb;
     bool earth_geography;
 };
 
 inline constexpr std::array<BodyInfo,4> body_catalog{{
-    {BodyId::Earth,"Earth","assets/earth.jpg",6371.0,  {0.25f,0.42f,0.62f},true},
-    {BodyId::Moon, "Moon", "assets/moon.jpg", 1737.4,  {0.46f,0.46f,0.48f},false},
-    {BodyId::Mars, "Mars", "assets/mars.jpg", 3389.5,  {0.63f,0.32f,0.22f},false},
-    {BodyId::Io,   "Io",   "assets/io.jpg",   1821.6,  {0.75f,0.63f,0.31f},false}
+    {BodyId::Earth,"Earth","assets/earth.jpg","imagery/manifest.txt",6371.0,  {0.25f,0.42f,0.62f},true},
+    {BodyId::Moon, "Moon", "assets/moon.jpg", "imagery/moon/manifest.txt", 1737.4,  {0.46f,0.46f,0.48f},false},
+    {BodyId::Mars, "Mars", "assets/mars.jpg", "imagery/mars/manifest.txt", 3389.5,  {0.63f,0.32f,0.22f},false},
+    {BodyId::Io,   "Io",   "assets/io.jpg",   "imagery/io/manifest.txt",   1821.6,  {0.75f,0.63f,0.31f},false}
 }};
 
 constexpr const BodyInfo& body_info(BodyId id) {

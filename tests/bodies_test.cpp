@@ -13,4 +13,6 @@ int main() {
     assert(body_info(BodyId::Moon).default_texture_resource == "assets/moon.jpg");
     assert(body_info(BodyId::Mars).default_texture_resource == "assets/mars.jpg");
     assert(body_info(BodyId::Io).default_texture_resource == "assets/io.jpg");
+    assert(body_info(BodyId::Moon).default_imagery_manifest == "imagery/moon/manifest.txt");
+    assert(body_info(BodyId::Mars).default_imagery_manifest == "imagery/mars/manifest.txt");
 }
