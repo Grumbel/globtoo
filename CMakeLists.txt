@@ -240,6 +240,13 @@ if(BUILD_TESTING)
     target_link_libraries(input_mouse_test PRIVATE ${SDL3_LIBRARIES})
     target_compile_options(input_mouse_test PRIVATE -Wall -Wextra -UNDEBUG)
     add_test(NAME input_mouse COMMAND input_mouse_test)
+    add_executable(ui_event_test tests/ui_event_test.cpp
+      src/ui.cpp src/input.cpp src/camera.cpp src/map_view.cpp src/scene.cpp
+      src/shader.cpp src/resources.cpp)
+    target_include_directories(ui_event_test PRIVATE src ${SDL3_INCLUDE_DIRS})
+    target_link_libraries(ui_event_test PRIVATE ${SDL3_LIBRARIES} ${GLES2_LIB} m)
+    target_compile_options(ui_event_test PRIVATE -Wall -Wextra -UNDEBUG)
+    add_test(NAME ui_event COMMAND ui_event_test)
   endif()
   add_executable(markers_test tests/markers_test.cpp src/markers.cpp)
   target_include_directories(markers_test PRIVATE src)

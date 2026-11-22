@@ -1,0 +1,85 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// GUI visibility is independent of the camera control mode, and a hidden
+// toolbar must not consume mouse input that belongs to the map.
+#include "ui.hpp"
+#include <cassert>
+
+int main() {
+    Ui ui{};
+    ui.viewport_w = 1280;
+    ui.viewport_h = 800;
+    Camera cam{};
+    MapView map{};
+    Globe globe{};
+    Countries countries{};
+    InputState input{};
+    input.viewport_w = ui.viewport_w;
+    input.viewport_h = ui.viewport_h;
+
+    SDL_Event event{};
+    event.type = SDL_EVENT_KEY_DOWN;
+    event.key.key = SDLK_TAB;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(!ui.visible);
+    assert(cam.mode == ControlMode::Grab); // Tab must not change orbit mode.
+
+    // Holding Tab must not show the controls again via key auto-repeat.
+    event.key.repeat = true;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(!ui.visible);
+
+    // With GUI hidden, pointer events should reach the map even when
+    // positioned over the toolbar or compass.
+    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button = SDL_BUTTON_LEFT;
+    event.button.x = 40.f;
+    event.button.y = 50.f;
+    assert(!ui_event(ui,event,cam,map,globe,countries,input));
+    event.button.x = 1175.f;
+    event.button.y = 178.f;
+    assert(!ui_event(ui,event,cam,map,globe,countries,input));
+    assert(cam.mode == ControlMode::Grab);
+
+    ui_draw(ui,cam,map,globe,countries);
+    assert(ui.triangles.empty());
+
+    // The next non-repeat Tab restores the GUI.
+    event.type = SDL_EVENT_KEY_DOWN;
+    event.key.key = SDLK_TAB;
+    event.key.repeat = false;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(ui.visible);
+
+    // Grab / Arcball now lives below Reset, inside the compass panel.
+    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button = SDL_BUTTON_LEFT;
+    event.button.x = 1175.f;
+    event.button.y = 179.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(cam.mode == ControlMode::Arcball);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(cam.mode == ControlMode::Grab);
+
+    // G is the keyboard alternative, while Tab only affects visibility.
+    event.type = SDL_EVENT_KEY_DOWN;
+    event.key.key = SDLK_G;
+    input_handle_event(input,cam,map,globe,countries,event);
+    assert(cam.mode == ControlMode::Arcball);
+    event.key.repeat = true;
+    input_handle_event(input,cam,map,globe,countries,event);
+    assert(cam.mode == ControlMode::Arcball);
+    event.key.repeat = false;
+    input_handle_event(input,cam,map,globe,countries,event);
+    assert(cam.mode == ControlMode::Grab);
+
+    // The main toolbar still toggles geographic overlays normally.
+    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button = SDL_BUTTON_LEFT;
+    event.button.x = 525.f;
+    event.button.y = 85.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(ui.grid_visible);
+    return 0;
+}

@@ -19,6 +19,7 @@ struct Ui {
     GLuint vbo = 0;
     int viewport_w = 1280, viewport_h = 800;
     int hover = -1;
+    bool visible = true; // Tab toggles screen-space controls, not map overlays
     bool grid_visible = false;
     double scale_bar_km = 0.;
     float scale_bar_pixels = 0.f;

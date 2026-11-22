@@ -26,11 +26,11 @@ constexpr Color needle_south{.43f,.67f,.86f,1.f};
 constexpr float pi = 3.14159265358979323846f;
 
 struct Bounds { float x,y,w,h; };
-constexpr Bounds toolbar{8,8,675,100};
+constexpr Bounds toolbar{8,8,605,100};
 Bounds compass_panel(const Ui& ui) {
     const float x = std::max(8.f, static_cast<float>(ui.viewport_w) - 128.f);
     // At narrow window widths, do not cover the main toolbar.
-    return {x, x < toolbar.x+toolbar.w+8 ? 116.f : 8.f, 120.f, 165.f};
+    return {x, x < toolbar.x+toolbar.w+8 ? 116.f : 8.f, 120.f, 193.f};
 }
 Bounds scale_panel(const Ui& ui) {
     return {8.f,std::max(124.f,static_cast<float>(ui.viewport_h)-91.f),264.f,83.f};
@@ -50,12 +50,13 @@ std::vector<Button> buttons() {
     std::vector<Button> out;
     const char* top[] = {"3D GLOBE", "PLATE", "MERCATOR", "MOLLWEIDE", "HAMMER", "-", "+"};
     const int topw[] = {103,72,108,121,88,30,30};
-    const char* bottom[] = {"SHADING", "COUNTRIES", "BORDERS", "NAMES", "TEXTURE", "GRAB", "GRID"};
-    const int botw[] = {93,116,94,73,94,68,72};
+    const char* bottom[] = {"SHADING", "COUNTRIES", "BORDERS", "NAMES", "TEXTURE", "GRID"};
+    const int botw[] = {93,116,94,73,94,72};
+    const int botcmd[] = {7,8,9,10,11,15};
     int x = 14;
     for (int i=0;i<7;i++) { out.push_back({top[i],x,34,topw[i],30,i}); x += topw[i]+5; }
     x = 14;
-    for (int i=0;i<7;i++) { out.push_back({bottom[i],x,70,botw[i],30,i==6 ? 15 : i+7}); x += botw[i]+5; }
+    for (int i=0;i<6;i++) { out.push_back({bottom[i],x,70,botw[i],30,botcmd[i]}); x += botw[i]+5; }
     return out;
 }
 
@@ -195,8 +196,12 @@ void draw_compass(Ui& ui, const Camera& cam, const MapView& map) {
                        static_cast<int>(box.y+107),106,24,14};
     const Button reset{"RESET",static_cast<int>(box.x+7),
                        static_cast<int>(box.y+135),106,24,13};
-    for (auto b : {north,reset}) {
-        rect(ui,b.x,b.y,b.w,b.h,ui.hover==b.command ? hover : inactive);
+    const Button mode{cam.mode == ControlMode::Grab ? "GRAB" : "ARCBALL",
+                      static_cast<int>(box.x+7),static_cast<int>(box.y+163),
+                      106,24,12};
+    for (auto b : {north,reset,mode}) {
+        rect(ui,b.x,b.y,b.w,b.h,ui.hover==b.command ? hover :
+             (b.command==12 && cam.mode==ControlMode::Grab ? active : inactive));
         draw_text(ui,b.x+(b.w-12.f*std::char_traits<char>::length(b.label))*.5f,
                   b.y+6,b.label,2,text);
     }
@@ -274,6 +279,14 @@ void ui_shutdown(Ui& ui) {
 
 bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
               Globe& globe,Countries& countries,InputState& input) {
+    if (e.type==SDL_EVENT_KEY_DOWN && e.key.key==SDLK_TAB) {
+        if (!e.key.repeat) {
+            ui.visible = !ui.visible;
+            ui.hover = -1;
+        }
+        return true; // Tab no longer switches Grab / Arcball
+    }
+    if (!ui.visible) return false; // Hidden controls must not intercept map drags
     if (e.type!=SDL_EVENT_MOUSE_MOTION && e.type!=SDL_EVENT_MOUSE_BUTTON_DOWN &&
         e.type!=SDL_EVENT_MOUSE_BUTTON_UP && e.type!=SDL_EVENT_MOUSE_WHEEL) return false;
     // Captured drags continue even if the cursor passes over controls;
@@ -305,9 +318,11 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
     if (on_compass) {
         const Bounds north{cp.x+7,cp.y+107,106,24};
         const Bounds reset{cp.x+7,cp.y+135,106,24};
+        const Bounds mode{cp.x+7,cp.y+163,106,24};
         // Clicking the compass rose itself is also a North-up shortcut.
         const bool rose=contains({cp.x+13,cp.y+4,94,94},x,y);
         const int command=contains(reset,x,y) ? 13 :
+                          contains(mode,x,y) ? 12 :
                           (contains(north,x,y) || rose ? 14 : -1);
         ui.hover=command;
         if (command>=0 && e.type==SDL_EVENT_MOUSE_BUTTON_DOWN &&
@@ -487,6 +502,7 @@ void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspe
 
 void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
              const Countries& countries) {
+    if (!ui.visible) return;
     rect(ui,toolbar.x,toolbar.y,toolbar.w,toolbar.h,panel);
     draw_text(ui,14,15,"GLOBTOO   VIEW",2,text);
     for (const auto& b : buttons()) {
@@ -528,8 +544,8 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         const float x=(nx+1.f)*ui.viewport_w*.5f;
         const float y=(1.f-ny)*ui.viewport_h*.5f;
         if (x<10 || y<10 || x>ui.viewport_w-10 || y>ui.viewport_h-10 ||
-            contains(toolbar,x,y) || contains(compass_panel(ui),x,y) ||
-            contains(scale_panel(ui),x,y)) continue;
+            (ui.visible && (contains(toolbar,x,y) || contains(compass_panel(ui),x,y) ||
+                            contains(scale_panel(ui),x,y)))) continue;
         candidates.push_back({x,y,nx*nx+ny*ny,&l});
     }
     std::sort(candidates.begin(), candidates.end(), [](const auto& a,const auto& b) {
@@ -546,9 +562,9 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         const Bounds b{candidate.x-tw*.5f-3,candidate.y-th*.5f-2,
                        candidate.x+tw*.5f+3,candidate.y+th*.5f+2};
         if (b.l<1 || b.r>ui.viewport_w-1 || b.t<1 || b.b>ui.viewport_h-1 ||
-            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},toolbar) ||
-            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},compass_panel(ui)) ||
-            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},scale_panel(ui))) continue;
+            (ui.visible && (overlaps({b.l,b.t,b.r-b.l,b.b-b.t},toolbar) ||
+                            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},compass_panel(ui)) ||
+                            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},scale_panel(ui))))) continue;
         bool clash=false;
         for (const auto& other: occupied) {
             if (b.l<other.r+3 && b.r>other.l-3 && b.t<other.b+3 && b.b>other.t-3) {
@@ -603,9 +619,9 @@ void ui_draw_markers(Ui& ui, const std::vector<Marker>& markers, const Camera& c
         const float ly=std::clamp(y-h*.5f,4.f,std::max(4.f,ui.viewport_h-h-4.f));
         const LabelBounds box{lx,ly,w,h};
         if (lx<4.f || lx+w>ui.viewport_w-4.f ||
-            overlaps({lx,ly,w,h},toolbar) ||
-            overlaps({lx,ly,w,h},compass_panel(ui)) ||
-            overlaps({lx,ly,w,h},scale_panel(ui))) continue;
+            (ui.visible && (overlaps({lx,ly,w,h},toolbar) ||
+                            overlaps({lx,ly,w,h},compass_panel(ui)) ||
+                            overlaps({lx,ly,w,h},scale_panel(ui))))) continue;
         bool overlap=false;
         for (const auto& other : occupied)
             if (overlaps({lx-4,ly-4,w+8,h+8}, {other.x,other.y,other.w,other.h})) {

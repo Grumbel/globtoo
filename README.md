@@ -133,7 +133,9 @@ NASA URLs are public domain. Credit: NASA Earth Observatory / Reto Stöckli.
 
 ## Controls
 
-Globtoo now has a small on-screen toolbar; keyboard shortcuts remain optional.
+Globtoo has an on-screen toolbar. Press **Tab** to hide or restore the
+GUI (toolbar, compass, and scale bar) for an unobstructed map view. Country
+names, markers, and the optional geographic grid remain visible.
 
 - **3D Globe**: classic tactile, inertia-based sphere.
 - **Plate**: equirectangular geographic map.
@@ -157,7 +159,8 @@ Globtoo now has a small on-screen toolbar; keyboard shortcuts remain optional.
   view center, automatically displayed in km or m. The graduated bar updates
   with zoom, projection, and globe/map transitions. Its value applies at the
   **center**; on projections, distortion increases away from the center.
-- **Grab mode**: switch between Grab and Arcball in globe mode.
+- **Grab / Arcball (below Reset)**: switch the 3D globe mouse-control mode.
+  The button shows the currently selected mode; `G` is its shortcut.
 - **Compass (upper-right)**: live geographic N/E/S/W heading for the globe and every 2D projection.
 - **North Up**: click the button or compass rose to straighten the view without panning or changing zoom (also works after a polar crossing).
 - **Reset**: below the compass; restore the timezone-relative viewpoint, North-up orientation, and default zoom without changing the selected projection.
@@ -180,7 +183,8 @@ at close range. The 10m country mesh is selected automatically at these scales;
 the raster Earth texture still has its original resolution.
 Shift+drag rolls the globe or rotates the flat map around the screen center.
 Optional shortcuts: `1..5` select projection, `Space` shading, `B` borders,
-`N` names, `P` political coloring, `V` texture, `Tab` Grab/Arcball, `T` trackball,
+`N` names, `P` political coloring, `V` texture, `Tab` toggle GUI,
+`G` Grab/Arcball, `T` trackball,
 `Esc` quit (or release trackball).
 
 The default view is centered on the **representative city of the system's IANA

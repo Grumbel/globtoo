@@ -86,6 +86,27 @@ Roll the map around the view center.
 .TP
 .B Mouse wheel
 Zoom in or out.
+.SH KEYBOARD CONTROLS
+.TP
+.B Tab
+Hide or restore the on-screen toolbar, compass and distance scale.
+Country names, markers and the optional geographic grid remain visible.
+.TP
+.B G
+Toggle Grab / Arcball control mode for the 3D globe. The same toggle
+is available below Reset in the compass panel.
+.TP
+.B 1, 2, 3, 4, 5
+Choose globe, Plate Carree, Mercator, Mollweide, or Hammer projection.
+.TP
+.B Space, B, N, P, V
+Toggle shading, borders, country names, political colors, or Earth texture.
+.TP
+.B T
+Toggle trackball relative-mouse mode when viewing the 3D globe.
+.TP
+.B Escape
+Exit trackball mode, or quit Globtoo.
 .SH VIEWS
 The GUI provides a globe and four projections: equirectangular (Plate
 Carr\('ee), Mercator, Mollweide, and Hammer. The map transforms smoothly

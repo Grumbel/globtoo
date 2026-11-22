@@ -87,9 +87,14 @@ at a pole.
 
 Click **NORTH UP** (or the compass rose) to straighten the current map or
 globe without moving the center or changing zoom. North-up rotates the screen to the actual local north tangent. Returning to
-the globe preserves that bearing and geographical center through the fold. **RESET**, now below the compass instead of in the toolbar,
+the globe preserves that bearing and geographical center through the fold. **RESET**, below the compass instead of in the toolbar,
 restores the timezone-derived center, default zoom, and North-up orientation
-without changing the chosen projection.
+without changing the chosen projection. The **GRAB / ARCBALL** button
+below Reset selects the 3D globe mouse mode; `G` toggles it from the keyboard.
+
+Press **Tab** to hide or show the UI controls, compass, and scale bar. The
+geographic grid, country names, and markers remain visible, and mouse drags
+work even where the hidden controls were previously located.
 
 The compass repositions below the main toolbar on small windows. UI hit
 testing uses the same bounds as drawing, so compass clicks cannot initiate a

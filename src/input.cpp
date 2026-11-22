@@ -61,7 +61,7 @@ void input_handle_event(InputState& in, Camera& cam, MapView& map,
             input_set_trackball(in, !in.trackball);
             camera_grab_kill_inertia(cam);
             camera_grab_end(cam);
-        } else if (e.key.key == SDLK_TAB) {
+        } else if (e.key.key == SDLK_G && !e.key.repeat) {
             if (cam.mode == ControlMode::Arcball) {
                 cam.mode = ControlMode::Grab;
                 fprintf(stderr, "Control: Grab (surface under cursor)\n");

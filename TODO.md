@@ -18,6 +18,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Tab hides/restores screen-space controls without hiding geographic overlays; move Grab / Arcball below compass Reset (G shortcut)
 - [x] CMake install target and Nix packaging through standard cmake install
 - [x] Desktop launcher and AppStream metadata; custom multi-size icon and SDL window icon
 - [x] Versioned man page, license and asset credits, release checklist
