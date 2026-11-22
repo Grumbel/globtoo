@@ -63,6 +63,29 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(cam.mode == ControlMode::Grab);
 
+    // The non-Earth third row has a landmark toggle, not Earth cities.
+    globe.body=BodyId::Io;
+    event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button=SDL_BUTTON_LEFT;
+    event.button.x=40.f;
+    event.button.y=772.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(!ui.planetary_features_visible);
+    event.type=SDL_EVENT_KEY_DOWN;
+    event.key.key=SDLK_F;
+    event.key.repeat=false;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(ui.planetary_features_visible);
+    // Resetting Io is its prime meridian, never the machine timezone.
+    event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button=SDL_BUTTON_LEFT;
+    event.button.x=1175.f;
+    event.button.y=148.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(std::abs(map.center_lon)<1e-6);
+    assert(std::abs(map.center_lat)<1e-6);
+    globe.body=BodyId::Earth;
+
     // G is the keyboard alternative, while Tab only affects visibility.
     event.type = SDL_EVENT_KEY_DOWN;
     event.key.key = SDLK_G;

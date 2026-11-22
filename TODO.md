@@ -185,4 +185,9 @@ silently download large maps or satellite data on an existing installation.
       as normalized GLES2 tiles; use installed or CLI-supplied datasets.
 - [ ] Verify and package rights-cleared planetary raster maps, pole orientation
       and longitude direction per **actual** source, with pinned download hashes.
-- [ ] Body-specific coordinate conventions and scientific landmarks.
+- [x] Source a small cross-body IAU Gazetteer feature-center catalog with
+      original longitude/latitude conventions, non-Earth marker overlay and
+      command-line --list-features / --focus navigation.
+- [ ] Import the full IAU planetary gazetteer, handle planetographic-to-
+      planetocentric latitude and datums accurately, and validate feature
+      alignment against real raster sources.

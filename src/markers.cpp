@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "markers.hpp"
+#include "planetary_features.hpp"
 #include <algorithm>
 #include <cctype>
 #include <charconv>
@@ -342,6 +343,8 @@ bool parse_command_line(int argc, const char* const* argv,
     std::uint32_t color=0xffc54b;
     float radius=7.f;
     bool positional_done=false;
+    bool explicit_body=false;
+    bool explicit_center=false;
     for (int i=1;i<argc;i++) {
         const std::string_view arg=argv[i];
         if (!positional_done && (arg=="--help" || arg=="-h")) {
@@ -405,6 +408,13 @@ bool parse_command_line(int argc, const char* const* argv,
             if (!parse_coordinates(*value,CoordinateOrder::LatitudeLongitude,lat,lon,error))
                 return false;
             output.center=std::make_pair(lon,lat);
+            explicit_center=true;
+        } else if (!positional_done && key=="--focus") {
+            const auto value=next();
+            if (!value || value->empty()) { error="--focus requires a feature name"; return false; }
+            output.focus_name=*value;
+        } else if (!positional_done && key=="--list-features") {
+            output.action=CommandAction::ListFeatures;
         } else if (!positional_done && key=="--download-asset") {
             const auto value=next();
             if (!value) return false;
@@ -420,6 +430,7 @@ bool parse_command_line(int argc, const char* const* argv,
             if (!parse_body(*value,output.body)) {
                 error="--body must be earth, moon, mars or io"; return false;
             }
+            explicit_body=true;
         } else if (!positional_done && key=="--body-texture") {
             const auto value=next();
             if (!value) return false;
@@ -478,6 +489,23 @@ bool parse_command_line(int argc, const char* const* argv,
             return false;
         }
     }
+    if (!output.focus_name.empty()) {
+        const auto* feature=find_planetary_feature(output.focus_name);
+        if (!feature) { error="unknown planetary feature: "+output.focus_name+
+            " (see --list-features)"; return false; }
+        if (explicit_body && output.body!=feature->body) {
+            error="--focus feature belongs to a different --body"; return false;
+        }
+        if (explicit_center) {
+            error="--center and --focus are mutually exclusive"; return false;
+        }
+        output.body=feature->body;
+        output.center=std::make_pair(feature_east_longitude(*feature),feature->source_latitude);
+    }
+    if (output.action==CommandAction::ListFeatures && argc!=2) {
+        error="--list-features must be used by itself";
+        return false;
+    }
     if (output.action==CommandAction::DownloadAsset &&
         !(argc==3 || (argc==2 && std::string_view(argv[1]).starts_with("--download-asset=")))) {
         error="--download-asset must be used by itself";
@@ -499,6 +527,8 @@ std::string command_line_help(std::string_view program) {
     help += "      --marker-size PX      Radius 2..32 for subsequent markers (default 7)\n";
     help += "      --center COORDS       Center initial view here (otherwise local timezone)\n";
     help += "      --body NAME           earth (default), moon, mars or io\n";
+    help += "      --focus NAME          Start on an IAU-named landmark; selects its body\n";
+    help += "      --list-features       List built-in planetary landmarks (no SDL)\n";
     help += "      --body-texture B=FILE Set a body's equirectangular image (repeatable)\n";
     help += "      --texture FILE        Texture of the initial body (or positional path)\n";
     help += "      --download-asset earth Fetch verified Earth image to XDG cache and exit\n";

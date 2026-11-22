@@ -12,8 +12,10 @@
 #include <utility>
 #include <vector>
 
-// Geographic coordinates are WGS84 degrees: positive north and east.
-// Markers are rendered at sea level in the same scene projection as countries.
+// Coordinates are north-positive/east-positive degrees in the viewer frame.
+// Earth uses the approximate WGS84 sphere; Moon/Mars/Io markers refer to the
+// selected body (and require source datum normalization for precision).
+// All markers follow the same screen projection and globe occlusion.
 struct Marker {
     double latitude = 0.0;
     double longitude = 0.0;
@@ -22,10 +24,11 @@ struct Marker {
     float radius = 7.f;             // screen pixels (independent of zoom)
 };
 
-enum class CommandAction { Run, Help, Version, DownloadAsset };
+enum class CommandAction { Run, Help, Version, DownloadAsset, ListFeatures };
 struct CommandLine {
     CommandAction action = CommandAction::Run;
     std::string download_asset;
+    std::string focus_name;
     std::string texture_path;
     BodyId body = BodyId::Earth;
     // Optional textures indexed by BodyId. The selected body's --texture

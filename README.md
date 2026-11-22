@@ -207,7 +207,8 @@ names, markers, and the optional geographic grid remain visible.
 - **Texture**: toggle the Earth imagery independently of the country colors. When both
   are enabled (the default), translucent country colors mix with the texture
   so terrain remains visible beneath the colors. Either layer can be shown alone.
-- **Capitals**: toggle national-capital diamonds and English labels.
+- **Landmarks** (Moon/Mars/Io only): toggle sourced feature-center labels, or press **F**.
+- **Capitals** (Earth only): toggle national-capital diamonds and English labels.
   Capital locations are always eligible regardless of zoom, but labels
   are decluttered rather than drawn over one another.
 - **Cities**: toggle dots and labels for other Natural Earth populated places.
@@ -324,3 +325,22 @@ use `GLOBTOO_MOON_TEXTURE`, `GLOBTOO_MARS_TEXTURE` or
 axis, planetocentric latitude and image-origin settings. See [planetary map guide](docs/PLANETARY_MAPS.md)
 for the preprocessing tool, source catalogs, caveats, and packaging example.
 No unverified planetary images are downloaded or bundled by default.
+
+The non-Earth **LANDMARKS** button (or **F**, including while controls are
+hidden) shows a small catalog of IAU-named craters, maria, mountains and
+volcanic features sourced from the USGS Gazetteer of Planetary Nomenclature.
+This overlay works even without a surface texture. Earth's country and city
+controls are replaced by planetary controls on the other bodies. Find the
+available names without starting SDL, then launch centered on one:
+
+```sh
+globtoo --list-features
+globtoo --focus 'Olympus Mons'
+globtoo --focus 'Loki Patera' --body io
+```
+
+`--focus` selects the feature's body and initial viewpoint; conflicting
+`--body` or `--center` options are rejected. The landmarks are approximate
+feature centers (Io's source coordinates use **west-positive** longitude and
+planetographic latitude), not a high-precision surface geodesy product. See
+[planetary feature sources and conventions](docs/PLANETARY_MAPS.md#named-planetary-features).

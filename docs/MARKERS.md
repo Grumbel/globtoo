@@ -83,3 +83,13 @@ for locally modified trees. A missing Git revision count falls back to zero;
 Nix builds use the flake's revision metadata and pass the resulting full string
 into CMake. A release `VERSION` without `-dev` is shown exactly as written,
 without a Git suffix. `--version` and the window title use the same string.
+
+## On Moon, Mars and Io
+
+`--marker`, `--marker-file`, and `--center` are interpreted in Globtoo's
+**east-positive, north-positive** spherical viewer coordinates for the
+selected body, not as WGS84 Earth locations. Source planetary gazetteers
+may specify west-positive longitudes or planetographic latitudes and require
+normalization. For nine sourced reference landmarks, see
+[planetary maps](PLANETARY_MAPS.md#named-planetary-features) and
+`globtoo --list-features`; `--focus NAME` centers on one of them.

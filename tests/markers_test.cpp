@@ -86,6 +86,33 @@ int main() {
     }
 
     {
+        CommandLine feature;
+        std::string err;
+        const char* args[]={"globtoo","--focus","LoKi PaTeRa"};
+        assert(parse_command_line(3,args,feature,err));
+        assert(feature.body==BodyId::Io);
+        assert(feature.center.has_value());
+        assert(std::abs(feature.center->first-51.2)<1.e-8);
+        assert(std::abs(feature.center->second-12.97)<1.e-8);
+        const char* ordered[]={"globtoo","--focus","Olympus Mons","--body","mars"};
+        assert(parse_command_line(5,ordered,feature,err));
+        assert(feature.body==BodyId::Mars);
+        const char* reverse[]={"globtoo","--body","mars","--focus","Olympus Mons"};
+        assert(parse_command_line(5,reverse,feature,err));
+        const char* wrong[]={"globtoo","--focus","Loki Patera","--body","mars"};
+        assert(!parse_command_line(5,wrong,feature,err));
+        const char* clash[]={"globtoo","--center","0,0","--focus","Tycho"};
+        assert(!parse_command_line(5,clash,feature,err));
+        const char* unknown[]={"globtoo","--focus","not-a-crater"};
+        assert(!parse_command_line(3,unknown,feature,err));
+        const char* list[]={"globtoo","--list-features"};
+        assert(parse_command_line(2,list,feature,err));
+        assert(feature.action==CommandAction::ListFeatures);
+        const char* extra[]={"globtoo","--list-features","--body","mars"};
+        assert(!parse_command_line(4,extra,feature,err));
+    }
+
+    {
         CommandLine download;
         std::string err;
         const char* args[]={"globtoo","--download-asset","earth"};

@@ -71,6 +71,16 @@ Select the body whose globe or projected map is displayed. Press M or
 use NEXT BODY to cycle bodies. Earth-only country, city, river and thematic
 layers are suppressed on other bodies.
 .TP
+.BI \--focus\  "NAME"
+Select a built-in named planetary feature (case-insensitive), switch to its
+body and start centered on its Gazetteer location. Conflicting explicit
+\--body or \--center options are rejected. Example:
+.B globtoo --focus 'Olympus Mons'
+.TP
+.B \--list-features
+Print the available IAU Gazetteer planetary landmark names and their
+approximate east-positive coordinates, without starting SDL.
+.TP
 .BI \--body-texture\  "BODY=FILE"
 Use a normalized small equirectangular texture for the selected body;
 repeatable. See the planetary maps documentation for source longitude
@@ -145,6 +155,10 @@ Roll the map around the view center (unless North Lock is enabled).
 .B Mouse wheel
 Zoom in or out with small, reciprocal increments.
 .SH KEYBOARD CONTROLS
+.TP
+.B F
+Toggle the approximate named planetary landmark overlay on Moon, Mars or Io,
+including when the screen controls are hidden.
 .TP
 .B Tab
 Hide or restore the on-screen toolbar, compass and distance scale.

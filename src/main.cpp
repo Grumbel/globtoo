@@ -18,6 +18,7 @@
 #include "ui.hpp"
 #include "map_view.hpp"
 #include "markers.hpp"
+#include "planetary_features.hpp"
 #include "geographic_overlay.hpp"
 #include "resources.hpp"
 #ifdef GLOBTOO_ENABLE_DOWNLOADS
@@ -96,6 +97,15 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    if (options.action == CommandAction::ListFeatures) {
+        for (const auto& feature : planetary_features)
+            std::printf("%-5.*s  %-24.*s lat %8.2f  lon(E) %8.2f  (%.*s)\n",
+                static_cast<int>(body_info(feature.body).name.size()),body_info(feature.body).name.data(),
+                static_cast<int>(feature.name.size()),feature.name.data(),
+                feature.source_latitude,feature_east_longitude(feature),
+                static_cast<int>(feature.kind.size()),feature.kind.data());
+        return 0;
+    }
     if (options.action == CommandAction::DownloadAsset) {
 #ifdef GLOBTOO_ENABLE_DOWNLOADS
         const DownloadAsset* asset=find_download_asset(options.download_asset);
@@ -195,10 +205,23 @@ int main(int argc, char** argv) {
     GeographicOverlay geography{};
     geographic_overlay_init(geography);
 
+    // Build once: these small, source-attributed gazetteer features are
+    // independent of imagery availability and selected at render time.
+    std::array<std::vector<Marker>,body_catalog.size()> feature_markers{};
+    for (const auto& feature : planetary_features) {
+        Marker marker;
+        marker.latitude=feature.source_latitude;
+        marker.longitude=feature_east_longitude(feature);
+        marker.label=std::string(feature.name);
+        marker.radius=4.0f;
+        marker.color=0x90d8fa;
+        feature_markers[static_cast<std::size_t>(feature.body)].push_back(std::move(marker));
+    }
+
     Ui ui{};
     if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
 
-    fprintf(stderr, "Controls: M=cycle Earth/Moon/Mars/Io, on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
+    fprintf(stderr, "Controls: M=cycle Earth/Moon/Mars/Io, F=planetary landmark labels, on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
@@ -257,6 +280,8 @@ int main(int argc, char** argv) {
             ui_draw_country_names(ui,countries,cam,map,aspect);
             ui_draw_places(ui,geography.features,cam,map,aspect);
         }
+        if (globe.body!=BodyId::Earth && ui.planetary_features_visible)
+            ui_draw_markers(ui,feature_markers[static_cast<std::size_t>(globe.body)],cam,map,aspect);
         ui_draw_markers(ui,options.markers,cam,map,aspect);
         ui_draw(ui,cam,map,globe,countries);
         ui_flush(ui);

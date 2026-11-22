@@ -17,6 +17,41 @@ products may use east- or west-positive longitude, 0–360° or ±180° domains,
 planetocentric or planetographic latitudes, and regional coverage. Direction
 and domain **cannot** be inferred from the name "Mars" or "Io" alone.
 
+## Named planetary features
+
+The bundled **small** feature catalog contains nine IAU-approved names and
+feature-center coordinates from the [USGS Gazetteer of Planetary Nomenclature](https://planetarynames.wr.usgs.gov/). These are reference point labels,
+not outlines and not a complete scientific GIS dataset. Click **LANDMARKS**
+(on Moon, Mars or Io) or press **F** to toggle them. Use
+`globtoo --list-features` to see the names, or start at one with
+`globtoo --focus 'Olympus Mons'`. This switches to the correct body and
+centers the camera. The labels work without any external texture.
+
+| Body | Label | Source center coordinates | Gazetteer entry |
+| --- | --- | --- | --- |
+| Moon | Tycho | 43.30°S, 11.22°W | [6163](https://planetarynames.wr.usgs.gov/Feature/6163) |
+| Moon | Copernicus | 9.62°N, 20.08°W | [1296](https://planetarynames.wr.usgs.gov/Feature/1296) |
+| Moon | Mare Tranquillitatis | 8.35°N, 30.83°E | [3691](https://planetarynames.wr.usgs.gov/Feature/3691) |
+| Mars | Olympus Mons | 18.40°N, 226.00°E | [4453](https://planetarynames.wr.usgs.gov/Feature/4453) |
+| Mars | Gale | 5.44°S, 137.70°E | [2071](https://planetarynames.wr.usgs.gov/Feature/2071) |
+| Mars | Hellas Planitia | 42.66°S, 70.00°E | [2432](https://planetarynames.wr.usgs.gov/Feature/2432) |
+| Io | Loki Patera | 12.97°N, 308.80°W | [3459](https://planetarynames.wr.usgs.gov/Feature/3459) |
+| Io | Pele | 18.71°S, 255.28°W | [4638](https://planetarynames.wr.usgs.gov/Feature/4638) |
+| Io | Tvashtar Paterae | 62.76°N, 123.53°W | [14131](https://planetarynames.wr.usgs.gov/Feature/14131) |
+
+**Coordinates are not interchangeable between bodies.** The selected lunar
+entries are planetographic latitude, east-positive longitude in −180–180;
+the selected Martian entries are planetocentric latitude, east-positive
+longitude in 0–360; the Io entries are planetographic latitude and
+**west-positive** longitude in 0–360. Globtoo flips Io's longitude sign and
+wraps all source longitudes to [−180°, 180°) east-positive, but the spherical
+renderer does **not** transform planetographic latitude to planetocentric
+latitude. Feature positions on the Moon and Io are therefore **approximate**;
+errors from actual mosaic datum/projection and shape modeling have not been
+quantified. This catalog is deliberately separate from source-texture
+longitude normalization. The IAU feature center is not guaranteed to equal
+a feature's visually brightest or highest point.
+
 ## Preparing an externally obtained map
 
 The input must be a color/grayscale **full 360° × 180° north-up plate carrée**
@@ -159,8 +194,9 @@ subsequent Nix fetch.
   elevation-aware paths.
 - Longitude mirroring/rotation does **not** correct planetographic vs.
   planetocentric latitude or shifted scientific prime meridians.
-- Planetary high-resolution tiling and planetary landmark gazetteers remain
-  future work. The existing relief, elevation, population, cities, rivers
-  and country boundaries are Earth-only.
+- Planetary high-resolution tiling and a small sourced landmark catalog exist.
+  A complete gazetteer import and body-specific terrain relief remain future
+  work. Existing measured elevation, population, cities, rivers and country
+  boundaries are Earth-only.
 - Hardware rendering and the geographic alignment of actual mosaics need
   testing with the original verified datasets, not just synthetic fixtures.

@@ -54,8 +54,9 @@ bool overlaps(Bounds a, Bounds b) {
 
 struct Button { const char* label; int x,y,w,h; int command; };
 // All hit rectangles and draw positions derive from the same layout.
-std::array<Button,19> buttons(const Ui& ui) {
+std::array<Button,19> buttons(const Ui& ui, BodyId body) {
     std::array<Button,19> out{};
+    for (auto& b : out) b.command=-1;
     std::size_t k=0;
     const char* top[] = {"3D GLOBE", "PLATE", "MERCATOR", "MOLLWEIDE", "HAMMER", "-", "+"};
     const int topw[] = {103,72,108,121,88,30,30};
@@ -66,6 +67,18 @@ std::array<Button,19> buttons(const Ui& ui) {
     int x = static_cast<int>(panel.x+6);
     for (int i=0;i<7;i++) { out[k++] = {top[i],x,static_cast<int>(panel.y+26),topw[i],30,i}; x += topw[i]+5; }
     x = static_cast<int>(panel.x+6);
+    if (body!=BodyId::Earth) {
+        // Country and thematic layers have no meaning on an alien surface.
+        for (const auto& button : std::array<Button,3>{{
+             {"SHADING",0,0,93,30,7}, {"TEXTURE",0,0,94,30,11},
+             {"GRID",0,0,72,30,15}}}) {
+            out[k++]={button.label,x,static_cast<int>(panel.y+62),button.w,button.h,button.command};
+            x+=button.w+5;
+        }
+        out[k++]={"LANDMARKS",static_cast<int>(panel.x+6),
+                  static_cast<int>(panel.y+98),136,30,24};
+        return out;
+    }
     for (int i=0;i<6;i++) { out[k++] = {bottom[i],x,static_cast<int>(panel.y+62),botw[i],30,botcmd[i]}; x += botw[i]+5; }
     const char* features[] = {"CAPITALS", "CITIES", "RIVERS", "RELIEF", "ELEV", "POP"};
     const int widths[] = {112,90,90,100,85,75};
@@ -277,7 +290,8 @@ void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState
         input_set_trackball(in,false);
         camera_grab_end(cam);
         camera_grab_kill_inertia(cam);
-        const auto home = timezone_center();
+        const auto home = g.body==BodyId::Earth ? timezone_center() :
+            std::array<double,2>{0.,0.};
         camera_center_on(cam, home[0],home[1]);
         cam.distance=3.2f;
         m.center_lon = home[0]*pi/180.;
@@ -328,6 +342,11 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
             ui.hover = -1;
         }
         return true; // Tab no longer switches Grab / Arcball
+    }
+    if (e.type==SDL_EVENT_KEY_DOWN && e.key.key==SDLK_F &&
+        globe.body!=BodyId::Earth) {
+        if (!e.key.repeat) ui.planetary_features_visible=!ui.planetary_features_visible;
+        return true; // Feature toggle also works while screen controls are hidden
     }
     if (!ui.visible) return false; // Hidden controls must not intercept map drags
     if (e.type!=SDL_EVENT_MOUSE_MOTION && e.type!=SDL_EVENT_MOUSE_BUTTON_DOWN &&
@@ -381,14 +400,16 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         }
         return true;
     }
-    for (const auto& b:buttons(ui)) {
+    for (const auto& b:buttons(ui,globe.body)) {
+        if (b.command<0) continue;
         if (!inside(b,x,y)) continue;
         ui.hover=b.command;
         if (e.type==SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button==SDL_BUTTON_LEFT) {
             input.dragging=false;
             input.drag_button=0;
             camera_grab_end(cam);
-            if (b.command == 15) ui.grid_visible = !ui.grid_visible;
+            if (b.command == 24) ui.planetary_features_visible = !ui.planetary_features_visible;
+            else if (b.command == 15) ui.grid_visible = !ui.grid_visible;
             else if (b.command == 17) ui.capitals_visible = !ui.capitals_visible;
             else if (b.command == 18) ui.cities_visible = !ui.cities_visible;
             else if (b.command == 19) ui.rivers_visible = !ui.rivers_visible;
@@ -637,8 +658,10 @@ void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
     const Bounds toolbar=toolbar_panel(ui);
     rect(ui,toolbar.x,toolbar.y,toolbar.w,toolbar.h,panel);
     draw_text(ui,toolbar.x+6,toolbar.y+7,"GLOBTOO   VIEW",2,text);
-    for (const auto& b : buttons(ui)) {
-        const bool enabled = b.command==15 ? ui.grid_visible :
+    for (const auto& b : buttons(ui,globe.body)) {
+        if (b.command<0) continue;
+        const bool enabled = b.command==24 ? ui.planetary_features_visible :
+            b.command==15 ? ui.grid_visible :
             b.command==17 ? ui.capitals_visible :
             b.command==18 ? ui.cities_visible :
             b.command==19 ? ui.rivers_visible :
