@@ -74,6 +74,21 @@ int main() {
         assert(!parse_command_line(static_cast<int>(std::size(invalid)),invalid,planetary,err));
     }
 
+    {
+        CommandLine download;
+        std::string err;
+        const char* args[]={"globtoo","--download-asset","earth"};
+        assert(parse_command_line(3,args,download,err));
+        assert(download.action==CommandAction::DownloadAsset);
+        assert(download.download_asset=="earth");
+        const char* equal[]={"globtoo","--download-asset=earth"};
+        assert(parse_command_line(2,equal,download,err));
+        const char* unknown[]={"globtoo","--download-asset","mars"};
+        assert(!parse_command_line(3,unknown,download,err));
+        const char* extra[]={"globtoo","--download-asset","earth","--layer","relief"};
+        assert(!parse_command_line(5,extra,download,err));
+    }
+
     CommandLine parsed;
     std::string error;
     const char* argv[]={"globtoo", "--marker-color", "#1a2B3c", "--marker-size", "12",

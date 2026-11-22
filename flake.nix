@@ -91,10 +91,8 @@
           name = "ne_10m_rivers_lake_centerlines.geojson";
         };
 
-      in
-      {
-        packages.default = pkgs.stdenv.mkDerivation {
-          pname = "globtoo";
+        mkPackage = { lite ? false }: pkgs.stdenv.mkDerivation {
+          pname = if lite then "globtoo-lite" else "globtoo";
           inherit version;
           src = ./.;
 
@@ -110,24 +108,34 @@
             libGL
             libglvnd
             mesa
-          ]) ++ sdl3PcDeps;
+          ]) ++ sdl3PcDeps ++ pkgs.lib.optionals lite [ pkgs.curl pkgs.openssl ];
 
           cmakeFlags = [
             "-DCMAKE_BUILD_TYPE=Release"
             "-DPROJECT_VERSION_FULL=${version}"
+            "-DGLOBTOO_ENABLE_DOWNLOADS=${if lite then "ON" else "OFF"}"
             # Install the pinned, fetched image itself; never a source-tree
             # placeholder or a file that happened to be named earth.jpg.
+          ] ++ pkgs.lib.optionals (!lite) [
             "-DGLOBTOO_EARTH_TEXTURE=${earthTexture}"
             # Optional high-resolution true-color tiles are supported by
             # -DGLOBTOO_IMAGERY_TEXTURE=<verified path> from a downstream
             # derivation; do not add a fetch with a fabricated hash here.
           ];
 
+          doCheck = true;
+          checkPhase = ''
+            runHook preCheck
+            ctest --output-on-failure
+            runHook postCheck
+          '';
+
           # Only GeoJSON is needed at source/configure time (mesh generation).
           # The image is installed directly from its immutable fetchurl path.
           postPatch = ''
             mkdir -p assets
             cp ${countries50m} assets/countries_50m.geojson
+          '' + pkgs.lib.optionalString (!lite) ''
             cp ${countries10m} assets/countries_10m.geojson
             cp ${places10m} assets/places_10m.geojson
             cp ${rivers10m} assets/rivers_10m.geojson
@@ -145,6 +153,15 @@
           };
         };
 
+      in
+      {
+        packages.default = mkPackage { };
+        packages.globtoo-lite = mkPackage { lite = true; };
+
+        # Both build variants participate in nix flake check.
+        checks.fat-build = self.packages.${system}.default;
+        checks.lite-build = self.packages.${system}.globtoo-lite;
+
         # Keep licensing checks part of `nix flake check` on every system.
         checks.reuse = pkgs.runCommand "globtoo-reuse-lint" {
           src = ./.;
@@ -160,7 +177,7 @@
             cmake pkg-config python3 python3Packages.pillow python3Packages.numpy
             python3Packages.rasterio
             sdl3 geos libGL libglvnd mesa reuse
-            gdb clang-tools curl
+            gdb clang-tools curl openssl
           ]) ++ sdl3PcDeps;
           shellHook = ''
             echo "Dev shell ready."
@@ -179,6 +196,10 @@
         apps.default = {
           type = "app";
           program = "${self.packages.${system}.default}/bin/globtoo";
+        };
+        apps.globtoo-lite = {
+          type = "app";
+          program = "${self.packages.${system}.globtoo-lite}/bin/globtoo";
         };
       });
 }

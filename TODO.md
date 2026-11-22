@@ -136,16 +136,20 @@ silently download large maps or satellite data on an existing installation.
       identify reliable NASA/USGS sources and per-asset licenses/checksums.
 
 ### Stage 5 — optional on-demand downloads and Nix split
-- [ ] Build opt-in libcurl texture/tiles fetcher with explicit user consent,
-      pinned manifest/checksums, XDG cache, size caps, offline behavior,
-      interruption recovery, clear attribution and meaningful errors.
-- [ ] Keep `packages.default` as the **fat**, fully functional offline install;
-      add `packages.globtoo-lite` using the same executable but smaller
-      packaged data and optional runtime downloads. Keep strict dependency
-      separation: no libcurl requirement for the fat/offline build unless
-      download functionality was explicitly enabled at compile time.
-- [ ] Add end-to-end Nix checks for each package, launch without networking,
-      cache hit/miss/corrupt cases, and `reuse lint` for new metadata.
+- [x] Add an opt-in libcurl CLI downloader for the pinned Earth base map:
+      XDG cache, HTTPS/TLS checks, SHA-256, size cap, progress, atomic writes,
+      safe retry and meaningful failures. No network on normal launch.
+- [ ] Expand verified asset catalog to licensed Moon/Mars/Io data and
+      high-resolution tiled sources; support resumable multi-part downloads
+      and interactive UI consent/progress as appropriate.
+- [x] Keep `packages.default` as the **fat**, offline Earth install;
+      add `packages.globtoo-lite` omitting Earth imagery and 10m features,
+      retaining 50m boundaries and opt-in libcurl Earth fetch. The default
+      package has no libcurl/OpenSSL dependency from the downloader.
+- [x] Register both Nix packages as build checks and add offline fixture tests
+      for cache hit, corruption, digest failure, size limit, and cleanup.
+- [ ] Run Nix checks on actual NixOS/SDL3/GLES2 hardware (not available in
+      current headless development environment); verify `reuse lint` there.
 
 ## Next
 - [ ] Test full-size GPWv4 population-density tiles and source metadata in

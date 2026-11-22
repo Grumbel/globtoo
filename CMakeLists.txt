@@ -51,6 +51,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
 
 option(GLOBTOO_BUILD_APP "Build the SDL3 + GLES2 globe viewer" ON)
+option(GLOBTOO_ENABLE_DOWNLOADS "Enable explicit libcurl/SSL asset download command" OFF)
+if(GLOBTOO_ENABLE_DOWNLOADS)
+  # pkg-config carries the transitive link dependencies of static libcurl
+  # installations as well as the usual shared-library configuration.
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(LIBCURL REQUIRED IMPORTED_TARGET libcurl)
+  find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+  add_library(globtoo_asset_download STATIC src/asset_download.cpp)
+  target_include_directories(globtoo_asset_download PUBLIC "${CMAKE_SOURCE_DIR}/src")
+  target_link_libraries(globtoo_asset_download PUBLIC PkgConfig::LIBCURL OpenSSL::Crypto)
+  target_compile_options(globtoo_asset_download PRIVATE -Wall -Wextra)
+endif()
+
 # Nix supplies the pinned fetchurl output here. Keep imagery out of the source
 # tree and never infer an Earth texture from a random file in assets/.
 set(GLOBTOO_EARTH_TEXTURE "" CACHE FILEPATH "Real equirectangular Earth image to package (e.g. a Nix fetchurl output)")
@@ -209,6 +222,11 @@ target_link_libraries(globtoo PRIVATE
   ${EGL_LIB}
   m
 )
+
+if(GLOBTOO_ENABLE_DOWNLOADS)
+  target_compile_definitions(globtoo PRIVATE GLOBTOO_ENABLE_DOWNLOADS=1)
+  target_link_libraries(globtoo PRIVATE globtoo_asset_download)
+endif()
 
 target_compile_options(globtoo PRIVATE -Wall -Wextra -O2)
 target_compile_definitions(globtoo PRIVATE
@@ -545,6 +563,13 @@ if(BUILD_TESTING)
   target_compile_definitions(resources_test PRIVATE
     GLOBTOO_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
   add_test(NAME resources COMMAND resources_test)
+  if(GLOBTOO_ENABLE_DOWNLOADS)
+    add_executable(asset_download_test tests/asset_download_test.cpp)
+    target_link_libraries(asset_download_test PRIVATE globtoo_asset_download)
+    target_compile_options(asset_download_test PRIVATE -UNDEBUG)
+    add_test(NAME asset_download COMMAND asset_download_test)
+  endif()
+
   if(GLOBTOO_BUILD_APP)
     add_executable(input_mouse_test
       tests/input_mouse_test.cpp src/input.cpp src/map_view.cpp src/camera.cpp)

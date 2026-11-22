@@ -139,6 +139,25 @@ The top-level `VERSION` file is the sole version source. `--version` (and the
 window title) display the same full version produced by CMake or Nix. Git
 `-dev` builds include the revision count and hash; releases do not.
 
+## Full and lite Nix packages
+
+`nix run .` starts the full offline Earth package with its bundled 4K base
+image and 10m geographic features. `nix run .#globtoo-lite` uses the same
+viewer, keeps 50m country boundaries, but omits the bundled imagery and the
+larger 10m geographic datasets. The lite package adds an **opt-in**, verified
+Earth image downloader (no automatic network traffic):
+
+```sh
+nix run .#globtoo-lite -- --download-asset earth
+nix run .#globtoo-lite
+```
+
+The texture is stored in the XDG cache for later offline launches. The
+normal full package does not link to libcurl or OpenSSL for downloading.
+See [download and package details](docs/DOWNLOADS.md) for the source hash,
+cache behavior, and limitations; currently only Earth is in the download
+catalog, not Moon, Mars or Io.
+
 ## Raster textures
 
 The default Nix build fetches its pinned 4K Earth image. Optional

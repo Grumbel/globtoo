@@ -22,9 +22,10 @@ struct Marker {
     float radius = 7.f;             // screen pixels (independent of zoom)
 };
 
-enum class CommandAction { Run, Help, Version };
+enum class CommandAction { Run, Help, Version, DownloadAsset };
 struct CommandLine {
     CommandAction action = CommandAction::Run;
+    std::string download_asset;
     std::string texture_path;
     BodyId body = BodyId::Earth;
     // Optional textures indexed by BodyId. The selected body's --texture

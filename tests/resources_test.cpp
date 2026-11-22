@@ -50,6 +50,23 @@ int main() {
 #endif
     assert(fs::equivalent(resource_path("assets/mars.jpg"),
                           base / "bin" / "assets" / "mars.jpg"));
+    // A lite install resolves explicitly downloaded textures under XDG.
+    fs::create_directories(base / "cache" / "globtoo" / "assets");
+    std::ofstream(base / "cache" / "globtoo" / "assets" / "earth.jpg") << "cached";
+    setenv("XDG_CACHE_HOME", (base / "cache").c_str(), 1);
+    assert(fs::equivalent(resource_cache_path("assets/earth.jpg"),
+                          base / "cache" / "globtoo" / "assets" / "earth.jpg"));
+    assert(resource_cache_path("../outside").empty());
+    assert(resource_cache_path("assets/../earth.jpg").empty());
+    // Packaged imagery must win over cached imagery in the fat package.
+#ifdef GLOBTOO_INSTALL_DATADIR
+    assert(fs::equivalent(resource_path("assets/earth.jpg"),
+                          base / "share" / "globtoo" / "assets" / "earth.jpg"));
+#endif
+    fs::remove(base / "share" / "globtoo" / "assets" / "earth.jpg");
+    assert(fs::equivalent(resource_path("assets/earth.jpg"),
+                          base / "cache" / "globtoo" / "assets" / "earth.jpg"));
+    unsetenv("XDG_CACHE_HOME");
     assert(resource_path("/tmp/absolute.txt") == "/tmp/absolute.txt");
     fs::create_directories(base / "custom" / "assets");
     std::ofstream(base / "custom" / "assets" / "earth.jpg") << "override";

@@ -405,6 +405,15 @@ bool parse_command_line(int argc, const char* const* argv,
             if (!parse_coordinates(*value,CoordinateOrder::LatitudeLongitude,lat,lon,error))
                 return false;
             output.center=std::make_pair(lon,lat);
+        } else if (!positional_done && key=="--download-asset") {
+            const auto value=next();
+            if (!value) return false;
+            if (*value!="earth") {
+                error="--download-asset currently supports only earth";
+                return false;
+            }
+            output.action=CommandAction::DownloadAsset;
+            output.download_asset=*value;
         } else if (!positional_done && key=="--body") {
             const auto value=next();
             if (!value) return false;
@@ -458,6 +467,11 @@ bool parse_command_line(int argc, const char* const* argv,
             return false;
         }
     }
+    if (output.action==CommandAction::DownloadAsset &&
+        !(argc==3 || (argc==2 && std::string_view(argv[1]).starts_with("--download-asset=")))) {
+        error="--download-asset must be used by itself";
+        return false;
+    }
     return true;
 }
 
@@ -476,6 +490,8 @@ std::string command_line_help(std::string_view program) {
     help += "      --body NAME           earth (default), moon, mars or io\n";
     help += "      --body-texture B=FILE Set a body's equirectangular image (repeatable)\n";
     help += "      --texture FILE        Texture of the initial body (or positional path)\n";
+    help += "      --download-asset earth Fetch verified Earth image to XDG cache and exit\n";
+    help += "                            Only available in curl-enabled (lite) builds\n";
     help += "      --layer NAME          imagery, relief, elevation, population (Earth only)\n";
     help += "      --imagery-dir DIR     High-resolution Earth imagery tiles\n";
     help += "      --relief-dir DIR      Directory with visual relief tile data\n";

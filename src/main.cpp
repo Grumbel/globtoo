@@ -20,6 +20,9 @@
 #include "markers.hpp"
 #include "geographic_overlay.hpp"
 #include "resources.hpp"
+#ifdef GLOBTOO_ENABLE_DOWNLOADS
+#include "asset_download.hpp"
+#endif
 #include "stb_image.h"
 
 #ifndef GLOBTOO_VERSION
@@ -91,6 +94,24 @@ int main(int argc, char** argv) {
     if (options.action == CommandAction::Version) {
         std::printf("globtoo %s\n", GLOBTOO_VERSION);
         return 0;
+    }
+
+    if (options.action == CommandAction::DownloadAsset) {
+#ifdef GLOBTOO_ENABLE_DOWNLOADS
+        const DownloadAsset* asset=find_download_asset(options.download_asset);
+        const std::string destination=resource_cache_path("assets/earth.jpg");
+        if (!asset || destination.empty()) {
+            std::fprintf(stderr,"globtoo: no cache path or pinned asset available\n");
+            return 1;
+        }
+        std::string report;
+        const DownloadResult result=download_asset(*asset,destination,report);
+        std::fprintf(stderr,"globtoo: %s\n",report.c_str());
+        return result==DownloadResult::Failed ? 1 : 0;
+#else
+        std::fprintf(stderr,"globtoo: this build has no downloader; use globtoo-lite or supply --texture\n");
+        return 1;
+#endif
     }
 
     const int width  = 1280;

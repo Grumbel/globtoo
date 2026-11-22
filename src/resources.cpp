@@ -22,6 +22,23 @@ std::string path_string(const fs::path& path) {
 }
 }
 
+std::string resource_cache_path(std::string_view relative_path) {
+    // Only fixed, catalogued resources may be resolved through this cache.
+    // This prevents an arbitrary user-supplied traversal path from being
+    // expanded beneath the user's cache directory.
+    if (relative_path != "assets/earth.jpg") return {};
+    fs::path root;
+    if (const char* xdg = std::getenv("XDG_CACHE_HOME")) {
+        if (*xdg && fs::path(xdg).is_absolute()) root = xdg;
+    }
+    if (root.empty()) {
+        const char* home = std::getenv("HOME");
+        if (!home || !*home || !fs::path(home).is_absolute()) return {};
+        root = fs::path(home) / ".cache";
+    }
+    return path_string(root / "globtoo" / relative_path);
+}
+
 void resources_set_executable_dir(std::string directory) {
     executable_dir = std::move(directory);
 }
@@ -53,6 +70,12 @@ std::string resource_path(std::string_view relative_path) {
     const fs::path configured = fs::path(GLOBTOO_INSTALL_RESOURCE_DIR) / relative;
     if (regular_file(configured)) return path_string(configured);
 #endif
+
+    // Fat/offline installations take precedence over downloaded assets. In a
+    // lite installation a verified, explicitly downloaded map is available
+    // on subsequent launches without a network request.
+    const std::string cached = resource_cache_path(relative_path);
+    if (!cached.empty() && regular_file(cached)) return cached;
 
     // Development fallback only. Never allow a stale source-tree asset to
     // shadow a real packaged texture, even with a nonstandard bindir.

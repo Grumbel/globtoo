@@ -83,6 +83,16 @@ and reference year displayed by the ELEV control.
 Use locally prepared numeric population density (people per square kilometre)
 tiles and a logarithmic-scale legend recording source, resolution, and year.
 The data is optional and is not fetched on application launch.
+.TP
+.BI \-\-download-asset\  "earth"
+Explicitly fetch the pinned Earth base map to the user's XDG cache and exit
+without starting SDL. Requires a build compiled with the libcurl downloader
+(enabled in the Nix
+.B globtoo-lite
+package). The full offline Nix package does not include the downloader.
+No network access occurs during normal launches. A corrupt or interrupted
+transfer never replaces an existing cached file.
+See the installed DOWNLOADS documentation for the URL and digest.
 .SH COORDINATES
 By default, coordinate pairs are latitude first, longitude second, in degrees.
 North and east are positive. Accepted forms include:
