@@ -55,6 +55,67 @@ possible and have not been quantified. This catalog is deliberately separate fro
 longitude normalization. The IAU feature center is not guaranteed to equal
 a feature's visually brightest or highest point.
 
+## Official raster candidates and landmark registration
+
+These are **candidate sources**, not vetted built-in download assets. We
+confirmed their published descriptions and linked image locations, but **did
+not obtain or rehash the actual files in this development environment**. They
+must not be added to the checked-download catalog without downloading the
+bytes and recording the true SHA-256, dimensions, redistribution rights and
+map projection/axis metadata. The JPL site describes the maps as full-world
+textures, but does not provide detailed per-image latitude or longitude
+conventions on the linked index page; do not infer those from the filename.
+
+| Body | Original catalog page | Candidate low-res image | Notes |
+| --- | --- | --- | --- |
+| Moon | [NASA SVS CGI Moon Kit](https://svs.gsfc.nasa.gov/4720/) | [2025 LROC color 2K JPG](https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg) | 2048×1024; NASA says the color map is centered on 0° longitude. Polar areas use filled-in albedo; aesthetic, not a scientific base map. |
+| Mars | [JPL Mars texture catalog](https://maps.jpl.nasa.gov/tmaps/mars.html) | [Viking global JPG](https://maps.jpl.nasa.gov/tmaps/pix/mar0kuu2.jpg) | Catalog lists a 1440×720 Caltech/JPL/USGS global texture. Reference system and latitude convention require checking. |
+| Io | [JPL Jupiter satellite texture catalog](https://maps.jpl.nasa.gov/tmaps/jupiter.html) | [Voyager/Galileo global JPG](https://maps.jpl.nasa.gov/tmaps/pix/jup1vss2.jpg) | Catalog lists 1440×720, with color from Galileo. These older mosaics have limited polar coverage and possible control-network differences. |
+
+For a **locally obtained** map, make a visual QA sheet without changing the
+viewer or committing the bitmap. Specify metadata as determined from the source
+product, **not** from the desired appearance. For example, *only if* the Moon
+source is verified east-positive, centered on 0° with a −180° left edge:
+
+```sh
+python3 tools/planetary_alignment.py /data/lroc_color_2k.jpg moon-qa.png \
+  --body moon --positive east --left 180 --json moon-qa.json
+```
+
+For a legacy Mars planetographic, west-positive 0°-left image, request the same
+latitude and longitude conversion used by the map-preparation tools:
+
+```sh
+python3 tools/planetary_alignment.py /data/mars-source.tif mars-qa.png \
+  --body mars --positive west --left 0 --latitude planetographic
+```
+
+To check already prepared tiled imagery (from any body), use its **normalized**
+preview. Do **not** repeat the orientation or Mars latitude transformation:
+
+```sh
+python3 tools/planetary_alignment.py /data/io-tiles io-qa.png \
+  --body io --normalized --json io-qa.json
+```
+
+The PNG includes 30° graticule lines and crosshairs/labels at the selected IAU
+Gazetteer **center** coordinates. The JSON records canonical east-positive
+longitude, latitude, floating pixel centers and the feature's Gazetteer ID.
+The reference label catalog is in `data/planetary_features.tsv`; the C++ test
+checks it against the runtime `planetary_features.hpp` table on every build.
+
+**What to verify by eye:** Tycho and Copernicus should point to lunar craters;
+Olympus Mons to the Martian shield volcano; Loki Patera and Pele to Io's
+volcanic centers. Compare a few features across both hemispheres, near poles,
+and on either side of the antimeridian. Horizontal mirroring, a half-turn,
+and a north/south projection discrepancy have different signatures. A feature
+center need not lie on the most visually distinctive part of the feature,
+especially when source map resolution is low. Neither this overlay nor a
+correct-looking picture proves that the source datum, reference ellipsoid,
+control network, color model, georeferencing, or scientific provenance is
+correct. In particular, **do not use a plausible visual match as a substitute
+for the original raster metadata**.
+
 ## Preparing an externally obtained map
 
 The input must be a color/grayscale **full 360° × 180° north-up plate carrée**

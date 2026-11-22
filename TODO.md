@@ -135,6 +135,9 @@ silently download large maps or satellite data on an existing installation.
       convert older Mars planetographic full-globe plate carrée rasters onto
       the planetocentric sphere before importing tiles; keep longitude axes
       separate from latitude assumptions.
+- [x] Add an offline visual map-registration QA sheet and tabular IAU feature
+      pixel report for source and normalized tiled maps; test east/west
+      canonical coordinates against the viewer's static feature table.
 - [ ] Validate actual source raster coordinate/reference metadata (including
       control networks, positive-east/positive-west and prime meridian) and
       verify planetocentric alignment using external scientific datasets.
@@ -187,6 +190,9 @@ silently download large maps or satellite data on an existing installation.
       Io imagery, with packaged fallback discovery and explicit CLI overrides.
 - [x] Accept planetocentric, full-world external high-resolution planetary mosaics
       as normalized GLES2 tiles; use installed or CLI-supplied datasets.
+- [x] Identify official NASA/JPL source pages and candidate low-resolution
+      Moon, Mars and Io JPGs, documenting unverified bytes, axis conventions
+      and redistribution/source-metadata limitations. No invented hashes.
 - [ ] Verify and package rights-cleared planetary raster maps, pole orientation
       and longitude direction per **actual** source, with pinned download hashes.
 - [x] Source a small cross-body IAU Gazetteer feature-center catalog with

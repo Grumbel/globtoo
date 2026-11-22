@@ -325,6 +325,11 @@ use `GLOBTOO_MOON_TEXTURE`, `GLOBTOO_MARS_TEXTURE` or
 axis, planetocentric latitude and image-origin settings. See [planetary map guide](docs/PLANETARY_MAPS.md)
 for the preprocessing tool, source catalogs, caveats, and packaging example.
 No unverified planetary images are downloaded or bundled by default.
+An offline [planetary alignment QA tool](docs/PLANETARY_MAPS.md#official-raster-candidates-and-landmark-registration)
+can annotate locally supplied maps or normalized tile previews with IAU
+landmark centers and a coordinate grid; it does not itself prove scientific
+map registration. The guide also links candidate official NASA/JPL maps
+without embedding them or asserting unchecked hashes.
 
 The non-Earth **LANDMARKS** button (or **F**, including while controls are
 hidden) shows a small catalog of IAU-named craters, maria, mountains and

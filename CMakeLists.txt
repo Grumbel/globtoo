@@ -682,6 +682,9 @@ if(BUILD_TESTING)
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/elevation_tiles_compiler_test.py")
     endif()
     if(_globtoo_test_pillow EQUAL 0)
+      add_test(NAME planetary_alignment
+        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+          ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/planetary_alignment_test.py")
       add_test(NAME planetary_texture_orientation
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/planet_texture_test.py")
       add_test(NAME raster_tiles_compiler
@@ -694,6 +697,8 @@ if(BUILD_TESTING)
   endif()
   add_executable(planetary_features_test tests/planetary_features_test.cpp)
   target_include_directories(planetary_features_test PRIVATE src)
+  target_compile_definitions(planetary_features_test PRIVATE
+    GLOBTOO_PLANETARY_FEATURES_TSV="${CMAKE_SOURCE_DIR}/data/planetary_features.tsv")
   target_compile_options(planetary_features_test PRIVATE -Wall -Wextra -UNDEBUG)
   add_test(NAME planetary_features COMMAND planetary_features_test)
   add_executable(bodies_test tests/bodies_test.cpp)

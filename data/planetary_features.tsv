@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# body\tname\tkind\tsource_latitude\tsource_longitude\tlongitude_direction\tlatitude_type\tgazetteer_id
+moon	Tycho	crater	-43.30	-11.22	east	planetographic	6163
+moon	Copernicus	crater	9.62	-20.08	east	planetographic	1296
+moon	Mare Tranquillitatis	mare	8.35	30.83	east	planetographic	3691
+mars	Olympus Mons	mountain	18.40	226.00	east	planetocentric	4453
+mars	Gale	crater	-5.44	137.70	east	planetocentric	2071
+mars	Hellas Planitia	plain	-42.66	70.00	east	planetocentric	2432
+io	Loki Patera	patera	12.97	308.80	west	planetographic	3459
+io	Pele	eruptive center	-18.71	255.28	west	planetographic	4638
+io	Tvashtar Paterae	paterae	62.76	123.53	west	planetographic	14131
