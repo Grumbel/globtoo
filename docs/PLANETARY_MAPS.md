@@ -116,6 +116,59 @@ control network, color model, georeferencing, or scientific provenance is
 correct. In particular, **do not use a plausible visual match as a substitute
 for the original raster metadata**.
 
+## One-command local source preparation and audit
+
+For a **locally downloaded** full-world map with verified source metadata,
+`tools/prepare_planetary_map.py` combines the existing coordinate
+normalization, GLES2 tiles, and Gazetteer QA into a single offline command.
+It **does not download** a NASA/JPL map, choose its reference system, or
+assert redistribution rights: supply those from the actual publisher record.
+Python 3 and Pillow are required. The input remains untouched.
+
+For example, **only if** the selected Io mosaic's original documentation
+confirms west-positive longitudes with a 0°W left edge, north-up plate carrée
+sampling, and spherical planetographic latitude:
+
+```sh
+python3 tools/prepare_planetary_map.py /data/io-original.jpg /data/io-tiles \
+  --body io \
+  --source-url 'https://maps.jpl.nasa.gov/tmaps/jupiter.html' \
+  --license 'publisher-confirmed redistribution terms' \
+  --projection plate-carree \
+  --positive west --left 0 --latitude planetographic \
+  --expected-sha256 'YOUR_64_CHARACTER_INDEPENDENTLY_VERIFIED_SHA256'
+
+globtoo --body io --body-imagery-dir io=/data/io-tiles
+```
+
+Replace the example's URL and license with the **exact** record for the
+selected original image. An `--expected-sha256` value must be a real trusted
+hash of those image bytes; the command stops before decoding if they differ.
+If no independently obtained pin exists, **omit** `--expected-sha256`:
+the script still records a locally calculated SHA-256 but explicitly labels
+it **unverified against an external reference**. A local checksum is useful
+for reproducibility; it is not proof of a publisher's source or license.
+
+The output can immediately be used with `--body-imagery-dir body=DIR`.
+It includes `manifest.txt`, power-of-two `tile-*.jpg`, `preview.jpg`,
+`preview-small.jpg`, `source.txt`, an auditable `source.json` (input digest,
+original coordinate assertions and hashes of every generated image/manifest),
+plus `alignment.png` and `alignment.json` with the landmark checks.
+Inspect the alignment PNG rather than trusting an automatically inferred
+orientation; **nothing is automatically inferred**. This output is a
+ready-to-use **local** map, not an addition to the source-controlled downloader.
+
+The command refuses to overwrite an existing output directory unless
+`--replace` is given. Conversion runs in a sibling staging directory first;
+a failed conversion preserves the prior output. On replacement, the previous
+directory is temporarily renamed out of the way and restored if publication
+fails. A process killed during replacement may leave a `.backup-*` directory:
+inspect it before deleting it. Source input is capped at 1 GiB and
+250 megapixels; the tiler handles large maps by tile strips rather than
+allocating a second full-size normalized raster. The output JSON records
+operator-provided map metadata; it does not validate the source's scientific
+datum, control network, or feature alignment automatically.
+
 ## Preparing an externally obtained map
 
 The input must be a color/grayscale **full 360° × 180° north-up plate carrée**

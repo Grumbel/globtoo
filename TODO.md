@@ -193,6 +193,10 @@ silently download large maps or satellite data on an existing installation.
 - [x] Identify official NASA/JPL source pages and candidate low-resolution
       Moon, Mars and Io JPGs, documenting unverified bytes, axis conventions
       and redistribution/source-metadata limitations. No invented hashes.
+- [x] Provide a one-command, offline source-map import workflow: explicit
+      publisher/rights/coordinate metadata, optional supplied SHA-256 pin,
+      per-body tiles and preview, audit JSON and IAU alignment QA, staging and
+      failure-safe replacement. Actual NASA/JPL raster bytes remain unverified.
 - [ ] Verify and package rights-cleared planetary raster maps, pole orientation
       and longitude direction per **actual** source, with pinned download hashes.
 - [x] Source a small cross-body IAU Gazetteer feature-center catalog with

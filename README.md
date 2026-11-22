@@ -325,6 +325,13 @@ use `GLOBTOO_MOON_TEXTURE`, `GLOBTOO_MARS_TEXTURE` or
 axis, planetocentric latitude and image-origin settings. See [planetary map guide](docs/PLANETARY_MAPS.md)
 for the preprocessing tool, source catalogs, caveats, and packaging example.
 No unverified planetary images are downloaded or bundled by default.
+For locally acquired and documented planetary mosaics, use
+`python3 tools/prepare_planetary_map.py SOURCE OUTPUT --body ...`
+with explicit longitude, latitude, projection, citation, license, and optional
+trusted SHA-256 pin. This generates an auditable tile directory plus a
+landmark QA sheet in one offline step; see the
+[planetary-map preparation guide](docs/PLANETARY_MAPS.md#one-command-local-source-preparation-and-audit).
+
 An offline [planetary alignment QA tool](docs/PLANETARY_MAPS.md#official-raster-candidates-and-landmark-registration)
 can annotate locally supplied maps or normalized tile previews with IAU
 landmark centers and a coordinate grid; it does not itself prove scientific
