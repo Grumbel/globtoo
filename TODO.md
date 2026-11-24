@@ -23,6 +23,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Earth imagery from one source at every zoom: BMNG with topography/
+      bathymetry, oceans recoloured lighter at tile time (`--recolor
+      brighten-ocean`), and the 4096-pixel distant/morph base written by the
+      same tiler run (`--base`). Previously the base was an unrelated
+      stylized 4K map and the tiles had near-black oceans. Cached tiles no
+      longer stay drawn after zooming out; non-selected tiles only stand in
+      while a selected one streams.
 - [x] Close-zoom Earth imagery by default: NASA BMNG 21600×10800 (July
       2004) tiled in its own `earth-imagery` derivation and installed via
       `GLOBTOO_IMAGERY_TILES`. `globtoo-max` adds the 86400×43200 BMNG

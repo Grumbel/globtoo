@@ -10,12 +10,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - **Natural Earth boundaries, populated places, and rivers:** public domain.
   Downloaded by the Nix build and converted into the distributed country
   meshes and compact point/line feature asset.
-- **Earth imagery:** NASA Blue Marble–derived image, public domain; fetched by
-  the Nix build. Credit: NASA Earth Observatory / Reto Stöckli. No placeholder Earth texture is distributed in the source tree.
-- **Close-zoom Earth imagery:** NASA Blue Marble Next Generation, July 2004
-  (21,600×10,800 by default; the 86,400×43,200 A1…D2 tiles in `globtoo-max`),
-  public domain. Credit: NASA Earth Observatory / Reto Stöckli. Fetched at
-  pinned hashes and installed only as derived tiles.
+- **Earth imagery:** NASA Blue Marble Next Generation with topography and
+  bathymetry, July 2004 (21,600×10,800 by default; the 86,400×43,200 A1…D2
+  tiles in `globtoo-max`), public domain. Credit: NASA Earth Observatory /
+  Reto Stöckli. Fetched at pinned hashes; installed only as derived tiles and
+  a 4096×2048 base image, with oceans recoloured lighter. A build without
+  tiles falls back to a Blue Marble–derived 4K image (turban/webgl-earth),
+  which is also the lite package's downloadable asset. No placeholder Earth
+  texture is distributed in the source tree.
 - **Moon, `globtoo-max` only:** USGS Astrogeology LRO LROC WAC Global
   Morphology Mosaic, 100 m/pixel, public domain. Credit: NASA/GSFC/Arizona
   State University. Installed only as derived tiles.

@@ -49,24 +49,23 @@
         # ---------------------------------------------------------------
         # Earth texture (fetched at build time – does NOT bloat the repo)
         # ---------------------------------------------------------------
-        # Default: public-domain equirectangular (Wikimedia)
-        # Good enough for development and still looks decent when zoomed.
-        # Seamless equirectangular day map (no clouds, no white border).
-        # NASA Blue Marble–derived 4k used by turban/webgl-earth.
-        # For full NASA BMNG 5400x2700 (public domain), swap URL to e.g.
-        #   https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg
-        # and update sha256 from the first failed build.
-        earthTexture = pkgs.fetchurl {
+        # Packages with Earth tiles use the tile derivation's own base.jpg
+        # (same source and colours as the close-up tiles). This stylized 4k
+        # day map (turban/webgl-earth) is only the fallback for a build
+        # without tiles; it is also the lite downloader's pinned asset.
+        earthTextureFallback = pkgs.fetchurl {
           url = "https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg";
           sha256 = "sha256-Yc09J0idgO0CXXlUU5ptkLUNRDO73Sfowa+KbxX3HoY=";
           name = "earth.jpg";
         };
 
-        # True-color close-zoom Earth imagery: NASA Blue Marble Next
-        # Generation, July 2004, without topography shading (public domain;
-        # NASA Earth Observatory / Reto Stöckli). The 4k image above stays
-        # the base for distant views and projection morphs.
-        bmngBase = "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/july";
+        # True-color Earth imagery: NASA Blue Marble Next Generation, July
+        # 2004, with topography and bathymetry shading (public domain; NASA
+        # Earth Observatory / Reto Stöckli). The plain bmng-base variant has
+        # uniformly black oceans; here the shaded sea floor is recoloured
+        # lighter by the tiler (--recolor brighten-ocean). All zoom levels,
+        # including the 4096-pixel distant/morph base, come from this source.
+        bmngBase = "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july";
         bmngLicense = "Public domain (NASA Earth Observatory, Blue Marble Next Generation)";
         bmngRaster = tag: file: sha256: pkgs.fetchurl {
           url = "${bmngBase}/${file}";
@@ -75,23 +74,23 @@
         };
         # 21600x10800 (1 arc-minute, ~1.9 km at the equator): default package.
         bmng21600 = [
-          (bmngRaster "21600" "world.200407.3x21600x10800.jpg"
-            "1qk1dppyfv3fz1mqxvg905wqw5waa1dcij70pkwgb4sgibfb9a6y")
+          (bmngRaster "21600" "world.topo.bathy.200407.3x21600x10800.jpg"
+            "1c57d7r89wv41s03a2mphl04fgj3yd46xppnv38s8j34bbrz29fj")
         ];
         # 86400x43200 (15 arc-seconds, ~460 m) as eight 21600x21600
         # quadrants: A..D are 90-degree columns from 180W eastwards, 1 is the
         # northern and 2 the southern half. Listed row-major for the tiler's
         # --mosaic 4x2. globtoo-max only.
         bmng86400 = map ({ tile, sha256 }:
-          bmngRaster tile "world.200407.3x21600x21600.${tile}.jpg" sha256) [
-          { tile = "A1"; sha256 = "0ml40c48vnwp26fvqc366gmkrr0ydpijya5nhnivajpv4jjdnnq4"; }
-          { tile = "B1"; sha256 = "09fniyng64jmm1wig3ra5d7m74g4hpqh12ghimvzy0506yh55rag"; }
-          { tile = "C1"; sha256 = "0mp976jms5sjknzl4f2mqrxyxykjq3jjcbhqc4ibnqqga5lvii0q"; }
-          { tile = "D1"; sha256 = "0s6yrap3v09qhf49hi79g5j5qhjnwig4ba21242pki6bqsbq2dfj"; }
-          { tile = "A2"; sha256 = "026ilzl0ddq9mq8k2y3i27c1flk3kmyp5gwb9f7z5apkws708kbd"; }
-          { tile = "B2"; sha256 = "16cyr0kcm5h2q07fsxc7hgv2898lprlpsnjbswa8x1glkr5qwzxs"; }
-          { tile = "C2"; sha256 = "18b612n0r9nxawxyvfapr73ph77s1f47svd7jmikyyyvkmjm1zhm"; }
-          { tile = "D2"; sha256 = "17fg80havffsbnlb2ni0fh1jg1v1y8svva2k6wqd83dfmi5q0nss"; }
+          bmngRaster tile "world.topo.bathy.200407.3x21600x21600.${tile}.jpg" sha256) [
+          { tile = "A1"; sha256 = "0w6bdchi6j4r93mdkq3hz3n8581z78xbq1d6jpdagiw0l6si18yd"; }
+          { tile = "B1"; sha256 = "13jm51xl535rww3cd5kkgxg5nrnx3ryj2wndzpkv7rknasswxn0m"; }
+          { tile = "C1"; sha256 = "182s8xg1cb9a4gkq1nzdwi8b1h1l6adydn0sil6n4pdk3smr117f"; }
+          { tile = "D1"; sha256 = "0mlvc2kf5bdp5prxng00bbakra3icwsk5738vh587798k170lj27"; }
+          { tile = "A2"; sha256 = "00md4pk3lxlms5qshk5n3bkiz7hbx0j70nbf9mqab9kljybnc2qz"; }
+          { tile = "B2"; sha256 = "1mw6rm5kjfqcir6z8fnrykypscgadj3i83513pmq2dq9zx4lrkip"; }
+          { tile = "C2"; sha256 = "02v6lb5snvdpg0a3h1da2hiwdr9yvsv9gxydswaspsnqdqffcdrj"; }
+          { tile = "D2"; sha256 = "19by4d29cw95dp71n3avwxb4sjdx6msxz8rnqgh6b08v2k8c50v8"; }
         ];
 
         # Natural Earth Admin-0 countries (public domain). The 50m mesh is
@@ -445,12 +444,14 @@
             nativeBuildInputs = [ python ];
           } ''
             python3 ${mapToolsSrc}/tools/build_raster_tiles.py \
-              ${pkgs.lib.escapeShellArgs sources} "$out" --mosaic ${mosaic}
+              ${pkgs.lib.escapeShellArgs sources} "$out" --mosaic ${mosaic} \
+              --recolor brighten-ocean --base 4096
             {
               echo "Body: earth"
               echo "Source: NASA Blue Marble Next Generation, July 2004 (${bmngBase}/)"
               echo "License: ${bmngLicense}"
               echo "Credit: NASA Earth Observatory / Reto Stöckli"
+              echo "Processing: oceans recoloured lighter (build_raster_tiles.py --recolor brighten-ocean)"
               ${pkgs.lib.concatMapStrings (source: ''
                 echo "Original file: ${source.url} (SHA-256 ${builtins.convertHash {
                   hash = source.outputHash; hashAlgo = "sha256"; toHashFormat = "base16"; }})"
@@ -499,11 +500,14 @@
             "-DCMAKE_BUILD_TYPE=Release"
             "-DPROJECT_VERSION_FULL=${version}"
             "-DGLOBTOO_ENABLE_DOWNLOADS=${if lite then "ON" else "OFF"}"
-          ] ++ bodyFlags ++ pkgs.lib.optionals (!lite) [
-            "-DGLOBTOO_EARTH_TEXTURE=${earthTexture}"
-          ] ++ pkgs.lib.optionals (earthTiles != null) [
+          ] ++ bodyFlags ++ (if earthTiles != null then [
+            # Distant views and morphs use the tiles' own base image, so
+            # zooming never switches to a differently coloured source.
+            "-DGLOBTOO_EARTH_TEXTURE=${earthTiles}/base.jpg"
             "-DGLOBTOO_IMAGERY_TILES=${earthTiles}"
-          ];
+          ] else pkgs.lib.optionals (!lite) [
+            "-DGLOBTOO_EARTH_TEXTURE=${earthTextureFallback}"
+          ]);
 
           doCheck = true;
           checkPhase = ''

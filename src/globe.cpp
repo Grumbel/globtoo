@@ -130,8 +130,9 @@ void globe_draw(Globe& g, const Camera& cam, float aspect,
     } else {
         glDisable(GL_CULL_FACE);
     }
-    // The whole-world texture under any tiles: the original (e.g. 4K)
-    // imagery source when present, otherwise the tile set's own preview.
+    // The whole-world texture under any tiles: the Earth texture (packaged
+    // as the tile set's own 4096-pixel base.jpg, so its colours match the
+    // tiles) when present, otherwise the tile set's preview.
     const Texture* base = nullptr;
     if (textured) {
         base = tiled && (g.surface != SurfaceLayer::Imagery || !g.texture.id)

@@ -129,6 +129,40 @@ class RasterTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'2:1'):
                 build(src,pathlib.Path(d)/'out')
 
+    def test_brighten_ocean_keeps_land_and_ice(self):
+        from tools.build_raster_tiles import OCEAN_DEEP, brighten_ocean
+        samples = {
+            'deep': (2, 5, 20), 'open': (7, 19, 47), 'shelf': (28, 70, 131),
+            'forest': (40, 60, 25), 'desert': (200, 160, 110),
+            'ice': (225, 235, 245), 'shadow': (40, 42, 46),
+        }
+        image = Image.new('RGB', (len(samples), 1))
+        for x, color in enumerate(samples.values()):
+            image.putpixel((x, 0), color)
+        out = dict(zip(samples, brighten_ocean(image).getdata()))
+        self.assertEqual(out['deep'], OCEAN_DEEP)
+        self.assertLess(out['deep'][2], out['open'][2])
+        self.assertLess(out['open'][2], out['shelf'][2])
+        for name in ('forest', 'desert', 'ice', 'shadow'):
+            self.assertEqual(out[name], samples[name], name)
+
+    def test_recolor_and_base_from_same_source(self):
+        from tools.build_raster_tiles import brighten_ocean
+        from tools.raster_manifest import tile_name
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            source = root / 'dark.png'
+            Image.new('RGB', (1024, 512), (7, 19, 47)).save(source)
+            build(source, root / 'out', 256, 4, recolor=brighten_ocean,
+                  base_width=512)
+            base = Image.open(root / 'out' / 'base.jpg')
+            self.assertEqual(base.size, (512, 256))
+            for image in (base, Image.open(root / 'out' / 'preview.jpg'),
+                          Image.open(root / 'out' / tile_name(0, 1, 1))):
+                self.assertGreater(image.convert('RGB').getpixel((10, 10))[2], 100)
+            with self.assertRaisesRegex(ValueError, 'even'):
+                build(source, root / 'odd', 256, 4, base_width=511)
+
     def test_pyramid_levels_and_manifest(self):
         # Sources wider than the 2048-pixel preview get coarser levels until
         # a level would no longer be sharper than that preview.

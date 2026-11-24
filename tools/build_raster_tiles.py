@@ -79,6 +79,37 @@ class VipsRaster:
         return self.crop((0, 0, self.width, self.height))
 
 
+# Blue Marble NG topography/bathymetry renders the deep ocean almost black
+# (about RGB 7,19,47), which reads as a hole in a globe. --brighten-ocean
+# recolours water onto a lighter deep-to-shelf ramp. The source's blue level
+# is a monotonic depth shading, so it is kept as the ramp position and the
+# bathymetric relief survives. Water is told apart from land by hue: it is
+# the only surface whose blue clearly dominates red and green; bright
+# pixels (ice, sea ice, glare) are left as they are. Pointwise, so every
+# pyramid level, preview and base image gets the same colours.
+OCEAN_DEEP = (22, 58, 118)
+OCEAN_SHALLOW = (70, 138, 196)
+
+
+def brighten_ocean(image):
+    import numpy as np
+    pixels = np.asarray(image.convert('RGB'), dtype=np.float32)
+    red, green, blue = pixels[..., 0], pixels[..., 1], pixels[..., 2]
+    ratio = blue / np.maximum(np.maximum(red, green), 4.0)
+    weight = np.clip((ratio - 1.25) / (1.6 - 1.25), 0, 1)
+    weight = weight * weight * (3 - 2 * weight)
+    weight *= np.clip((150 - blue) / 20, 0, 1)
+    depth = np.clip((blue - 20) / (131 - 20), 0, 1) ** 0.85
+    deep = np.array(OCEAN_DEEP, dtype=np.float32)
+    shallow = np.array(OCEAN_SHALLOW, dtype=np.float32)
+    ocean = deep + (shallow - deep) * depth[..., None]
+    pixels += (ocean - pixels) * weight[..., None]
+    return Image.fromarray(np.clip(pixels + .5, 0, 255).astype(np.uint8), 'RGB')
+
+
+RECOLOR = {'none': None, 'brighten-ocean': brighten_ocean}
+
+
 def _pil(image):
     return image.to_pil() if isinstance(image, VipsRaster) else image
 
@@ -209,7 +240,7 @@ def _oriented_preview(image, positive, left, top='north'):
 
 
 def _write_level(image, destination, level, tile_size, gutter, positive,
-                 left, latitude, body, top_edge, workers=1):
+                 left, latitude, body, top_edge, workers=1, recolor=None):
     """Tile one pyramid level; `image` is the (resized) unoriented source."""
     width, height = image.size
     content = tile_size - 2 * gutter
@@ -219,7 +250,7 @@ def _write_level(image, destination, level, tile_size, gutter, positive,
     def write(cell):
         row, column = cell
         _write_tile(image, destination, level, row, column, tile_size, gutter,
-                    positive, left, latitude, body, top_edge)
+                    positive, left, latitude, body, top_edge, recolor)
 
     if workers > 1:
         # libvips and JPEG encoding release the GIL. Every tile is an
@@ -233,7 +264,7 @@ def _write_level(image, destination, level, tile_size, gutter, positive,
 
 
 def _write_tile(image, destination, level, row, column, tile_size, gutter,
-                positive, left, latitude, body, top_edge):
+                positive, left, latitude, body, top_edge, recolor=None):
     width, height = image.size
     content = tile_size - 2 * gutter
     # Every tile is tile_size², including small final edge cells, making
@@ -287,18 +318,24 @@ def _write_tile(image, destination, level, row, column, tile_size, gutter,
     if valid_h < tile_size:
         edge = tile.crop((0, valid_h-1, tile_size, valid_h))
         tile.paste(edge.resize((tile_size, tile_size-valid_h)), (0, valid_h))
+    if recolor:
+        tile = recolor(tile)
     tile.save(destination / tile_name(level, row, column),
               quality=93, subsampling=0)
 
 
 def build(source, destination, tile_size=1024, gutter=4,
           positive='east', left=180, latitude='planetocentric', body=None,
-          top_edge='north', mosaic=(1, 1), backend='auto', workers=None):
+          top_edge='north', mosaic=(1, 1), backend='auto', workers=None,
+          recolor=None, base_width=None):
     """Tile `source`: one raster path, or a row-major list of `mosaic` tiles.
 
     Sources up to 250 megapixels are decoded with Pillow. Larger rasters and
     mosaics are streamed through libvips (pyvips) with the same tile layout,
-    gutters and orientation handling.
+    gutters and orientation handling. `recolor` maps every written Pillow
+    image (tiles, previews, base). `base_width` additionally writes base.jpg,
+    a whole-world texture from the same source, so that the viewer's distant
+    view matches its close-up tiles.
     """
     validate_latitude_type(body, latitude)
     if top_edge not in ('north', 'south'):
@@ -309,6 +346,8 @@ def build(source, destination, tile_size=1024, gutter=4,
         raise ValueError("tile size must be a power of two in [64, 2048]")
     if not 2 <= gutter <= 16 or gutter * 2 >= tile_size:
         raise ValueError("invalid tile gutter")
+    if base_width is not None and (base_width < 2 or base_width % 2):
+        raise ValueError("base width must be even")
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
     with open_source(source, mosaic, backend) as image:
@@ -331,15 +370,20 @@ def build(source, destination, tile_size=1024, gutter=4,
             level_image = image if level == 0 else image.resize(
                 layout.level_size(level), Image.Resampling.LANCZOS)
             _write_level(level_image, destination, level, tile_size, gutter,
-                         positive, left, latitude, body, top_edge, workers)
+                         positive, left, latitude, body, top_edge, workers,
+                         recolor)
             del level_image
         # Use a small preview for zoomed-out views; loading its full resolution
         # cannot exceed GLES2's ubiquitous 2048x2048 limit.
-        for name, size in (('preview.jpg', (2048, 1024)),
-                           ('preview-small.jpg', (1024, 512))):
+        outputs = [('preview.jpg', (2048, 1024)), ('preview-small.jpg', (1024, 512))]
+        if base_width is not None:
+            outputs.append(('base.jpg', (base_width, base_width // 2)))
+        for name, size in outputs:
             scaled = _pil(image.resize(size, Image.Resampling.LANCZOS)).convert('RGB')
             preview = reproject_latitude_rows(
                 _oriented_preview(scaled, positive, left, top_edge), body, latitude)
+            if recolor:
+                preview = recolor(preview)
             preview.save(destination / name, quality=90)
         (destination / 'manifest.txt').write_text(format_manifest(layout),
                                                   encoding='ascii')
@@ -365,6 +409,10 @@ def main():
                     help='join equal-sized sources as COLUMNSxROWS (needs pyvips)')
     ap.add_argument('--backend', choices=('auto', 'pil', 'vips'), default='auto')
     ap.add_argument('--jobs', type=int, help='parallel tile writers (libvips only)')
+    ap.add_argument('--recolor', choices=sorted(RECOLOR), default='none',
+                    help='colour adjustment for every output image')
+    ap.add_argument('--base', type=int, metavar='WIDTH',
+                    help='also write base.jpg, a WIDTHx(WIDTH/2) whole-world image')
     ap.add_argument('--tile-size', type=int, default=1024)
     ap.add_argument('--gutter', type=int, default=4)
     ap.add_argument('--positive', choices=('east','west'), default='east',
@@ -385,7 +433,7 @@ def main():
     print('Created %d x %d raster tiles' % build(
         args.source, args.output, args.tile_size, args.gutter, args.positive,
         args.left, args.latitude, args.body, args.top, args.mosaic,
-        args.backend, args.jobs))
+        args.backend, args.jobs, RECOLOR[args.recolor], args.base))
 
 
 if __name__ == '__main__':

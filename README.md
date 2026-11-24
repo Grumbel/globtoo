@@ -185,8 +185,8 @@ window title) display the same full version produced by CMake or Nix. Git
 
 ## Full and lite Nix packages
 
-`nix run .` starts the full offline Earth package with its bundled 4K base
-image and 10m geographic features. `nix run .#globtoo-lite` uses the same
+`nix run .` starts the full offline Earth package with its bundled NASA Blue
+Marble imagery and 10m geographic features. `nix run .#globtoo-lite` uses the same
 viewer, keeps 50m country boundaries, but omits the bundled imagery and the
 larger 10m geographic datasets. The lite package adds an **opt-in**, verified
 Earth image downloader (no automatic network traffic):
@@ -204,10 +204,10 @@ catalog, not the other bodies.
 
 ## Raster textures
 
-The default Nix build fetches its pinned 4K Earth image. Optional
-**high-resolution Imagery tiles** can augment the normal Earth mode at close
-zoom (`--imagery-dir DIR` or `-DGLOBTOO_IMAGERY_TEXTURE=...`) while retaining
-that 4K image as the overview fallback. There is also an
+The default Nix build tiles pinned 21,600×10,800 NASA Blue Marble imagery
+(oceans recoloured lighter) and installs a 4096-pixel base image from the
+same source for distant views. Other **high-resolution Imagery tiles** can
+be supplied with `--imagery-dir DIR` or `-DGLOBTOO_IMAGERY_TEXTURE=...`. There is also an
 **optional high-resolution Relief** layer: a real NASA Blue Marble topography
 and ocean-bathymetry image preprocessed into GLES2-friendly tiles, with
 on-demand local tile loading at close zoom. The optional layer has its own

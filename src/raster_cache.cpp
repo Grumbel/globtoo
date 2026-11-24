@@ -317,11 +317,28 @@ int raster_cache_draw(RasterCache& r,const Camera& cam,const MapView& map,
         r.loader->wake.notify_one();
     }
 
-    // 4. Draw every loaded visible tile, finest level first. Tiles that are
-    // finer than needed are harmless (mipmapped) and make good fallbacks.
+    // 4. Draw the loaded wanted tiles. Other loaded tiles (finer ones left
+    // over from zooming in, coarser ones from zooming out) only stand in
+    // where an overlapping wanted tile is still streaming or broken; once
+    // the selection is loaded, the picture depends on the view alone, not on
+    // what happened to be cached, and where no tile is wanted the base
+    // texture shows. Drawn finest level first (see globe_draw's stencil).
+    std::vector<int> missing;
+    for (int index : wanted)
+        if (!r.cells[static_cast<size_t>(index)].image.id) missing.push_back(index);
+    const auto overlaps=[&](const RasterTileRegion& a,const RasterTileRegion& b) {
+        return a.u0<b.u1 && b.u0<a.u1 && a.v0<b.v1 && b.v0<a.v1;
+    };
     std::vector<int> draw;
-    for (const auto& c : visible)
-        if (r.cells[static_cast<size_t>(c.index)].image.id) draw.push_back(c.index);
+    for (const auto& c : visible) {
+        const auto& cell=r.cells[static_cast<size_t>(c.index)];
+        if (!cell.image.id) continue;
+        const bool stand_in=cell.recent!=r.frame &&
+            std::any_of(missing.begin(),missing.end(),[&](int index) {
+                return overlaps(cell.region,r.cells[static_cast<size_t>(index)].region);
+            });
+        if (cell.recent==r.frame || stand_in) draw.push_back(c.index);
+    }
     if (draw.empty()) return 0;
     std::stable_sort(draw.begin(),draw.end(),[&](int a,int b) {
         return r.cells[static_cast<size_t>(a)].level<r.cells[static_cast<size_t>(b)].level;

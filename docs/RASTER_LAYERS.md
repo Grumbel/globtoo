@@ -18,24 +18,32 @@ Measured elevation and bathymetry now have a **separate** ELEV layer using
 signed 16-bit source rasters; see [ELEVATION.md](ELEVATION.md). The original
 RELIEF layer remains a photographic visualization without physical units.
 
-No images are downloaded at runtime. The standard Nix package still ships its
-pinned 4K image, **not** an unverified large download. Optional 21,600×10,800
-NASA imagery can now be used in the normal IMAGERY mode, as well as independently
-for the RELIEF mode. A shaded-relief JPEG is a visualization, not a measured
+No images are downloaded at runtime. The standard Nix package ships
+checksum-pinned 21,600×10,800 NASA imagery as tiles in the normal IMAGERY
+mode; the same kind of source can be used independently for the RELIEF mode. A shaded-relief JPEG is a visualization, not a measured
 elevation raster; colors must not be interpreted as meters of elevation or depth.
 The separate ELEV and POP layers use numeric measurements and carry legends.
 
 ## High-resolution true-color Imagery (normal Earth mode)
 
-The baseline `assets/earth.jpg` is kept for distant views and during projection
-transitions; `imagery/` contains the optional close-up tiles. The tiles are
+The baseline `assets/earth.jpg` is used for distant views and during projection
+transitions; `imagery/` contains the close-up tile pyramid. The Nix packages
+install the tile set's own 4096×2048 `base.jpg` as `assets/earth.jpg`, so every
+zoom level comes from one source with identical colours and there is no visible
+switch while zooming. The tiles are
 **not** an additional display mode: they are automatically selected when you
 zoom into Imagery. Country colors, borders, and graticules still work over them.
 The preview is also a fallback when the baseline image does not fit the GPU.
 
 The Nix packages ship NASA's
-[Blue Marble Next Generation base map](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/)
-(July 2004, north-up, public domain) as checksum-pinned tiles:
+[Blue Marble Next Generation with topography and bathymetry](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/)
+(July 2004, north-up, public domain) as checksum-pinned tiles. Its shaded sea
+floor is still very dark (deep ocean about RGB 7,19,47), which looks like a
+hole in a globe, so the tiler's `--recolor brighten-ocean` maps water onto a
+lighter deep-to-shelf blue ramp. It keeps the bathymetric shading as the ramp
+position, detects water by hue (blue clearly dominating red and green) and
+leaves land, ice and bright pixels untouched. The plain BMNG base map has
+uniformly black oceans and is not used.
 
 | Package | Earth imagery | Moon imagery |
 |---|---|---|
@@ -50,13 +58,15 @@ roughly 20 GB of downloads and tens of GB of temporary space while tiling;
 To tile a source yourself, download and verify it, then run:
 
 ```sh
-python3 tools/build_raster_tiles.py /path/to/world.200407.3x21600x10800.jpg \
-  /tmp/globtoo-imagery
+python3 tools/build_raster_tiles.py /path/to/world.topo.bathy.200407.3x21600x10800.jpg \
+  /tmp/globtoo-imagery --recolor brighten-ocean --base 4096
 # A row-major mosaic of equally sized parts (NASA's A1 B1 C1 D1 A2 ... D2):
-python3 tools/build_raster_tiles.py world.200407.3x21600x21600.{A,B,C,D}1.jpg \
-  world.200407.3x21600x21600.{A,B,C,D}2.jpg /tmp/globtoo-imagery-max --mosaic 4x2
-# Start any installed Globtoo and supply these tiles directly:
-globtoo --imagery-dir /tmp/globtoo-imagery
+python3 tools/build_raster_tiles.py world.topo.bathy.200407.3x21600x21600.{A,B,C,D}1.jpg \
+  world.topo.bathy.200407.3x21600x21600.{A,B,C,D}2.jpg /tmp/globtoo-imagery-max \
+  --mosaic 4x2 --recolor brighten-ocean --base 4096
+# Start any installed Globtoo and supply these tiles directly; pass the
+# matching base image too, or zooming switches between two different maps:
+globtoo --imagery-dir /tmp/globtoo-imagery --texture /tmp/globtoo-imagery/base.jpg
 ```
 
 Or have CMake preprocess and install them, while retaining a separate low-
@@ -146,8 +156,10 @@ add a new Nix fetch with an unverified hash.
   surface at the tile's nearest and farthest visible points and requests
   every level that some visible point needs: the coarsest level that is
   still at least as sharp as the screen. Nothing is requested where the
-  base image (the regular 4K Earth map where available, otherwise the
-  preview) is already sharp enough. If a selection would exceed the
+  base image (the Earth map where available, otherwise the preview) is
+  already sharp enough. Only the selected tiles are drawn; other cached
+  tiles stand in only where a selected tile is still loading, so zooming out
+  returns to the same picture as before zooming in. If a selection would exceed the
   32-tile GPU cache (~170 MiB with mipmaps), the whole selection is
   coarsened one level at a time.
 - JPEG decoding runs on a background thread per tile set; the render thread
