@@ -43,6 +43,7 @@ Available packages:
 nix build .#default        # Earth + all other bodies, packaged offline
 nix build .#globtoo-earth  # Full Earth maps, without planetary rasters
 nix build .#globtoo-lite   # Lean package; explicitly download Earth on demand
+nix build .#planetary-maps # Only the tiled planetary imagery (cached separately)
 nix run .#default -- --body mars
 ```
 

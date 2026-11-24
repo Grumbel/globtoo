@@ -18,8 +18,10 @@ import sys
 from PIL import Image
 
 if __package__:
+    from .install_planetary_map import verify_prepared_map
     from .planetary_bodies import BODIES
 else:
+    from install_planetary_map import verify_prepared_map
     from planetary_bodies import BODIES
 TILE_NAME = re.compile(r'tile-[0-9]{3}-[0-9]{3}\.jpg\Z')
 
@@ -83,7 +85,6 @@ def verify_body(prefix: Path, body: str) -> int:
     if (imagery / 'source.json').exists():
         # Prepared maps already have audited SHA-256 records, which must
         # survive the CMake/Nix install unchanged.
-        from tools.install_planetary_map import verify_prepared_map
         verify_prepared_map(imagery, body)
     else:
         source = _file(imagery / 'source.txt').read_text(encoding='utf-8')

@@ -490,9 +490,14 @@ subsequent Nix fetch.
 The default `nix build` / `nix run` packages Earth and **every other body in
 `data/bodies.tsv`**: all planets, the major moons, Pluto and Charon. The
 planetary data is **not** committed to Git: `flake.nix` pins each upstream
-image with a fixed-output hash, performs the oriented plate-carrée tile
-conversion during the build, and installs `share/globtoo/imagery/<body>/`
-(manifest, tiles, previews, source record). The `preview-small.jpg` is also
+image with a fixed-output hash and runs `tools/prepare_planetary_map.py` on it
+in a separate per-body derivation (`.#planetary-map-<body>`, or all of them as
+`.#planetary-maps`). Those derivations only depend on the source image, the
+tiling tools and the body/landmark catalogs, so changing application code does
+not re-tile any imagery. Each result is a regular audited prepared map
+(manifest, tiles, previews, `source.txt`/`source.json`, alignment QA sheet),
+handed to CMake as `GLOBTOO_<BODY>_PREPARED_MAP` and installed as
+`share/globtoo/imagery/<body>/`. The `preview-small.jpg` is also
 installed as `share/globtoo/assets/<body>.jpg` so both the distant globe and
 close zoom show the same map. `postInstall` audits every installed tile grid.
 

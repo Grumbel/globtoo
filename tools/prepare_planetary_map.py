@@ -58,7 +58,8 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
             license_text: str, positive: str, left: int, latitude: str,
             projection: str, expected_sha256: str | None = None,
             tile_size: int = 1024, gutter: int = 4, qa_width: int = 2048,
-            replace: bool = False, top: str = 'north') -> dict:
+            replace: bool = False, top: str = 'north',
+            preprocessing: str | None = None) -> dict:
     source = Path(source).absolute()
     destination = Path(destination).absolute()
     if body not in BODIES:
@@ -73,6 +74,8 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
         raise ValueError('explicit planetocentric|planetographic latitude is required')
     if not source_url.strip() or not license_text.strip():
         raise ValueError('a source publication URL/citation and license statement are required')
+    if preprocessing is not None and (not preprocessing.strip() or '\n' in preprocessing):
+        raise ValueError('preprocessing note must be a non-empty single line')
     if expected_sha256 is not None and not SHA256_PATTERN.fullmatch(expected_sha256):
         raise ValueError('expected SHA-256 must contain exactly 64 hexadecimal characters')
     if not source.is_file() or source.is_symlink():
@@ -121,6 +124,7 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
             f'Projection: plate-carree, {top}-up (operator-declared)\n'
             f'Longitude: {positive}-positive, left={left} degrees (operator-declared)\n'
             f'Latitude: {latitude} (operator-declared)\n'
+            + (f'Preprocessing: {preprocessing}\n' if preprocessing else '') +
             'Output: east-positive, planetocentric, -180 degrees at left\n'
             'Visual Gazetteer overlay is for QA; it does not certify registration.\n',
             encoding='utf-8')
@@ -148,6 +152,7 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
             'output_tile_size': tile_size,
             'output_tile_gutter': gutter,
             'files_sha256': output_hashes,
+            'source_preprocessing': preprocessing,
             'limitations': ('Publisher metadata, license, datum and feature alignment are '
                             'operator assertions; SHA-256 pin matching proves payload '
                             'identity only, not scientific map registration.'),
@@ -197,6 +202,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--gutter', type=int, default=4)
     parser.add_argument('--qa-width', type=int, default=2048)
     parser.add_argument('--replace', action='store_true', help='replace previous completed output')
+    parser.add_argument('--preprocessing',
+                        help='one-line record of geometric preprocessing already applied to SOURCE')
     args = parser.parse_args(argv)
     try:
         record = prepare(args.source, args.output, body=args.body,
@@ -205,7 +212,8 @@ def main(argv: list[str] | None = None) -> int:
                          left=args.left, latitude=args.latitude,
                          expected_sha256=args.expected_sha256,
                          tile_size=args.tile_size, gutter=args.gutter,
-                         qa_width=args.qa_width, replace=args.replace, top=args.top)
+                         qa_width=args.qa_width, replace=args.replace, top=args.top,
+                         preprocessing=args.preprocessing)
     except (OSError, ValueError, Image.DecompressionBombError) as exc:
         parser.exit(1, f'planetary map preparation: {exc}\n')
     print(f'{args.body}: prepared {args.output}\n'

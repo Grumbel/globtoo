@@ -347,45 +347,60 @@
             (pkgs.lib.splitString "\n" (builtins.readFile ./data/bodies.tsv)));
         planetaryBodies = builtins.filter (body: body != "earth") bodyOrder;
 
-        # A supplied audited map replaces the corresponding bundled source;
+        # Texture generation lives in its own derivations, one per body, so
+        # app code changes never re-tile gigapixels of imagery. Their source
+        # is limited to the tiling tools and catalogs they actually read.
+        mapToolsSrc = pkgs.lib.fileset.toSource {
+          root = ./.;
+          fileset = pkgs.lib.fileset.unions [
+            ./tools/prepare_planetary_map.py
+            ./tools/build_raster_tiles.py
+            ./tools/planetary_alignment.py
+            ./tools/normalize_planet_texture.py
+            ./tools/planetary_bodies.py
+            ./tools/planetary_latitudes.py
+            ./tools/install_planetary_map.py
+            ./data/bodies.tsv
+            ./data/planetary_features.tsv
+          ];
+        };
+        # Output: an audited prepared map (tiles, previews, source.json with
+        # per-file SHA-256, alignment QA sheet), the same format as a manual
+        # tools/prepare_planetary_map.py run and GLOBTOO_<BODY>_PREPARED_MAP.
+        mkPlanetaryMap = body: image: pkgs.runCommand "globtoo-map-${body}" {
+            nativeBuildInputs = [ pythonWithPillow ];
+          } ''
+            # prepare stages next to its destination; the store is read-only.
+            python3 ${mapToolsSrc}/tools/prepare_planetary_map.py \
+              ${image.source} "$NIX_BUILD_TOP/${body}" \
+              --body ${body} --projection plate-carree \
+              --source-url ${pkgs.lib.escapeShellArg image.url} \
+              --license ${pkgs.lib.escapeShellArg image.license} \
+              --positive ${image.positive} --left ${image.left} \
+              --top ${image.top or "north"} --latitude ${image.latitude} \
+              ${pkgs.lib.escapeShellArgs (pkgs.lib.optionals (image ? preprocessing)
+                [ "--preprocessing" image.preprocessing ])}
+            python3 ${mapToolsSrc}/tools/install_planetary_map.py \
+              "$NIX_BUILD_TOP/${body}" --verify --body ${body}
+            cp -r "$NIX_BUILD_TOP/${body}" "$out"
+          '';
+        bundledMaps = builtins.mapAttrs mkPlanetaryMap planetaryRasters;
+
+        # A supplied audited map replaces the corresponding bundled one;
         # a caller does not have to build, install or manually copy assets.
-        # Passing {} uses all bundled sources in the full build.
+        # Passing {} uses all bundled maps in the full build.
         mkPackage = { lite ? false, planetaryMaps ? {},
                       includePlanetaryTextures ? !lite }:
           let
-            bodies = planetaryBodies;
             # Only selected assets are fetched; lite has no planetary fetches
             # unless an audited map was explicitly supplied by the caller.
-            activeBodies = builtins.filter (body:
-              builtins.hasAttr body planetaryMaps || includePlanetaryTextures) bodies;
-            bodyFlags = pkgs.lib.concatMap (body:
-              let
-                upper = pkgs.lib.strings.toUpper body;
-              in
-                if builtins.hasAttr body planetaryMaps then [
-                  "-DGLOBTOO_${upper}_PREPARED_MAP=${builtins.getAttr body planetaryMaps}"
-                ] else if includePlanetaryTextures then
-                  let image = builtins.getAttr body planetaryRasters;
-                  in [
-                    "-DGLOBTOO_${upper}_IMAGERY_TEXTURE=${image.source}"
-                    "-DGLOBTOO_${upper}_LONGITUDE_POSITIVE=${image.positive}"
-                    "-DGLOBTOO_${upper}_LONGITUDE_LEFT=${image.left}"
-                    "-DGLOBTOO_${upper}_TOP=${image.top or "north"}"
-                    "-DGLOBTOO_${upper}_LATITUDE_TYPE=${image.latitude}"
-                    "-DGLOBTOO_${upper}_SOURCE=${image.url}"
-                    "-DGLOBTOO_${upper}_LICENSE=${image.license}"
-                  ]
-                else []
-            ) bodies;
-            # Free-text values contain spaces, which plain cmakeFlags would
-            # split; pass them through cmakeFlagsArray in preConfigure.
-            bodyTextFlags = pkgs.lib.concatMap (body:
-              let image = builtins.getAttr body planetaryRasters; in
-              pkgs.lib.optional (includePlanetaryTextures
-                  && !(builtins.hasAttr body planetaryMaps)
-                  && image ? preprocessing)
-                "-DGLOBTOO_${pkgs.lib.strings.toUpper body}_PREPROCESSING=${image.preprocessing}"
-            ) bodies;
+            maps = (if includePlanetaryTextures
+                    then pkgs.lib.getAttrs planetaryBodies bundledMaps
+                    else {}) // planetaryMaps;
+            activeBodies = builtins.filter (body: maps ? ${body}) planetaryBodies;
+            bodyFlags = map (body:
+              "-DGLOBTOO_${pkgs.lib.strings.toUpper body}_PREPARED_MAP=${maps.${body}}"
+            ) activeBodies;
           in pkgs.stdenv.mkDerivation {
           pname = if lite then "globtoo-lite" else "globtoo";
           inherit version;
@@ -412,10 +427,6 @@
           ] ++ bodyFlags ++ pkgs.lib.optionals (!lite) [
             "-DGLOBTOO_EARTH_TEXTURE=${earthTexture}"
           ];
-
-          preConfigure = pkgs.lib.optionalString (bodyTextFlags != []) ''
-            cmakeFlagsArray+=(${pkgs.lib.escapeShellArgs bodyTextFlags})
-          '';
 
           doCheck = true;
           checkPhase = ''
@@ -456,10 +467,18 @@
 
       in
       {
-        packages.default = mkPackage { };
-        packages.globtoo-lite = mkPackage { lite = true; };
-        # Full geographic data and Earth image without planetary tile assets.
-        packages.globtoo-earth = mkPackage { includePlanetaryTextures = false; };
+        packages = {
+          default = mkPackage { };
+          globtoo-lite = mkPackage { lite = true; };
+          # Full geographic data and Earth image without planetary tile assets.
+          globtoo-earth = mkPackage { includePlanetaryTextures = false; };
+          # All bundled prepared planetary maps; each body is also exposed as
+          # `planetary-map-<body>`. Built independently of the app, so code
+          # changes reuse them from the store instead of re-tiling.
+          planetary-maps = pkgs.linkFarm "globtoo-planetary-maps"
+            (pkgs.lib.mapAttrsToList (name: path: { inherit name path; }) bundledMaps);
+        } // pkgs.lib.mapAttrs' (body: prepared:
+          pkgs.lib.nameValuePair "planetary-map-${body}" prepared) bundledMaps;
 
         # Reproducible opt-in package composition for downstream Nix flakes.
         # Input maps must be locally prepared/pinned store paths; CMake

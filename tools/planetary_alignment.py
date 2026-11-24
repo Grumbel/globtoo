@@ -22,10 +22,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 if __package__:
     from .normalize_planet_texture import normalize
-    from .planetary_bodies import BODIES
+    from .planetary_bodies import BODIES, BODY_INFO
 else:
     from normalize_planet_texture import normalize
-    from planetary_bodies import BODIES
+    from planetary_bodies import BODIES, BODY_INFO
 
 CATALOG = Path(__file__).resolve().parents[1] / 'data' / 'planetary_features.tsv'
 
@@ -148,9 +148,13 @@ def render(source: Path, output: Path, *, body: str,
         else:
             raster = normalize(loaded, positive, left, width, latitude, body, top)
 
-    features = read_features(catalog, body)
-    sheet, positioned = report_image(raster, body, features,
-                                     f'{body.upper()}  /  Gazetteer center registration (visual QA only)')
+    # Gas and ice giant maps are cloud tops without a fixed surface frame or
+    # landmarks; their sheet shows only the coordinate grid.
+    solid = BODY_INFO.get(body, {}).get('surface', 'solid') == 'solid'
+    features = read_features(catalog, body) if solid else []
+    title = (f'{body.upper()}  /  Gazetteer center registration (visual QA only)' if solid
+             else f'{body.upper()}  /  coordinate grid only (no fixed surface landmarks)')
+    sheet, positioned = report_image(raster, body, features, title)
     output.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(output, format='PNG')
     if report is not None:

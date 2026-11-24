@@ -111,6 +111,19 @@ class PlanetaryAlignmentTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'already normalized'):
                 render(tiles,root/'bad.png',body='mars',positive='east',left=180)
 
+    def test_giant_planet_sheet_has_grid_only(self):
+        # Cloud-top maps have no landmarks, but a prepared map still needs
+        # its QA sheet and report; they must not fail or invent features.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            src, report = root/'jupiter.png', root/'jupiter.json'
+            Image.new('RGB', (256, 128), (180, 140, 100)).save(src)
+            positioned = render(src, root/'jupiter-qa.png', body='jupiter',
+                                normalized=True, width=256, report=report)
+            self.assertEqual(positioned, [])
+            self.assertEqual(json.loads(report.read_text())['features'], [])
+            self.assertTrue((root/'jupiter-qa.png').exists())
+
     def test_invalid_dimensions(self):
         with self.assertRaisesRegex(ValueError, '2:1'):
             report_image(Image.new('RGB',(100,100)),'moon',[],'test')

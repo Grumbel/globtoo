@@ -177,6 +177,9 @@ silently download large maps or satellite data on an existing installation.
       tile sizes, complete manifest grids, preview/base identity, attribution
       and SHA-256 of audited prepared maps; include corrupt-asset fixtures.
       This does not independently validate fetched source hashes or map datums.
+- [x] Tile bundled planetary imagery in separate per-body Nix derivations
+      (`planetary-map-<body>`, aggregated as `planetary-maps`) that produce
+      audited prepared maps, so app code changes do not re-tile imagery.
 - [ ] Expand verified asset catalog to licensed Moon/Mars/Io data and
       high-resolution tiled sources; support resumable multi-part downloads
       and interactive UI consent/progress as appropriate.
