@@ -10,10 +10,10 @@ void globe_select_body(Globe& g, BodyId body) {
     destroy_texture(g.texture);
     g.body=body;
     g.surface=SurfaceLayer::Imagery; // Earth-only thematic rasters
-    const std::string& path=g.body_textures[static_cast<std::size_t>(body)];
+    const std::string& path=g.body_textures[body_index(body)];
     if (!path.empty() && std::filesystem::is_regular_file(path)) {
         g.texture=load_texture(path.c_str());
-    } else if (body!=BodyId::Earth && !g.imagery[static_cast<std::size_t>(body)].valid()) {
+    } else if (body!=BodyId::Earth && !g.imagery[body_index(body)].valid()) {
         std::fprintf(stderr,"%.*s: no surface map installed; showing untextured sphere.\n",
                      static_cast<int>(body_info(body).name.size()),
                      body_info(body).name.data());

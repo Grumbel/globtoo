@@ -29,9 +29,11 @@ from PIL import Image
 if __package__:
     from .build_raster_tiles import build
     from .planetary_alignment import render
+    from .planetary_bodies import BODIES
 else:
     from build_raster_tiles import build
     from planetary_alignment import render
+    from planetary_bodies import BODIES
 
 MAX_SOURCE_BYTES = 1024 * 1024 * 1024
 SHA256_PATTERN = re.compile(r'^[0-9a-fA-F]{64}$')
@@ -56,15 +58,17 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
             license_text: str, positive: str, left: int, latitude: str,
             projection: str, expected_sha256: str | None = None,
             tile_size: int = 1024, gutter: int = 4, qa_width: int = 2048,
-            replace: bool = False) -> dict:
+            replace: bool = False, top: str = 'north') -> dict:
     source = Path(source).absolute()
     destination = Path(destination).absolute()
-    if body not in ('moon', 'mars', 'io'):
-        raise ValueError('body must be moon, mars or io')
+    if body not in BODIES:
+        raise ValueError(f'unsupported body: {body}')
     if projection != 'plate-carree':
-        raise ValueError('only north-up global plate-carree imagery is supported')
+        raise ValueError('only global plate-carree imagery is supported')
     if positive not in ('east', 'west') or left not in (0, 180):
         raise ValueError('explicit east|west longitude and left boundary 0|180 are required')
+    if top not in ('north', 'south'):
+        raise ValueError('explicit north|south top edge is required')
     if latitude not in ('planetocentric', 'planetographic'):
         raise ValueError('explicit planetocentric|planetographic latitude is required')
     if not source_url.strip() or not license_text.strip():
@@ -97,7 +101,7 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
                                     dir=destination.parent))
     backup = None
     try:
-        build(source, staging, tile_size, gutter, positive, left, latitude, body)
+        build(source, staging, tile_size, gutter, positive, left, latitude, body, top)
         # QA uses the normalized preview, so the converter and annotation share
         # a coordinate frame, without repeating the source transformation.
         render(staging, staging / 'alignment.png', body=body, normalized=True,
@@ -114,7 +118,7 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
             f'Body: {body}\nSource: {source_url}\nLicense (operator-declared): {license_text}\n'
             f'Original filename: {source.name}\nSource SHA-256: {digest}\n'
             f'Pin checked: {"yes" if expected_sha256 else "no (local hash only)"}\n'
-            f'Projection: plate-carree, north-up (operator-declared)\n'
+            f'Projection: plate-carree, {top}-up (operator-declared)\n'
             f'Longitude: {positive}-positive, left={left} degrees (operator-declared)\n'
             f'Latitude: {latitude} (operator-declared)\n'
             'Output: east-positive, planetocentric, -180 degrees at left\n'
@@ -136,7 +140,7 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
             'source_width': width,
             'source_height': height,
             'source_projection_as_declared': projection,
-            'source_north_up_as_declared': True,
+            'source_north_up_as_declared': top == 'north',
             'source_longitude_positive_as_declared': positive,
             'source_left_longitude_as_declared': left,
             'source_latitude_type_as_declared': latitude,
@@ -179,13 +183,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path, help='locally acquired original global mosaic')
     parser.add_argument('output', type=Path, help='new tile output directory')
-    parser.add_argument('--body', choices=('moon', 'mars', 'io'), required=True)
+    parser.add_argument('--body', choices=BODIES, required=True)
     parser.add_argument('--source-url', required=True, help='original publication/URL or citation')
     parser.add_argument('--license', required=True, help='operator-confirmed redistribution license')
     parser.add_argument('--projection', choices=('plate-carree',), required=True)
     parser.add_argument('--positive', choices=('east', 'west'), required=True)
     parser.add_argument('--left', choices=(0, 180), type=int, required=True)
     parser.add_argument('--latitude', choices=('planetocentric', 'planetographic'), required=True)
+    parser.add_argument('--top', choices=('north', 'south'), default='north',
+                        help='pole at the source top edge (some Venus mosaics are south-up)')
     parser.add_argument('--expected-sha256', help='pin obtained independently, checked before decoding')
     parser.add_argument('--tile-size', type=int, default=1024)
     parser.add_argument('--gutter', type=int, default=4)
@@ -199,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
                          left=args.left, latitude=args.latitude,
                          expected_sha256=args.expected_sha256,
                          tile_size=args.tile_size, gutter=args.gutter,
-                         qa_width=args.qa_width, replace=args.replace)
+                         qa_width=args.qa_width, replace=args.replace, top=args.top)
     except (OSError, ValueError, Image.DecompressionBombError) as exc:
         parser.exit(1, f'planetary map preparation: {exc}\n')
     print(f'{args.body}: prepared {args.output}\n'

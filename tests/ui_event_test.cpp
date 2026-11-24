@@ -74,10 +74,26 @@ int main() {
     assert(globe.surface==SurfaceLayer::Imagery);
     event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
     event.button.button=SDL_BUTTON_LEFT;
-    event.button.x=1175.f;
-    event.button.y=238.f; // NEXT BODY, below NORTH LOCK
+    event.button.x=1240.f;
+    event.button.y=238.f; // NEXT >, right half of the row below NORTH LOCK
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.body==BodyId::Mars);
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.body==BodyId::Jupiter);
+    // Gas giants have no named surface features, so no LANDMARKS button.
+    {
+        SDL_Event probe=event;
+        probe.button.x=40.f;
+        probe.button.y=772.f;
+        const bool before=ui.planetary_features_visible;
+        assert(ui_event(ui,probe,cam,map,globe,countries,input)); // toolbar consumes
+        assert(ui.planetary_features_visible==before);
+    }
+    event.button.x=1175.f; // < PREV, left half
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    assert(globe.body==BodyId::Mars);
+    event.button.x=1240.f;
+    assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.body==BodyId::Io);
     // The non-Earth third row has a landmark toggle, not Earth cities.

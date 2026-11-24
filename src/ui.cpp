@@ -5,6 +5,7 @@
 #include "scene.hpp"
 #include "grid_metrics.hpp"
 #include "geocoordinates.hpp"
+#include "planetary_features.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -75,8 +76,9 @@ std::array<Button,19> buttons(const Ui& ui, BodyId body) {
             out[k++]={button.label,x,static_cast<int>(panel.y+62),button.w,button.h,button.command};
             x+=button.w+5;
         }
-        out[k++]={"LANDMARKS",static_cast<int>(panel.x+6),
-                  static_cast<int>(panel.y+98),136,30,24};
+        if (body_has_planetary_features(body))
+            out[k++]={"LANDMARKS",static_cast<int>(panel.x+6),
+                      static_cast<int>(panel.y+98),136,30,24};
         return out;
     }
     for (int i=0;i<6;i++) { out[k++] = {bottom[i],x,static_cast<int>(panel.y+62),botw[i],30,botcmd[i]}; x += botw[i]+5; }
@@ -239,15 +241,19 @@ void draw_compass(Ui& ui, const Camera& cam, const MapView& map) {
     const Button lock{map.north_locked ? "NORTH LOCK ON" : "NORTH LOCK OFF",
                       static_cast<int>(box.x+7),static_cast<int>(box.y+191),
                       106,24,16};
-    const Button body{"NEXT BODY",static_cast<int>(box.x+7),
-                      static_cast<int>(box.y+219),106,24,23};
-    for (auto b : {north,reset,mode,lock,body}) {
+    // The body row is split: previous / next in catalog (heliocentric) order.
+    const Button prev_body{"< PREV",static_cast<int>(box.x+7),
+                           static_cast<int>(box.y+219),51,24,25};
+    const Button next_body{"NEXT >",static_cast<int>(box.x+62),
+                           static_cast<int>(box.y+219),51,24,23};
+    for (auto b : {north,reset,mode,lock,prev_body,next_body}) {
         rect(ui,b.x,b.y,b.w,b.h,ui.hover==b.command ? hover :
              ((b.command==12 && cam.mode==ControlMode::Grab) ||
               (b.command==16 && map.north_locked) ? active : inactive));
-        const int font_scale = b.command==16 ? 1 : 2;
+        const bool small = b.command==16 || b.command==23 || b.command==25;
+        const int font_scale = small ? 1 : 2;
         draw_text(ui,b.x+(b.w-6.f*font_scale*std::char_traits<char>::length(b.label))*.5f,
-                  b.y+(b.command==16 ? 9.f : 6.f),b.label,font_scale,text);
+                  b.y+(small ? 9.f : 6.f),b.label,font_scale,text);
     }
 }
 
@@ -307,6 +313,9 @@ void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState
         break;
     case 23:
         globe_select_body(g,next_body(g.body));
+        break;
+    case 25:
+        globe_select_body(g,previous_body(g.body));
         break;
     case 16:
         m.north_locked = !m.north_locked;
@@ -383,10 +392,12 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         const Bounds reset{cp.x+7,cp.y+135,106,24};
         const Bounds mode{cp.x+7,cp.y+163,106,24};
         const Bounds lock{cp.x+7,cp.y+191,106,24};
-        const Bounds body{cp.x+7,cp.y+219,106,24};
+        const Bounds prev_body{cp.x+7,cp.y+219,51,24};
+        const Bounds next_body{cp.x+62,cp.y+219,51,24};
         // Clicking the compass rose itself is also a North-up shortcut.
         const bool rose=contains({cp.x+13,cp.y+4,94,94},x,y);
-        const int command=contains(body,x,y) ? 23 :
+        const int command=contains(next_body,x,y) ? 23 :
+                          contains(prev_body,x,y) ? 25 :
                           contains(reset,x,y) ? 13 :
                           contains(mode,x,y) ? 12 :
                           contains(lock,x,y) ? 16 :

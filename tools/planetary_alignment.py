@@ -22,8 +22,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 if __package__:
     from .normalize_planet_texture import normalize
+    from .planetary_bodies import BODIES
 else:
     from normalize_planet_texture import normalize
+    from planetary_bodies import BODIES
 
 CATALOG = Path(__file__).resolve().parents[1] / 'data' / 'planetary_features.tsv'
 
@@ -111,11 +113,13 @@ def report_image(image: Image.Image, body: str, features: list[dict], title: str
 def render(source: Path, output: Path, *, body: str,
            normalized: bool = False, positive: str | None = None, left: int | None = None,
            latitude: str = 'planetocentric', width: int = 2048,
-           report: Path | None = None, catalog: Path = CATALOG) -> list[dict]:
+           report: Path | None = None, catalog: Path = CATALOG,
+           top: str = 'north') -> list[dict]:
     if width < 2 or width % 2 or width > 8192:
         raise ValueError('--width must be even, between 2 and 8192')
     if normalized:
-        if positive is not None or left is not None or latitude != 'planetocentric':
+        if (positive is not None or left is not None or latitude != 'planetocentric'
+                or top != 'north'):
             raise ValueError('--normalized cannot be combined with source coordinate flags')
         path = source / 'preview.jpg' if source.is_dir() else source
         if source.is_dir() and not (source / 'manifest.txt').is_file():
@@ -142,7 +146,7 @@ def render(source: Path, output: Path, *, body: str,
             if raster.width > width:
                 raster = raster.resize((width, width // 2), Image.Resampling.LANCZOS)
         else:
-            raster = normalize(loaded, positive, left, width, latitude, body)
+            raster = normalize(loaded, positive, left, width, latitude, body, top)
 
     features = read_features(catalog, body)
     sheet, positioned = report_image(raster, body, features,
@@ -154,6 +158,7 @@ def render(source: Path, output: Path, *, body: str,
         report.write_text(json.dumps({
             'body': body, 'input': str(source), 'normalized': normalized,
             'longitude_positive': positive, 'longitude_left': left,
+            'top': top if not normalized else 'north',
             'latitude_type': latitude if not normalized else 'planetocentric',
             'image_width': raster.width, 'image_height': raster.height,
             'coordinates': 'east-positive/planetocentric; x,y refer to raster BEFORE the 32px header',
@@ -167,11 +172,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path, help='original full-world image, or normalized image / tile directory')
     parser.add_argument('output', type=Path, help='annotated PNG registration sheet')
-    parser.add_argument('--body', choices=('moon', 'mars', 'io'), required=True)
+    parser.add_argument('--body', choices=BODIES, required=True)
     parser.add_argument('--positive', choices=('east', 'west'))
     parser.add_argument('--left', type=int, choices=(0, 180))
     parser.add_argument('--latitude', choices=('planetocentric', 'planetographic'),
                         default='planetocentric')
+    parser.add_argument('--top', choices=('north', 'south'), default='north',
+                        help='pole at the source top edge')
     parser.add_argument('--normalized', action='store_true',
                         help='input already normalized, or an existing tiled output directory')
     parser.add_argument('--width', type=int, default=2048, help='maximum QA raster width')
@@ -181,7 +188,7 @@ def main() -> int:
         features = render(args.input, args.output, body=args.body,
                           normalized=args.normalized, positive=args.positive,
                           left=args.left, latitude=args.latitude, width=args.width,
-                          report=args.json)
+                          report=args.json, top=args.top)
     except (OSError, ValueError) as exc:
         parser.exit(1, f'planetary alignment: {exc}\n')
     for feature in features:

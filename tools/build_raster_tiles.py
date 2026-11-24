@@ -12,9 +12,11 @@ from pathlib import Path
 from PIL import Image, ImageOps
 
 if __package__:
+    from .planetary_bodies import BODIES
     from .planetary_latitudes import (row_indices, reproject_latitude_rows,
                                       validate_latitude_type)
 else:
+    from planetary_bodies import BODIES
     from planetary_latitudes import (row_indices, reproject_latitude_rows,
                                      validate_latitude_type)
 
@@ -25,7 +27,7 @@ Image.MAX_IMAGE_PIXELS = 250_000_000
 
 
 def _oriented_strip(image, tile, x_begin, x_end, y0, y1, y_begin,
-                    positive, left):
+                    positive, left, top='north'):
     """Paste source strips in canonical -180..180 east-positive pixel order.
 
     Only crop strips needed by a tile. Mirroring or half-turning a 21600x10800
@@ -33,6 +35,9 @@ def _oriented_strip(image, tile, x_begin, x_end, y0, y1, y_begin,
     Pixel-center transforms match normalize_planet_texture.normalize exactly.
     """
     width = image.width
+    # Rows y0..y1 are canonical (north-up); south-up sources store them
+    # bottom-to-top, so read the mirrored row range and flip the strip.
+    src_y0, src_y1 = (image.height - y1, image.height - y0) if top == 'south' else (y0, y1)
     half = width // 2 if left == 0 else 0
     reverse = positive == 'west'
 
@@ -50,15 +55,19 @@ def _oriented_strip(image, tile, x_begin, x_end, y0, y1, y_begin,
         while x < x_end and source_x(x) == last + step:
             last = source_x(x)
             x += 1
-        patch = image.crop((min(first, last), y0, max(first, last)+1, y1))
+        patch = image.crop((min(first, last), src_y0, max(first, last)+1, src_y1))
         if reverse:
             patch = ImageOps.mirror(patch)
+        if top == 'south':
+            patch = ImageOps.flip(patch)
         tile.paste(patch, (start - x_begin, y0 - y_begin))
 
 
-def _oriented_preview(image, positive, left):
+def _oriented_preview(image, positive, left, top='north'):
     # Apply exactly the same ordering as the full-resolution strips, but only
     # after reducing the preview to 2048x1024 pixels.
+    if top == 'south':
+        image = ImageOps.flip(image)
     if positive == 'west':
         image = ImageOps.mirror(image)
     if left == 0:
@@ -71,8 +80,11 @@ def _oriented_preview(image, positive, left):
 
 
 def build(source, destination, tile_size=1024, gutter=4,
-          positive='east', left=180, latitude='planetocentric', body=None):
+          positive='east', left=180, latitude='planetocentric', body=None,
+          top_edge='north'):
     validate_latitude_type(body, latitude)
+    if top_edge not in ('north', 'south'):
+        raise ValueError('top edge must be north or south')
     if positive not in ('east', 'west') or left not in (0, 180):
         raise ValueError('longitude must be east|west with left boundary 0|180')
     if tile_size & (tile_size - 1) or tile_size < 64 or tile_size > 2048:
@@ -86,7 +98,7 @@ def build(source, destination, tile_size=1024, gutter=4,
         if width * height > 250_000_000:
             raise ValueError("raster exceeds the 250-megapixel build limit")
         if width != 2 * height:
-            raise ValueError("expected a north-up, full-world 2:1 equirectangular raster")
+            raise ValueError("expected a full-world 2:1 equirectangular raster")
         image = image.convert('RGB')
         content = tile_size - 2 * gutter
         columns, rows = math.ceil(width / content), math.ceil(height / content)
@@ -118,16 +130,16 @@ def build(source, destination, tile_size=1024, gutter=4,
                                                      body, latitude)
                         first = Image.new('RGB', (valid_w, 1))
                         _oriented_strip(image, first, x_begin, x_end,
-                                        a, a+1, a, positive, left)
+                                        a, a+1, a, positive, left, top_edge)
                         if b != a and fraction > 0:
                             second = Image.new('RGB', (valid_w, 1))
                             _oriented_strip(image, second, x_begin, x_end,
-                                            b, b+1, b, positive, left)
+                                            b, b+1, b, positive, left, top_edge)
                             first = Image.blend(first, second, fraction)
                         tile.paste(first, (0, dst_y))
                 elif y0 < y1:
                     _oriented_strip(image, tile, x_begin, x_end, y0, y1,
-                                    y_begin, positive, left)
+                                    y_begin, positive, left, top_edge)
                 valid_w, valid_h = cell_w+2*gutter, cell_h+2*gutter
                 if y_begin < 0 and not (latitude == 'planetographic' and body == 'mars'):
                     edge = tile.crop((0, -y_begin, valid_w, -y_begin+1))
@@ -150,11 +162,11 @@ def build(source, destination, tile_size=1024, gutter=4,
         # Use a small preview for zoomed-out views; loading its full resolution
         # cannot exceed GLES2's ubiquitous 2048x2048 limit.
         preview = reproject_latitude_rows(_oriented_preview(
-            image.resize((2048, 1024), Image.Resampling.LANCZOS), positive, left),
+            image.resize((2048, 1024), Image.Resampling.LANCZOS), positive, left, top_edge),
             body, latitude)
         preview.save(destination / 'preview.jpg', quality=90)
         preview_small = reproject_latitude_rows(_oriented_preview(
-            image.resize((1024, 512), Image.Resampling.LANCZOS), positive, left),
+            image.resize((1024, 512), Image.Resampling.LANCZOS), positive, left, top_edge),
             body, latitude)
         preview_small.save(destination / 'preview-small.jpg', quality=90)
         (destination / 'manifest.txt').write_text(
@@ -173,17 +185,20 @@ def main():
                     help='source longitude-positive direction (default east)')
     ap.add_argument('--left', type=int, choices=(0, 180), default=180,
                     help='source left longitude boundary (default 180)')
+    ap.add_argument('--top', choices=('north', 'south'), default='north',
+                    help='pole at the source top edge (default north)')
     ap.add_argument('--latitude', choices=('planetocentric', 'planetographic'),
                     default='planetocentric', help='source latitude convention')
-    ap.add_argument('--body', choices=('moon', 'mars', 'io'),
+    ap.add_argument('--body', choices=BODIES,
                     help='required for planetographic input; only Mars needs resampling')
     args = ap.parse_args()
     if args.latitude == 'planetographic' and args.body is None:
-        ap.error('planetographic latitude requires --body moon|mars|io')
+        ap.error('planetographic latitude requires --body')
     print('Created %d x %d raster tiles' % build(args.source, args.output,
                                                   args.tile_size, args.gutter,
                                                   args.positive, args.left,
-                                                  args.latitude, args.body))
+                                                  args.latitude, args.body,
+                                                  args.top))
 
 
 if __name__ == '__main__':

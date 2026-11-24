@@ -90,6 +90,33 @@ class RasterTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'longitude'):
                     build(source, pathlib.Path(d) / 'bad', 64, 4, *invalid)
 
+    def test_south_up_source_matches_rotated_north_up(self):
+        # A Venus-style mosaic rotated by 180 degrees is south-up AND west-
+        # positive; declaring both must reproduce the north-up east tiles.
+        width, height = 128, 64
+        image = Image.new('RGB', (width, height))
+        pixels = image.load()
+        for y in range(height):
+            for x in range(width):
+                pixels[x, y] = (round(255 * x / width), round(255 * y / height), 90)
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            image.save(root / 'north.png')
+            image.rotate(180).save(root / 'south.png')
+            build(root / 'north.png', root / 'n', 64, 4, 'east', 180)
+            build(root / 'south.png', root / 's', 64, 4, 'west', 180, top_edge='south')
+            for name in ('tile-000-000.jpg', 'tile-001-002.jpg', 'preview-small.jpg'):
+                with Image.open(root / 'n' / name) as a, Image.open(root / 's' / name) as b:
+                    for point in ((5, 5), (30, 40), (60, 10), (12, 60)):
+                        pa, pb = a.getpixel(point), b.getpixel(point)
+                        self.assertLessEqual(max(abs(u-v) for u, v in zip(pa, pb)), 12,
+                                             (name, point, pa, pb))
+            north = normalize(image, 'east', 180, width)
+            south = normalize(image.rotate(180), 'west', 180, width, top='south')
+            self.assertEqual(list(north.getdata()), list(south.getdata()))
+            with self.assertRaisesRegex(ValueError, 'north or south'):
+                build(root / 'north.png', root / 'bad', 64, 4, top_edge='east')
+
     def test_reject_not_world(self):
         with tempfile.TemporaryDirectory() as d:
             src = pathlib.Path(d)/'bad.png'

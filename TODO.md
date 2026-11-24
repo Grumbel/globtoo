@@ -6,6 +6,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # TODO.md — globtoo
 
 ## Current tip
+- All eight planets, Pluto and 19 major moons (28 bodies incl. Earth) from one
+  catalog (`data/bodies.tsv` / `src/bodies.hpp`); M / Shift+M and NEXT / PREV
+  cycle them, `--list-bodies` prints them. Every non-Earth body ships a
+  pinned, orientation-checked texture in the Nix package; 64 IAU landmarks
+  cover every solid body except Earth.
 - On-screen GLES2 controls for globe/map projections, shading, countries, borders, names, zoom
 - Animated globe/2D morph and interpolated Equirectangular, Mercator, Mollweide, Hammer projections
 - Start globe oriented to geographical TZ-reference city (or UTC meridian fallback)
@@ -125,9 +130,11 @@ silently download large maps or satellite data on an existing installation.
       multi-gigabyte downloads to the default package without verification.
 
 ### Stage 4 — other planetary bodies
-- [ ] Refactor Earth-only data into a Body catalog (Earth, Moon, Mars, Io,
-      then more): sphere radius, coordinate direction, prime meridian, body
-      shape, rotation convention, map source and feature overlays.
+- [x] Body catalog for all planets, Pluto/Charon and the major moons:
+      radius, kind, parent, solid surface vs. cloud tops, map source and
+      feature overlays, shared by C++, Python tools and CMake/Nix.
+- [ ] Per-body rotation sense / prime-meridian metadata (IAU WGCCRE) and
+      oblate shapes for the gas giants; the viewer still uses a sphere.
 - [ ] Support body-specific base maps and optional shaded elevation; provide
       selector in UI and CLI, without showing Earth countries, cities, rivers,
       population, or Earth-based kilometer scale on other bodies.
@@ -194,7 +201,8 @@ silently download large maps or satellite data on an existing installation.
 - [ ] Optional finer-than-10m country-by-country boundaries (e.g. geoBoundaries)
 
 ### Stage 4a — planetary body selection
-- [x] Select Earth, Moon, Mars, or Io by CLI (`--body`) and cycle using M or NEXT BODY.
+- [x] Select any catalog body by CLI (`--body`, `--list-bodies`) and cycle
+      using M / Shift+M or NEXT / PREV.
 - [x] Optional per-body equirectangular texture (`--body-texture body=FILE`).
 - [x] Hide Earth country, city and river layers on non-Earth bodies; scale bar uses body radius.
 - [x] Add test-covered normalization for externally supplied planet maps:
@@ -211,8 +219,13 @@ silently download large maps or satellite data on an existing installation.
       publisher/rights/coordinate metadata, optional supplied SHA-256 pin,
       per-body tiles and preview, audit JSON and IAU alignment QA, staging and
       failure-safe replacement. Actual NASA/JPL raster bytes remain unverified.
-- [ ] Verify and package rights-cleared planetary raster maps, pole orientation
-      and longitude direction per **actual** source, with pinned download hashes.
+- [x] Package rights-cleared raster maps for every body with pinned hashes
+      (SSS SRI SHA-256 / Commons SHA-1) and declared longitude direction,
+      left edge and top pole (`--top south` for the rotated Venus map),
+      checked with alignment QA sheets; near-2:1 sources resampled by
+      `tools/fit_plate_carree.py` against a pinned source size.
+- [x] Correct the packaged Io map declaration to east/180 (Pele, Loki and
+      Tvashtar only register that way; west/0 was wrong).
 - [x] Source a small cross-body IAU Gazetteer feature-center catalog with
       original longitude/latitude conventions, non-Earth marker overlay and
       command-line --list-features / --focus navigation.

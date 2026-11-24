@@ -24,7 +24,7 @@ struct Marker {
     float radius = 7.f;             // screen pixels (independent of zoom)
 };
 
-enum class CommandAction { Run, Help, Version, DownloadAsset, ListFeatures };
+enum class CommandAction { Run, Help, Version, DownloadAsset, ListFeatures, ListBodies };
 struct CommandLine {
     CommandAction action = CommandAction::Run;
     std::string download_asset;
@@ -58,4 +58,6 @@ bool parse_coordinates(std::string_view text, CoordinateOrder order,
 // and malformed input work on headless systems.
 bool parse_command_line(int argc, const char* const* argv,
                         CommandLine& output, std::string& error);
+// One line per catalog body: slug, name, kind, parent and mean radius.
+std::string body_list_text();
 std::string command_line_help(std::string_view program);

@@ -17,6 +17,17 @@ from tools.build_raster_tiles import build
 
 
 class PlanetaryAlignmentTest(unittest.TestCase):
+    def test_every_solid_body_has_landmarks(self):
+        from tools.planetary_bodies import BODY_INFO
+        for body, info in BODY_INFO.items():
+            if body == 'earth' or info['surface'] != 'solid':
+                with self.assertRaisesRegex(ValueError, 'no features'):
+                    read_features(CATALOG, body)
+            else:
+                self.assertIn(len(read_features(CATALOG, body)), (2, 3), body)
+        mercury = {f['name']: f for f in read_features(CATALOG, 'mercury')}
+        self.assertAlmostEqual(mercury['Caloris Planitia']['longitude_east'], 170.2)
+
     def test_feature_catalog_and_longitudes(self):
         self.assertEqual([len(read_features(CATALOG, body)) for body in ('moon', 'mars', 'io')],
                          [3, 3, 3])

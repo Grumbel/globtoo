@@ -26,17 +26,42 @@ For individual file licensing, see the SPDX headers and `REUSE.toml`.
 
 ## Bundled planetary imagery in the default Nix package
 
-- **Moon and Mars:** Solar System Scope, 8K planetary surface textures,
+- **Moon, Mercury, Venus, Mars, Jupiter, Saturn (8K) and Uranus, Neptune
+  (2K):** Solar System Scope planetary textures,
   used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
   Source: https://www.solarsystemscope.com/textures/ . The images include
   aesthetic processing and reconstructed/fictitious coverage; Globtoo rotates
   and tiles them for OpenGL ES 2.0 and generates lower-resolution previews.
+  The Venus surface texture is published rotated by 180 degrees (south up);
+  Globtoo declares that orientation and turns it north-up when tiling.
 - **Io:** USGS Astrogeology Research Program Galileo/Voyager composite,
   public domain, mirrored at
   https://commons.wikimedia.org/wiki/File:Io_for_GeoHacks.jpg .
   Globtoo changes the source aspect ratio by one pixel to form an exact
   2:1 global plate-carrée grid and produces tiled, longitude-normalized output.
 
+- **Europa, Ganymede, Callisto, Miranda, Ariel, Umbriel, Titania, Oberon:**
+  Caltech/JPL/USGS Voyager–Galileo global maps (JPL Solar System Simulator),
+  public domain, via Wikimedia Commons. The Uranian maps only cover the
+  hemispheres imaged by Voyager 2; unimaged areas are left blank.
+- **Mimas, Enceladus, Tethys, Dione, Rhea, Iapetus:** Cassini ISS global color
+  mosaics, NASA/JPL-Caltech/Space Science Institute/Lunar and Planetary
+  Institute (PIA18437, PIA18435, PIA18439, PIA18434, PIA18438, PIA18436),
+  public domain, via Wikimedia Commons.
+- **Titan:** Cassini ISS global map, NASA/JPL/Space Science Institute
+  (PIA14908, April 2011), public domain.
+- **Triton:** Voyager 2 global mosaic, Paul Schenk / Lunar and Planetary
+  Institute, public domain, via Wikimedia Commons.
+- **Pluto and Charon:** New Horizons global mosaics, NASA/Johns Hopkins
+  University Applied Physics Laboratory/Southwest Research Institute
+  (Charon as mirrored by the IAU, iau1803c), public domain.
+
+Where a published mosaic is a pixel short of an exact 2:1 grid (Io, Tethys,
+Rhea, Iapetus), Globtoo resamples its width to form an exact global
+plate-carrée grid; every map is longitude-normalized and tiled. Exact
+source URLs and hashes are pinned in `flake.nix` and recorded in each
+installed `imagery/<body>/source.txt`.
+
 The files are downloaded at build time, not checked into the source tree.
-These acknowledgments do not imply affiliation or endorsement by NASA, USGS,
-Solar System Scope or Wikimedia Commons.
+These acknowledgments do not imply affiliation or endorsement by NASA, JPL, USGS, LPI,
+JHUAPL, SwRI, the IAU, Solar System Scope or Wikimedia Commons.

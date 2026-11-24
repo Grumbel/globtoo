@@ -136,5 +136,15 @@ int main() {
     event.key.repeat=false;
     input_handle_event(in,cam,map,globe,countries,event);
     assert(globe.body==BodyId::Moon);
+    // Shift+M walks the catalog backwards (and wraps at the start).
+    in.shift_down=true;
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(globe.body==BodyId::Earth);
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(globe.body==BodyId::Venus);
+    input_handle_event(in,cam,map,globe,countries,event);
+    input_handle_event(in,cam,map,globe,countries,event);
+    assert(globe.body==BodyId::Charon);
+    in.shift_down=false;
     return 0;
 }

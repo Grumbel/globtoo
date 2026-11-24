@@ -75,7 +75,7 @@ class PlanetaryMapPreparationTest(unittest.TestCase):
             prepare(self.source, self.destination, replace=True,
                     expected_sha256='0' * 64, **self.settings)
         self.assertEqual((self.destination / 'old.txt').read_text(), 'keep this one')
-        with self.assertRaisesRegex(ValueError, 'north-up global plate-carree'):
+        with self.assertRaisesRegex(ValueError, 'global plate-carree'):
             prepare(self.source, self.destination, replace=True,
                     **{**self.settings, 'projection': 'mercator'})
         with self.assertRaisesRegex(ValueError, 'longitude'):

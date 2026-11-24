@@ -66,9 +66,11 @@ folder must contain a valid
 .B manifest.txt
 and the generated tiles.
 .TP
-.BI \--body\  "earth|moon|mars|io"
-Select the body whose globe or projected map is displayed. Press M or
-use NEXT BODY to cycle bodies. Earth-only country, city, river and thematic
+.BI \--body\  "NAME"
+Select the body whose globe or projected map is displayed, for example
+.BR earth ", " mars ", " titan " or " pluto .
+Press M (Shift+M backwards) or use the NEXT > / < PREV buttons to cycle
+bodies. Earth-only country, city, river and thematic
 layers are suppressed on other bodies.
 .TP
 .BI \--focus\  "NAME"
@@ -76,6 +78,11 @@ Select a built-in named planetary feature (case-insensitive), switch to its
 body and start centered on its Gazetteer location. Conflicting explicit
 \--body or \--center options are rejected. Example:
 .B globtoo --focus 'Olympus Mons'
+.TP
+.B \--list-bodies
+Print every selectable body with its name, kind (planet, dwarf planet or
+moon), parent body and mean radius, without starting SDL. Gas giants are
+shown at their cloud tops.
 .TP
 .B \--list-features
 Print the available IAU Gazetteer planetary landmark names and their
@@ -87,7 +94,7 @@ repeatable. See the planetary maps documentation for source longitude
 conventions.
 .TP
 .BI \--body-imagery-dir\  "BODY=DIR"
-Provide high-resolution tiles for Earth, Moon, Mars or Io. Repeatable;
+Provide high-resolution tiles for any body. Repeatable;
 the manifest, 2048-pixel preview and power-of-two tiles are loaded from the
 specified directory. The source must be normalized to east-positive,
 north-up, 180 degrees west at the left edge. The build-time tile converter
@@ -157,8 +164,11 @@ Zoom in or out with small, reciprocal increments.
 .SH KEYBOARD CONTROLS
 .TP
 .B F
-Toggle the approximate named planetary landmark overlay on Moon, Mars or Io,
+Toggle the approximate named planetary landmark overlay on solid-surface bodies,
 including when the screen controls are hidden.
+.TP
+.B M, Shift + M
+Switch to the next or previous body in the catalog.
 .TP
 .B Tab
 Hide or restore the on-screen toolbar, compass and distance scale.

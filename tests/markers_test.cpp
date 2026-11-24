@@ -77,11 +77,11 @@ int main() {
         assert(planetary.body_imagery_dirs[static_cast<std::size_t>(BodyId::Mars)]=="/maps/mars");
         assert(planetary.body_imagery_dirs[static_cast<std::size_t>(BodyId::Io)]=="/maps/io");
         assert(planetary.body_imagery_dirs[static_cast<std::size_t>(BodyId::Earth)]=="/maps/earth");
-        const char* bad_tiles[]={"globtoo","--body-imagery-dir","jupiter=/maps/jupiter"};
+        const char* bad_tiles[]={"globtoo","--body-imagery-dir","phobos=/maps/phobos"};
         assert(!parse_command_line(3,bad_tiles,planetary,err));
         const char* empty_tiles[]={"globtoo","--body-imagery-dir=io="};
         assert(!parse_command_line(2,empty_tiles,planetary,err));
-        const char* invalid[]={"globtoo","--body","venus"};
+        const char* invalid[]={"globtoo","--body","vulcan"};
         assert(!parse_command_line(static_cast<int>(std::size(invalid)),invalid,planetary,err));
     }
 
@@ -110,6 +110,22 @@ int main() {
         assert(feature.action==CommandAction::ListFeatures);
         const char* extra[]={"globtoo","--list-features","--body","mars"};
         assert(!parse_command_line(4,extra,feature,err));
+        const char* bodies[]={"globtoo","--list-bodies"};
+        assert(parse_command_line(2,bodies,feature,err));
+        assert(feature.action==CommandAction::ListBodies);
+        const char* bodies_extra[]={"globtoo","--list-bodies","--body","io"};
+        assert(!parse_command_line(4,bodies_extra,feature,err));
+        const std::string listing=body_list_text();
+        for (const auto& body:body_catalog)
+            assert(listing.find(std::string(body.slug)+" ")!=std::string::npos);
+        assert(listing.find("Saturn")!=std::string::npos);
+        const char* titan[]={"globtoo","--body","Titan","--body-texture","enceladus=/x.jpg"};
+        assert(parse_command_line(5,titan,feature,err));
+        assert(feature.body==BodyId::Titan);
+        assert(feature.body_textures[body_index(BodyId::Enceladus)]=="/x.jpg");
+        const char* phobos[]={"globtoo","--body","phobos"};
+        assert(!parse_command_line(3,phobos,feature,err));
+        assert(err.find("--list-bodies")!=std::string::npos);
     }
 
     {

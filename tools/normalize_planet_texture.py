@@ -3,8 +3,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Normalize a full-globe planetary plate carrée raster to Globtoo's UV convention.
 
-The source must cover 360 degrees by 180 degrees, north at its top, with
-uniform angular sampling. Longitude at its LEFT PIXEL BOUNDARY is either
+The source must cover 360 degrees by 180 degrees with uniform angular
+sampling. Its top edge is the north pole unless --top south declares a
+south-up raster (some published Venus mosaics are rotated by 180 degrees,
+which is --top south --positive west).
+The longitude declaration always describes the source columns as stored. Longitude at its LEFT PIXEL BOUNDARY is either
 0 degrees or 180 degrees in the declared positive longitude direction.
 The result has east-positive longitude, -180 degrees at its left boundary.
 
@@ -23,14 +26,19 @@ except ImportError as error:
     raise SystemExit("Pillow is required to normalize planetary raster maps") from error
 
 if __package__:
+    from .planetary_bodies import BODIES
     from .planetary_latitudes import reproject_latitude_rows, validate_latitude_type
 else:
+    from planetary_bodies import BODIES
     from planetary_latitudes import reproject_latitude_rows, validate_latitude_type
 
 
 def normalize(image: Image.Image, positive: str, left: int, max_width: int,
-              latitude: str = "planetocentric", body: str | None = None) -> Image.Image:
+              latitude: str = "planetocentric", body: str | None = None,
+              top: str = "north") -> Image.Image:
     validate_latitude_type(body, latitude)
+    if top not in {"north", "south"}:
+        raise ValueError("top edge must be north or south")
     width, height = image.size
     if width < 2 or width % 2 or width != 2 * height:
         raise ValueError("expected an even-width full-globe 2:1 plate carree image")
@@ -51,6 +59,8 @@ def normalize(image: Image.Image, positive: str, left: int, max_width: int,
     # Mirror maps the longitudinal sampling *pixel centers* exactly (no
     # one-pixel antimeridian error). The half-turn is lossless for 0..360
     # rasters; no bilinear sampling, clipped poles or duplicate seam column.
+    if top == "south":
+        image = ImageOps.flip(image)
     if positive == "west":
         image = ImageOps.mirror(image)
     if left == 0:
@@ -75,11 +85,13 @@ def main(argv: list[str] | None = None) -> int:
                         help="positive longitude direction in source raster")
     parser.add_argument("--left", required=True, type=int, choices=(0, 180),
                         help="longitude at source image's left boundary (0 or 180 degrees)")
+    parser.add_argument("--top", choices=("north", "south"), default="north",
+                        help="pole at the source image's top edge (default north)")
     parser.add_argument("--max-width", type=int, default=2048,
                         help="downsample to this even width for GLES2 (default 2048)")
     parser.add_argument("--latitude", choices=("planetocentric", "planetographic"),
                         default="planetocentric", help="source latitude convention")
-    parser.add_argument("--body", choices=("moon", "mars", "io"),
+    parser.add_argument("--body", choices=BODIES,
                         help="required for planetographic input; only Mars needs resampling")
     args = parser.parse_args(argv)
     if args.source.resolve() == args.output.resolve():
@@ -89,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with Image.open(args.source) as src:
             result = normalize(src, args.positive, args.left, args.max_width,
-                               args.latitude, args.body)
+                               args.latitude, args.body, args.top)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         if args.output.suffix.lower() in (".jpg", ".jpeg"):
             result.save(args.output, format="JPEG", quality=93, subsampling=0)

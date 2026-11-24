@@ -97,9 +97,13 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    if (options.action == CommandAction::ListBodies) {
+        std::fputs(body_list_text().c_str(),stdout);
+        return 0;
+    }
     if (options.action == CommandAction::ListFeatures) {
         for (const auto& feature : planetary_features)
-            std::printf("%-5.*s  %-24.*s lat %8.2f  lon(E) %8.2f  (%.*s)\n",
+            std::printf("%-9.*s  %-24.*s lat %8.2f  lon(E) %8.2f  (%.*s)\n",
                 static_cast<int>(body_info(feature.body).name.size()),body_info(feature.body).name.data(),
                 static_cast<int>(feature.name.size()),feature.name.data(),
                 feature.source_latitude,feature_east_longitude(feature),
@@ -134,18 +138,18 @@ int main(int argc, char** argv) {
     globe.body=options.body;
     globe.body_textures=options.body_textures;
     for (const auto& body : body_catalog) {
-        const auto index=static_cast<std::size_t>(body.id);
+        const auto index=body_index(body.id);
         if (!options.body_imagery_dirs[index].empty())
             globe.body_imagery_manifests[index]=
                 (std::filesystem::path(options.body_imagery_dirs[index])/"manifest.txt").string();
     }
     // The default Earth image is never reused on another body.
     if (!options.texture_path.empty()) {
-        globe.body_textures[static_cast<std::size_t>(options.body)]=options.texture_path;
-    } else if (globe.body_textures[0].empty()) {
-        globe.body_textures[0]=resource_path("assets/earth.jpg");
+        globe.body_textures[body_index(options.body)]=options.texture_path;
+    } else if (globe.body_textures[body_index(BodyId::Earth)].empty()) {
+        globe.body_textures[body_index(BodyId::Earth)]=resource_path("assets/earth.jpg");
     }
-    const std::string texture=globe.body_textures[0];
+    const std::string texture=globe.body_textures[body_index(BodyId::Earth)];
     const std::string imagery_manifest=options.imagery_dir.empty() ? "" :
         (std::filesystem::path(options.imagery_dir)/"manifest.txt").string();
     const std::string relief_manifest=options.relief_dir.empty() ? "" :
@@ -215,13 +219,13 @@ int main(int argc, char** argv) {
         marker.label=std::string(feature.name);
         marker.radius=4.0f;
         marker.color=0x90d8fa;
-        feature_markers[static_cast<std::size_t>(feature.body)].push_back(std::move(marker));
+        feature_markers[body_index(feature.body)].push_back(std::move(marker));
     }
 
     Ui ui{};
     if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
 
-    fprintf(stderr, "Controls: M=cycle Earth/Moon/Mars/Io, F=planetary landmark labels, on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
+    fprintf(stderr, "Controls: M/Shift+M=next/previous body, F=planetary landmark labels, on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
@@ -267,7 +271,7 @@ int main(int argc, char** argv) {
                            (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) ||
                            (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid()) ||
                            (globe.surface==SurfaceLayer::Population && globe.population.valid()) ||
-                           globe.texture.id != 0 || globe.imagery[0].valid()));
+                           globe.texture.id != 0 || globe.imagery[body_index(BodyId::Earth)].valid()));
         if (globe.body==BodyId::Earth)
             geographic_overlay_draw_rivers(geography,cam,aspect,map,ui.rivers_visible);
         ui.raster_legend_visible = globe.body==BodyId::Earth && globe.texture_visible &&
@@ -281,7 +285,7 @@ int main(int argc, char** argv) {
             ui_draw_places(ui,geography.features,cam,map,aspect);
         }
         if (globe.body!=BodyId::Earth && ui.planetary_features_visible)
-            ui_draw_markers(ui,feature_markers[static_cast<std::size_t>(globe.body)],cam,map,aspect);
+            ui_draw_markers(ui,feature_markers[body_index(globe.body)],cam,map,aspect);
         ui_draw_markers(ui,options.markers,cam,map,aspect);
         ui_draw(ui,cam,map,globe,countries);
         ui_flush(ui);

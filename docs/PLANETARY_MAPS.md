@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# Moon, Mars and Io: planetary surface maps
+# Planetary surface maps
 
 Globtoo models all bodies with a spherical, planetocentric-style viewer. In
 its **internal** convention, longitude is positive **east**, latitude is
@@ -19,16 +19,23 @@ and domain **cannot** be inferred from the name "Mars" or "Io" alone.
 
 ## Named planetary features
 
-The bundled **small** feature catalog contains nine IAU-approved names and
+The bundled **small** feature catalog contains 64 IAU-approved names and
 feature-center coordinates from the [USGS Gazetteer of Planetary Nomenclature](https://planetarynames.wr.usgs.gov/). These are reference point labels,
-not outlines and not a complete scientific GIS dataset. Click **LANDMARKS**
-(on Moon, Mars or Io) or press **F** to toggle them. Use
+not outlines and not a complete scientific GIS dataset. Every solid body
+except Earth has two or three; the gas giants have none. Click **LANDMARKS**
+(on any body with landmarks) or press **F** to toggle them. Use
 `globtoo --list-features` to see the names, or start at one with
 `globtoo --focus 'Olympus Mons'`. This switches to the correct body and
 centers the camera. The labels work without any external texture.
 
 | Body | Label | Source center coordinates | Gazetteer entry |
 | --- | --- | --- | --- |
+| Mercury | Caloris Planitia | 30.50°N, 189.80°W | [979](https://planetarynames.wr.usgs.gov/Feature/979) |
+| Mercury | Rachmaninoff | 27.60°N, 302.40°W | [14653](https://planetarynames.wr.usgs.gov/Feature/14653) |
+| Mercury | Kuiper | 11.30°S, 31.10°W | [3140](https://planetarynames.wr.usgs.gov/Feature/3140) |
+| Venus | Maxwell Montes | 65.20°N, 3.30°E | [3766](https://planetarynames.wr.usgs.gov/Feature/3766) |
+| Venus | Aphrodite Terra | 5.80°S, 104.80°E | [317](https://planetarynames.wr.usgs.gov/Feature/317) |
+| Venus | Mead | 12.50°N, 57.20°E | [3787](https://planetarynames.wr.usgs.gov/Feature/3787) |
 | Moon | Tycho | 43.30°S, 11.22°W | [6163](https://planetarynames.wr.usgs.gov/Feature/6163) |
 | Moon | Copernicus | 9.62°N, 20.08°W | [1296](https://planetarynames.wr.usgs.gov/Feature/1296) |
 | Moon | Mare Tranquillitatis | 8.35°N, 30.83°E | [3691](https://planetarynames.wr.usgs.gov/Feature/3691) |
@@ -38,19 +45,72 @@ centers the camera. The labels work without any external texture.
 | Io | Loki Patera | 12.97°N, 308.80°W | [3459](https://planetarynames.wr.usgs.gov/Feature/3459) |
 | Io | Pele | 18.71°S, 255.28°W | [4638](https://planetarynames.wr.usgs.gov/Feature/4638) |
 | Io | Tvashtar Paterae | 62.76°N, 123.53°W | [14131](https://planetarynames.wr.usgs.gov/Feature/14131) |
+| Europa | Pwyll | 25.20°S, 271.40°W | [4878](https://planetarynames.wr.usgs.gov/Feature/4878) |
+| Europa | Conamara Chaos | 9.70°N, 272.70°W | [1282](https://planetarynames.wr.usgs.gov/Feature/1282) |
+| Europa | Tyre | 33.60°N, 146.60°W | [6170](https://planetarynames.wr.usgs.gov/Feature/6170) |
+| Ganymede | Galileo Regio | 45.00°N, 127.00°W | [2076](https://planetarynames.wr.usgs.gov/Feature/2076) |
+| Ganymede | Osiris | 38.00°S, 166.31°W | [4509](https://planetarynames.wr.usgs.gov/Feature/4509) |
+| Ganymede | Tros | 11.14°N, 27.26°W | [6091](https://planetarynames.wr.usgs.gov/Feature/6091) |
+| Callisto | Valhalla | 14.70°N, 56.00°W | [6284](https://planetarynames.wr.usgs.gov/Feature/6284) |
+| Callisto | Asgard | 32.20°N, 139.90°W | [420](https://planetarynames.wr.usgs.gov/Feature/420) |
+| Callisto | Bran | 24.20°S, 205.60°W | [862](https://planetarynames.wr.usgs.gov/Feature/862) |
+| Mimas | Herschel | 1.38°S, 111.76°W | [2478](https://planetarynames.wr.usgs.gov/Feature/2478) |
+| Mimas | Arthur | 35.40°S, 196.04°W | [403](https://planetarynames.wr.usgs.gov/Feature/403) |
+| Enceladus | Baghdad Sulcus | 86.91°S, 230.54°W | [14248](https://planetarynames.wr.usgs.gov/Feature/14248) |
+| Enceladus | Ali Baba | 56.84°N, 17.51°W | [184](https://planetarynames.wr.usgs.gov/Feature/184) |
+| Enceladus | Samarkand Sulci | 30.00°N, 327.50°W | [5291](https://planetarynames.wr.usgs.gov/Feature/5291) |
+| Tethys | Odysseus | 32.82°N, 128.89°W | [4406](https://planetarynames.wr.usgs.gov/Feature/4406) |
+| Tethys | Ithaca Chasma | 14.00°S, 6.10°W | [2751](https://planetarynames.wr.usgs.gov/Feature/2751) |
+| Tethys | Penelope | 10.83°S, 249.22°W | [4645](https://planetarynames.wr.usgs.gov/Feature/4645) |
+| Dione | Evander | 57.00°S, 145.00°W | [14353](https://planetarynames.wr.usgs.gov/Feature/14353) |
+| Dione | Padua Chasmata | 17.70°N, 247.17°W | [14384](https://planetarynames.wr.usgs.gov/Feature/14384) |
+| Dione | Aeneas | 25.89°N, 46.27°W | [64](https://planetarynames.wr.usgs.gov/Feature/64) |
+| Rhea | Tirawa | 34.20°N, 151.70°W | [6026](https://planetarynames.wr.usgs.gov/Feature/6026) |
+| Rhea | Inktomi | 14.10°S, 112.10°W | [14671](https://planetarynames.wr.usgs.gov/Feature/14671) |
+| Rhea | Mamaldi | 14.00°N, 184.00°W | [14751](https://planetarynames.wr.usgs.gov/Feature/14751) |
+| Titan | Xanadu | 15.00°S, 100.00°W | [6958](https://planetarynames.wr.usgs.gov/Feature/6958) |
+| Titan | Kraken Mare | 68.00°N, 310.00°W | [14399](https://planetarynames.wr.usgs.gov/Feature/14399) |
+| Titan | Menrva | 20.10°N, 87.20°W | [7025](https://planetarynames.wr.usgs.gov/Feature/7025) |
+| Iapetus | Cassini Regio | 28.10°S, 92.60°W | [1047](https://planetarynames.wr.usgs.gov/Feature/1047) |
+| Iapetus | Engelier | 40.50°S, 264.70°W | [14463](https://planetarynames.wr.usgs.gov/Feature/14463) |
+| Iapetus | Turgis | 16.90°N, 28.40°W | [14488](https://planetarynames.wr.usgs.gov/Feature/14488) |
+| Miranda | Inverness Corona | 66.90°S, 325.70°E | [2704](https://planetarynames.wr.usgs.gov/Feature/2704) |
+| Miranda | Verona Rupes | 18.30°S, 347.80°E | [6359](https://planetarynames.wr.usgs.gov/Feature/6359) |
+| Miranda | Arden Corona | 29.10°S, 73.70°E | [353](https://planetarynames.wr.usgs.gov/Feature/353) |
+| Ariel | Yangoor | 68.70°S, 279.70°E | [6638](https://planetarynames.wr.usgs.gov/Feature/6638) |
+| Ariel | Kachina Chasmata | 33.70°S, 246.00°E | [2879](https://planetarynames.wr.usgs.gov/Feature/2879) |
+| Umbriel | Wunda | 7.90°S, 273.60°E | [6587](https://planetarynames.wr.usgs.gov/Feature/6587) |
+| Umbriel | Vuver | 4.70°S, 311.60°E | [6460](https://planetarynames.wr.usgs.gov/Feature/6460) |
+| Titania | Messina Chasmata | 33.30°S, 335.00°E | [3870](https://planetarynames.wr.usgs.gov/Feature/3870) |
+| Titania | Gertrude | 15.80°S, 287.10°E | [2150](https://planetarynames.wr.usgs.gov/Feature/2150) |
+| Oberon | Hamlet | 46.10°S, 44.40°E | [2340](https://planetarynames.wr.usgs.gov/Feature/2340) |
+| Oberon | Mommur Chasma | 16.30°S, 323.50°E | [3958](https://planetarynames.wr.usgs.gov/Feature/3958) |
+| Triton | Leviathan Patera | 17.00°N, 28.50°E | [3368](https://planetarynames.wr.usgs.gov/Feature/3368) |
+| Triton | Tuonela Planitia | 34.00°N, 14.50°E | [6134](https://planetarynames.wr.usgs.gov/Feature/6134) |
+| Triton | Mazomba | 18.50°S, 63.50°E | [3771](https://planetarynames.wr.usgs.gov/Feature/3771) |
+| Pluto | Sputnik Planitia | 19.51°N, 178.69°E | [15669](https://planetarynames.wr.usgs.gov/Feature/15669) |
+| Pluto | Tombaugh Regio | 7.62°N, 183.22°E | [15668](https://planetarynames.wr.usgs.gov/Feature/15668) |
+| Pluto | Burney | 45.68°N, 133.79°E | [15680](https://planetarynames.wr.usgs.gov/Feature/15680) |
+| Charon | Dorothy | 58.53°N, 40.58°E | [15738](https://planetarynames.wr.usgs.gov/Feature/15738) |
+| Charon | Argo Chasma | 27.80°N, 80.40°E | [15734](https://planetarynames.wr.usgs.gov/Feature/15734) |
+| Charon | Kubrick Mons | 3.60°N, 30.80°E | [15736](https://planetarynames.wr.usgs.gov/Feature/15736) |
 
-**Coordinates are not interchangeable between bodies.** The selected lunar
-entries are planetographic latitude, east-positive longitude in −180–180;
-the selected Martian entries are planetocentric latitude, east-positive
-longitude in 0–360; the Io entries are planetographic latitude and
-**west-positive** longitude in 0–360. Globtoo flips Io's longitude sign and
-wraps all source longitudes to [−180°, 180°) east-positive. According to
+**Coordinates are not interchangeable between bodies.** Each row keeps the
+system the Gazetteer publishes for that body: lunar entries are
+planetographic latitude, east-positive longitude in −180–180; Martian entries
+are planetocentric, east-positive 0–360; Mercury, Io, Europa, Ganymede,
+Callisto and the Saturnian moons are planetographic and **west-positive**
+0–360; Venus, the Uranian moons, Pluto and Charon are planetocentric,
+east-positive 0–360; Triton is planetographic, east-positive 0–360. Globtoo
+flips west-positive longitudes and wraps all of them to [−180°, 180°)
+east-positive. According to
 [USGS Gazetteer coordinate guidance](https://planetarynames.wr.usgs.gov/Page/Website),
-the Gazetteer uses a **spherical cartographic reference for the Moon and Io**,
-so planetographic and planetocentric **latitude are numerically identical**
-for these entries; their labels need no latitude correction. Mars Gazetteer
-entries in our catalog already use planetocentric latitude. Differences from
-an actual mosaic's control network, underlying shape and projection are still
+every body listed here with planetographic entries has a **spherical
+cartographic reference**, so planetographic and planetocentric **latitude are
+numerically identical** for those entries; their labels need no latitude
+correction (the tests enforce that Mars, the one oblate body with landmarks,
+is listed planetocentric). Differences from an actual mosaic's control
+network, underlying shape and projection are still
 possible and have not been quantified. This catalog is deliberately separate from source-texture
 longitude normalization. The IAU feature center is not guaranteed to equal
 a feature's visually brightest or highest point.
@@ -186,8 +246,8 @@ The installer reads `source.json`, validates the declared target body and
 coordinate convention, checks the manifest's tile grid and SHA-256 of **every
 listed file**, and rejects unexpected files and symlinks. It copies the map
 into `$XDG_DATA_HOME/globtoo/imagery/io/` (normally
-`$HOME/.local/share/globtoo/imagery/io/`). Moon and Mars use equivalent
-paths. An explicit `--body-imagery-dir` or `GLOBE_ASSET_DIR` overrides the
+`$HOME/.local/share/globtoo/imagery/io/`). Every other body uses the
+equivalent path under its lower-case name. An explicit `--body-imagery-dir` or `GLOBE_ASSET_DIR` overrides the
 user installation. A user-installed map overrides an older map packaged by
 CMake/Nix, and doesn't modify a read-only Nix store. To replace a previously
 installed map, pass `--replace`; validation and the copy happen in a sibling
@@ -214,8 +274,8 @@ cmake --install build --prefix "$HOME/.local"
 # share/globtoo/imagery/mars/{manifest.txt,preview.jpg,tile-*.jpg,...}
 ```
 
-The same option exists for `GLOBTOO_MOON_PREPARED_MAP` and
-`GLOBTOO_IO_PREPARED_MAP`. Each must be a complete output of
+The same option exists for every body except Earth, e.g.
+`GLOBTOO_MOON_PREPARED_MAP` or `GLOBTOO_TITAN_PREPARED_MAP`. Each must be a complete output of
 `prepare_planetary_map.py`; configuration and the build validate its full
 checksum manifest and reject an asset prepared for a different body.
 `PREPARED_MAP` cannot be combined with the older `TEXTURE` or
@@ -243,8 +303,8 @@ bundling the Earth image. The ordinary `packages.default` and
 
 ## Preparing an externally obtained map
 
-The input must be a color/grayscale **full 360° × 180° north-up plate carrée**
-image, with exactly 2:1 dimensions (uniform longitude and latitude spacing),
+The input must be a color/grayscale **full 360° × 180° plate carrée**
+image (north-up, or south-up with `--top south`), with exactly 2:1 dimensions (uniform longitude and latitude spacing),
 no added map borders or legend. TIFF/GeoTIFF support depends on Pillow's
 installed codecs; other supported raster formats include PNG and JPEG. The
 script **does not reproject** Mercator, polar stereographic, regional mosaics,
@@ -277,7 +337,11 @@ python3 tools/normalize_planet_texture.py mars_source.tif mars.jpg \
   --positive west --left 0 --body mars --latitude planetographic
 ```
 
-For ±180° maps, use `--left 180`, regardless of positive direction. The
+For ±180° maps, use `--left 180`, regardless of positive direction. A map
+whose top row is the **south** pole takes `--top south` (all of the
+normalizer, tiler, alignment and preparation tools accept it). A raster
+rotated by 180° is south-up **and** reversed in longitude: declare it with
+`--top south --positive west`, exactly as stored, never by guessing. The
 preprocessor mirrors west-positive pixels and rotates 0–360° images by half
 a revolution; its operations have exact pixel-center alignment, including
 the antimeridian seam and both poles. Downsampling occurs before rearranging
@@ -285,12 +349,12 @@ the pixels. The maximum width defaults to 2048 to avoid exceeding typical
 GLES2 texture limits; the runtime further checks `GL_MAX_TEXTURE_SIZE`.
 
 Run with `globtoo --body moon --body-texture moon=/path/to/moon.jpg`, or install
-one of the normalized maps as `share/globtoo/assets/{moon,mars,io}.jpg`.
+one of the normalized maps as `share/globtoo/assets/<body>.jpg`.
 Globtoo discovers installed planetary maps when switching bodies, while an
 explicit `--body-texture` overrides the installed file. The application does
 not download any textures without user action.
 
-## High-resolution tiled Moon, Mars and Io imagery
+## High-resolution tiled planetary imagery
 
 For full-world mosaics wider than a GLES2 texture limit, use the **same
 power-of-two, lazily uploaded tile pipeline** as Earth imagery instead of
@@ -330,7 +394,7 @@ close zoom, tiles are loaded lazily with the existing bounded GPU cache. The
 application never accesses the network while drawing or changing bodies.
 
 CMake can also package the mosaics under
-`share/globtoo/imagery/{moon,mars,io}/` for automatic detection:
+`share/globtoo/imagery/<body>/` for automatic detection:
 
 ```sh
 cmake -S . -B build \
@@ -384,7 +448,8 @@ cmake --install build
 ```
 
 Replace bracketed fields with **actual verified** provenance and terms. The
-same options exist for `GLOBTOO_MARS_*` and `GLOBTOO_IO_*`. The normalized
+same options exist for every other body (`GLOBTOO_MARS_*`, `GLOBTOO_IO_*`,
+`GLOBTOO_TITAN_*`, ...), including `GLOBTOO_<BODY>_TOP=north|south`. The normalized
 JPEG and its `<body>.source.txt` attribution are staged beside the binary
 and included in the installed resource directory. Input imagery is not
 stored in the Git repository. Leave these CMake options empty to keep the
@@ -422,31 +487,46 @@ subsequent Nix fetch.
 
 ## Reproducible Nix installation (Stage 13)
 
-The default `nix build` / `nix run` packages Earth, Moon, Mars and Io. The
+The default `nix build` / `nix run` packages Earth and **every other body in
+`data/bodies.tsv`**: all planets, the major moons, Pluto and Charon. The
 planetary data is **not** committed to Git: `flake.nix` pins each upstream
 image with a fixed-output hash, performs the oriented plate-carrée tile
 conversion during the build, and installs `share/globtoo/imagery/<body>/`
 (manifest, tiles, previews, source record). The `preview-small.jpg` is also
 installed as `share/globtoo/assets/<body>.jpg` so both the distant globe and
-close zoom show the same map.
+close zoom show the same map. `postInstall` audits every installed tile grid.
 
-Sources and limitations:
+Each source's orientation is **declared** in `flake.nix` and was checked with
+`tools/planetary_alignment.py` QA sheets against the landmark catalog above
+(gas giants have no surface landmarks; their maps are cloud-top textures
+without a fixed surface frame):
 
-- Moon and Mars: Solar System Scope 8K maps (`8k_moon.jpg`, `8k_mars.jpg`),
-  CC BY 4.0. The hash pins are published in
-  [Orrery's ASSETS.md](https://github.com/RTF22/Orrery/blob/master/ASSETS.md);
-  the author fills some missing data with illustrative terrain. Map placement
-  (east-positive, −180° at the left) is a rendering assumption pending
-  comparison against authoritative crater/landmark coordinates.
-- Io: USGS Galileo/Voyager photomosaic mirrored by
-  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Io_for_GeoHacks.jpg),
-  public domain. The upstream SHA-1 hash is published in Commons file
-  metadata. The source is 1225×613 pixels, one column short of an exact 2:1
-  cylindrical texture, so Nix resamples it to 1226×613 before tiling. The
-  cartographic input is treated as west-positive, 0° at the left, with
-  spherical latitude. Visual registration against IAU features is outstanding.
+| Body | Source | Longitude, left edge, top | Landmark QA |
+| --- | --- | --- | --- |
+| Moon, Mars | Solar System Scope 8K, CC BY 4.0 | east, 180°, north | Tycho, Copernicus, Olympus Mons, Hellas match |
+| Mercury | Solar System Scope 8K | east, 180°, north | Kuiper, Rachmaninoff, Caloris match |
+| Venus | Solar System Scope 8K (`8k_venus_surface`) | **west, 180°, south** (rotated 180°) | Maxwell Montes, Aphrodite Terra match |
+| Jupiter, Saturn, Uranus, Neptune | Solar System Scope | east, 180°, north | n/a (cloud tops) |
+| Io | USGS Galileo/Voyager, Commons | **east, 180°**, north | Pele ring, Loki, Tvashtar match (the earlier west/0° declaration was wrong) |
+| Europa, Ganymede, Callisto | NASA/JPL Voyager maps, Commons | east, 180°, north | Pwyll, Tyre, Valhalla, Asgard match |
+| Mimas, Enceladus, Tethys, Dione, Rhea, Iapetus | Cassini color maps (PIA184xx), Commons | east, 0°, north | Herschel, Odysseus, Engelier, Cassini Regio match |
+| Titan | Cassini ISS map, April 2011, Commons | east, 0°, north | Menrva ring and Xanadu match |
+| Miranda, Ariel, Umbriel, Titania, Oberon | NASA/JPL/USGS Voyager maps, Commons | east, 180°, north | Arden Corona, Kachina Chasmata, Wunda, Messina Chasmata, Hamlet match |
+| Triton | Voyager map (P. Schenk, LPI), Commons | east, 180°, north | Leviathan Patera on imaged terrain |
+| Pluto | New Horizons color mosaic, Commons | east, 0°, north | Sputnik Planitia / Tombaugh Regio match |
+| Charon | New Horizons map (IAU iau1803c), Commons | east, 180°, north | Kubrick Mons, Argo Chasma match |
 
-The package choices are `default` (Earth and all three bodies),
+Solar System Scope files are pinned with SRI SHA-256 digests; Commons files
+are pinned with the SHA-1 published by the Commons imageinfo API, like Io.
+Io (1225×613), Tethys (13467×6734), Rhea (12015×6008) and Iapetus
+(11741×5871) are a pixel or two off an exact 2:1 grid; the build resamples
+their width with `tools/fit_plate_carree.py`, which refuses a source whose
+pinned size changed or whose aspect deviates by more than 1%. Voyager-era
+maps of the Uranian moons, Triton, and the New Horizons maps of Pluto and
+Charon have large unimaged regions (black or filled), which is how the
+original products are published.
+
+The package choices are `default` (Earth and all other bodies),
 `globtoo-earth` (full Earth assets only), and `globtoo-lite` (no bundled
 textures; the explicit Earth downloader is retained). Changing the map
 source or its hash in `flake.nix` should be accompanied by verifying the
@@ -466,9 +546,3 @@ The other bundled bodies remain unchanged. With `withPlanetaryMapsLite`, only
 the explicitly passed audited maps are included. For already-installed users,
 `tools/install_planetary_map.py` publishes maps to XDG user data and the viewer
 uses their preview and tiles together ahead of the package's bundled assets.
-
-**Build limitation:** These raster source URLs and externally published hashes
-have not yet been fetched/recomputed in the development sandbox, which lacks
-network access. Full Nix evaluation, package builds and GLES2 rendering must
-be verified on NixOS before treating the image pins and axis assumptions as
-fully validated.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Verify and install a prepared Moon/Mars/Io map in XDG user data.
+"""Verify and install a prepared planetary (non-Earth) map in XDG user data.
 
 Only accepts outputs from prepare_planetary_map.py (manifest, provenance,
 checksummed tiles, previews and QA). No network access or runtime conversion.
@@ -36,7 +36,10 @@ def hash_file(path: Path) -> tuple[str, int]:
         raise ValueError(f'file is empty: {path}')
     return digest.hexdigest(), total
 
-BODIES = ('moon', 'mars', 'io')
+if __package__:
+    from .planetary_bodies import BODIES
+else:
+    from planetary_bodies import BODIES
 HASH_RE = re.compile(r'[0-9a-f]{64}\Z')
 TILE_RE = re.compile(r'tile-\d{3}-\d{3}\.jpg\Z')
 FIXED_FILES = {'manifest.txt', 'preview.jpg', 'preview-small.jpg',

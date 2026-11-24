@@ -11,13 +11,14 @@
 #include <string>
 
 int main() {
-    assert(planetary_features.size()==9);
+    assert(planetary_features.size()==64);
     assert(!find_planetary_feature("Earth"));
     assert(find_planetary_feature("lOkI pAtErA")->body==BodyId::Io);
     assert(find_planetary_feature("tycho")->body==BodyId::Moon);
     assert(find_planetary_feature("OLYMPUS MONS")->body==BodyId::Mars);
     std::set<std::string> names;
     unsigned moon=0,mars=0,io=0;
+    std::array<unsigned,body_catalog.size()> per_body{};
     for (const auto& feature:planetary_features) {
         assert(feature.body!=BodyId::Earth);
         assert(feature.gazetteer_id>0);
@@ -27,11 +28,25 @@ int main() {
         assert(feature_east_longitude(feature)<180);
         assert(names.emplace(std::string(feature.name)).second);
         assert(find_planetary_feature(feature.name)==&feature);
+        per_body[body_index(feature.body)]++;
+        // Only spherical reference bodies may use planetographic latitude
+        // directly as the renderer's centric latitude.
+        if(feature.latitude_type==FeatureLatitude::Planetographic)
+            assert(body_info(feature.body).solid_surface && feature.body!=BodyId::Mars);
         if(feature.body==BodyId::Moon) { moon++; assert(feature.latitude_type==FeatureLatitude::Planetographic); }
         if(feature.body==BodyId::Mars) { mars++; assert(feature.latitude_type==FeatureLatitude::Planetocentric); }
         if(feature.body==BodyId::Io) { io++; assert(feature.longitude_direction==FeatureLongitude::WestPositive); }
     }
     assert(moon==3 && mars==3 && io==3);
+    for (const auto& info : body_catalog) {
+        const unsigned count=per_body[body_index(info.id)];
+        // Every solid body except Earth carries 2-3 landmarks; gas giants none.
+        if (info.id==BodyId::Earth || !info.solid_surface) assert(count==0);
+        else assert(count>=2 && count<=3);
+        assert(body_has_planetary_features(info.id)==(count>0));
+    }
+    assert(std::abs(feature_east_longitude(*find_planetary_feature("Caloris Planitia"))-170.2)<.00001);
+    assert(std::abs(feature_east_longitude(*find_planetary_feature("Sputnik Planitia"))-178.69)<.00001);
     // The visual QA script reads a tabular copy of the same curated catalog.
     // Catch accidental divergence between the renderer and offline alignment
     // reports (in particular source-west Io longitudes and Mars latitudes).

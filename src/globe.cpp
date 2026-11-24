@@ -23,13 +23,13 @@ bool globe_init(Globe& g, const char* texture_path,
         fprintf(stderr, "Failed to load shaders\n");
         return false;
     }
-    if (texture_path && g.body_textures[0].empty())
-        g.body_textures[0] = texture_path;
+    if (texture_path && g.body_textures[body_index(BodyId::Earth)].empty())
+        g.body_textures[body_index(BodyId::Earth)] = texture_path;
     // Packagers may install normalized, attributed planetary mosaics without
     // requiring an explicit --body-texture for each launch. CLI always wins.
     for (const BodyInfo& body : body_catalog) {
         if (body.id == BodyId::Earth) continue;
-        auto& path = g.body_textures[static_cast<std::size_t>(body.id)];
+        auto& path = g.body_textures[body_index(body.id)];
         if (path.empty()) {
             const std::string installed = resource_path(body.default_texture_resource);
             if (std::filesystem::is_regular_file(installed)) path = installed;
@@ -38,7 +38,7 @@ bool globe_init(Globe& g, const char* texture_path,
     // Each body's imagery has its own cache and preview; swapping bodies must
     // never reuse Earth's raster or an unrelated planetary mosaic.
     for (const BodyInfo& body : body_catalog) {
-        const auto index=static_cast<std::size_t>(body.id);
+        const auto index=body_index(body.id);
         std::string path=g.body_imagery_manifests[index];
         if (body.id==BodyId::Earth && imagery_manifest_path)
             path=imagery_manifest_path;
@@ -66,7 +66,7 @@ bool globe_init(Globe& g, const char* texture_path,
         raster_cache_shutdown(g.population);
     }
     if (g.body == BodyId::Earth && !g.texture.id) {
-        fprintf(stderr, "%s\n", g.imagery[0].valid()
+        fprintf(stderr, "%s\n", g.imagery[body_index(BodyId::Earth)].valid()
                 ? "Base Earth texture unavailable; using imagery-tile preview"
                 : "Failed to load earth texture – using solid color fallback");
     }
@@ -87,7 +87,7 @@ void globe_shutdown(Globe& g) {
 void globe_draw(Globe& g, const Camera& cam, float aspect,
                 const MapView& map) {
     RasterCache* raster = g.surface==SurfaceLayer::Imagery
-                         ? &g.imagery[static_cast<std::size_t>(g.body)] :
+                         ? &g.imagery[body_index(g.body)] :
                          g.body!=BodyId::Earth ? nullptr :
                          g.surface==SurfaceLayer::Relief ? &g.relief :
                          g.surface==SurfaceLayer::Elevation ? &g.elevation :

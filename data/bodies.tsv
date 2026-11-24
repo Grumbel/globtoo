@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Body catalog shared by CMake, Python tools and tests; mirrors src/bodies.hpp.
+# parent is '-' for bodies orbiting the Sun. surface: solid | clouds.
+# slug	name	kind	parent	mean_radius_km	surface
+mercury	Mercury	planet	-	2439.4	solid
+venus	Venus	planet	-	6051.8	solid
+earth	Earth	planet	-	6371.0	solid
+moon	Moon	moon	earth	1737.4	solid
+mars	Mars	planet	-	3389.5	solid
+jupiter	Jupiter	planet	-	69911.0	clouds
+io	Io	moon	jupiter	1821.6	solid
+europa	Europa	moon	jupiter	1560.8	solid
+ganymede	Ganymede	moon	jupiter	2631.2	solid
+callisto	Callisto	moon	jupiter	2410.3	solid
+saturn	Saturn	planet	-	58232.0	clouds
+mimas	Mimas	moon	saturn	198.2	solid
+enceladus	Enceladus	moon	saturn	252.1	solid
+tethys	Tethys	moon	saturn	531.0	solid
+dione	Dione	moon	saturn	561.4	solid
+rhea	Rhea	moon	saturn	763.5	solid
+titan	Titan	moon	saturn	2574.7	solid
+iapetus	Iapetus	moon	saturn	734.3	solid
+uranus	Uranus	planet	-	25362.0	clouds
+miranda	Miranda	moon	uranus	235.8	solid
+ariel	Ariel	moon	uranus	578.9	solid
+umbriel	Umbriel	moon	uranus	584.7	solid
+titania	Titania	moon	uranus	788.9	solid
+oberon	Oberon	moon	uranus	761.4	solid
+neptune	Neptune	planet	-	24622.0	clouds
+triton	Triton	moon	neptune	1352.6	solid
+pluto	Pluto	dwarf-planet	-	1188.3	solid
+charon	Charon	moon	pluto	606.0	solid

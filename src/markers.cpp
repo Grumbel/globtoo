@@ -7,6 +7,7 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <utility>
@@ -413,6 +414,8 @@ bool parse_command_line(int argc, const char* const* argv,
             const auto value=next();
             if (!value || value->empty()) { error="--focus requires a feature name"; return false; }
             output.focus_name=*value;
+        } else if (!positional_done && key=="--list-bodies") {
+            output.action=CommandAction::ListBodies;
         } else if (!positional_done && key=="--list-features") {
             output.action=CommandAction::ListFeatures;
         } else if (!positional_done && key=="--download-asset") {
@@ -428,7 +431,7 @@ bool parse_command_line(int argc, const char* const* argv,
             const auto value=next();
             if (!value) return false;
             if (!parse_body(*value,output.body)) {
-                error="--body must be earth, moon, mars or io"; return false;
+                error="unknown --body "+std::string(*value)+" (see --list-bodies)"; return false;
             }
             explicit_body=true;
         } else if (!positional_done && key=="--body-texture") {
@@ -438,9 +441,9 @@ bool parse_command_line(int argc, const char* const* argv,
             BodyId id=BodyId::Earth;
             if (sep==std::string_view::npos || sep==0 || sep+1==value->size() ||
                 !parse_body(value->substr(0,sep),id)) {
-                error="--body-texture expects earth|moon|mars|io=FILE"; return false;
+                error="--body-texture expects BODY=FILE (see --list-bodies)"; return false;
             }
-            output.body_textures[static_cast<std::size_t>(id)] =
+            output.body_textures[body_index(id)] =
                 std::string(value->substr(sep+1));
         } else if (!positional_done && key=="--body-imagery-dir") {
             const auto value=next();
@@ -449,9 +452,9 @@ bool parse_command_line(int argc, const char* const* argv,
             BodyId id=BodyId::Earth;
             if (sep==std::string_view::npos || sep==0 || sep+1==value->size() ||
                 !parse_body(value->substr(0,sep),id)) {
-                error="--body-imagery-dir expects earth|moon|mars|io=DIR"; return false;
+                error="--body-imagery-dir expects BODY=DIR (see --list-bodies)"; return false;
             }
-            output.body_imagery_dirs[static_cast<std::size_t>(id)]=
+            output.body_imagery_dirs[body_index(id)]=
                 std::string(value->substr(sep+1));
         } else if (!positional_done && key=="--layer") {
             const auto value=next();
@@ -506,12 +509,34 @@ bool parse_command_line(int argc, const char* const* argv,
         error="--list-features must be used by itself";
         return false;
     }
+    if (output.action==CommandAction::ListBodies && argc!=2) {
+        error="--list-bodies must be used by itself";
+        return false;
+    }
     if (output.action==CommandAction::DownloadAsset &&
         !(argc==3 || (argc==2 && std::string_view(argv[1]).starts_with("--download-asset=")))) {
         error="--download-asset must be used by itself";
         return false;
     }
     return true;
+}
+
+std::string body_list_text() {
+    std::string text;
+    char line[160];
+    for (const auto& body : body_catalog) {
+        const auto kind=body_kind_name(body.kind);
+        const auto parent=body.parent==body.id ? std::string_view("Sun") :
+            body_info(body.parent).name;
+        std::snprintf(line,sizeof(line),"%-10.*s %-10.*s %-12.*s %-8.*s %9.1f km%s\n",
+                      static_cast<int>(body.slug.size()),body.slug.data(),
+                      static_cast<int>(body.name.size()),body.name.data(),
+                      static_cast<int>(kind.size()),kind.data(),
+                      static_cast<int>(parent.size()),parent.data(),
+                      body.mean_radius_km,body.solid_surface ? "" : "  (cloud tops)");
+        text+=line;
+    }
+    return text;
 }
 
 std::string command_line_help(std::string_view program) {
@@ -526,7 +551,8 @@ std::string command_line_help(std::string_view program) {
     help += "      --marker-color HEX    #RRGGBB for subsequent markers (default #FFC54B)\n";
     help += "      --marker-size PX      Radius 2..32 for subsequent markers (default 7)\n";
     help += "      --center COORDS       Center initial view here (otherwise local timezone)\n";
-    help += "      --body NAME           earth (default), moon, mars or io\n";
+    help += "      --body NAME           Initial body, e.g. moon, mars, titan (default earth)\n";
+    help += "      --list-bodies         List the selectable planets and moons (no SDL)\n";
     help += "      --focus NAME          Start on an IAU-named landmark; selects its body\n";
     help += "      --list-features       List built-in planetary landmarks (no SDL)\n";
     help += "      --body-texture B=FILE Set a body's equirectangular image (repeatable)\n";
@@ -549,7 +575,7 @@ std::string command_line_help(std::string_view program) {
     help += "  geo:52.52,13.405         RFC 5870 Geo URI (altitude ignored)\n";
     help += "  +52.52+013.405/          ISO 6709 signed coordinate pair\n\n";
     help += "Planetary maps must use east-positive longitude, north at image top.\n";
-    help += "Non-Earth bodies have no bundled map yet; Earth layers are hidden.\n\n";
+    help += "Earth-only layers are hidden on other bodies; M / Shift+M cycle bodies.\n\n";
     help += "Examples:\n";
     help += "  globtoo --marker '52.5200,13.4050|Berlin'\n";
     help += "  globtoo --marker 'N40°41′21″, W74°02′40″' --label 'Liberty Island'\n";

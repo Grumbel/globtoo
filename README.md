@@ -13,7 +13,7 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Smooth zoom down to individual small countries
 - Earth texture is **fetched at build time** by the Nix flake (does not bloat the repo)
 - Zoom-aware capitals, cities, and major rivers from Natural Earth 10m
-- Pinned Moon, Mars and Io raster sources are tiled and installed by the default Nix package; optional custom planetary maps and Blue Marble relief are supported
+- All eight planets, Pluto and 19 major moons: pinned raster sources are tiled and installed by the default Nix package; optional custom planetary maps and Blue Marble relief are supported
 - Optional measured elevation/depth and population density (people/km²) layers
 
 ![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
@@ -25,9 +25,13 @@ nix build
 ./result/bin/globtoo
 ```
 
-The default Nix package fetches and tiles Moon and Mars (8K Solar System Scope,
-CC BY 4.0) and Io (USGS via Wikimedia Commons, public domain) **at build time**,
-in addition to the existing Earth imagery and geographic data. It installs a
+The default Nix package fetches and tiles every other body in the catalog
+**at build time**, in addition to the existing Earth imagery and geographic
+data: the Moon, Mercury, Venus, Mars and the four giant planets from Solar
+System Scope (CC BY 4.0), and Io, Europa, Ganymede, Callisto, the Saturnian
+and Uranian moons, Triton, Pluto and Charon from NASA/JPL/USGS/APL mosaics
+(public domain, via Wikimedia Commons). `globtoo --list-bodies` prints the
+catalog; [CREDITS](data/CREDITS.md) lists every source. It installs a
 small base texture for each body plus a matching set of GLES2 tiles. No
 network access is needed when starting Globtoo. These presentation mosaics
 are not suitable for scientific measurements; source registration and precise
@@ -36,7 +40,7 @@ IAU landmark alignment remain to be checked on real hardware.
 Available packages:
 
 ```sh
-nix build .#default        # Earth + Moon + Mars + Io, all packaged offline
+nix build .#default        # Earth + all other bodies, packaged offline
 nix build .#globtoo-earth  # Full Earth maps, without planetary rasters
 nix build .#globtoo-lite   # Lean package; explicitly download Earth on demand
 nix run .#default -- --body mars
@@ -80,7 +84,7 @@ The on-screen application icon is installed both for desktop launchers and as
 the SDL window icon. Run `man globtoo` after installing to a prefix on your
 manpage search path.
 
-For persistent Moon, Mars, or Io maps, run
+For persistent maps of any non-Earth body, run
 `python3 tools/install_planetary_map.py /path/to/prepared-tiles` after
 [preparing and auditing the source](docs/PLANETARY_MAPS.md). The viewer then
 finds the tiles under `$XDG_DATA_HOME/globtoo/imagery/<body>` automatically,
@@ -158,7 +162,7 @@ Use `--marker` / `-m` repeatedly, `--label` / `-l` for the previous pin,
 `--texture` (or the legacy positional filename) for a custom Earth image.
 `--layer imagery|relief|elevation|population` selects the starting raster;
 `--imagery-dir DIR` supplies higher-resolution true-color close-up tiles
-for the normal Imagery mode, `--body-imagery-dir moon=DIR` (also Mars and Io)
+for the normal Imagery mode, `--body-imagery-dir moon=DIR` (any non-Earth body)
 provides independent high-resolution planetary tiles, `--relief-dir DIR` supplies a separate visual relief
 layer, and `--elevation-dir DIR` uses a measured elevation/bathymetry tile set
 with a physical-unit legend.
@@ -194,7 +198,7 @@ The texture is stored in the XDG cache for later offline launches. The
 normal full package does not link to libcurl or OpenSSL for downloading.
 See [download and package details](docs/DOWNLOADS.md) for the source hash,
 cache behavior, and limitations; currently only Earth is in the download
-catalog, not Moon, Mars or Io.
+catalog, not the other bodies.
 
 ## Raster textures
 
@@ -242,7 +246,7 @@ names, markers, and the optional geographic grid remain visible.
 - **Texture**: toggle the Earth imagery independently of the country colors. When both
   are enabled (the default), translucent country colors mix with the texture
   so terrain remains visible beneath the colors. Either layer can be shown alone.
-- **Landmarks** (Moon/Mars/Io only): toggle sourced feature-center labels, or press **F**.
+- **Landmarks** (solid-surface bodies only): toggle sourced feature-center labels, or press **F**.
 - **Capitals** (Earth only): toggle national-capital diamonds and English labels.
   Capital locations are always eligible regardless of zoom, but labels
   are decluttered rather than drawn over one another.
@@ -348,18 +352,21 @@ with `nix develop -c reuse lint`).
 
 ### Planetary bodies (experimental)
 
-`--body earth|moon|mars|io` selects a body at startup. `M` or the compass
-**NEXT BODY** button cycles bodies. Use `--body-texture mars=/path/to/map.jpg`
+`--body NAME` selects a body at startup; `--list-bodies` prints all of them
+(slug, name, kind, parent and mean radius). `M` / `Shift+M` or the compass
+**NEXT >** / **< PREV** buttons cycle forward and backward through the
+catalog, which is ordered by distance from the Sun with each planet followed
+by its moons. Gas giants are rendered at their cloud tops and have no
+landmarks. Use `--body-texture mars=/path/to/map.jpg`
 (repeatable) to assign a north-up, east-positive equirectangular texture;
 `--texture FILE` sets the initial body's texture. Without one, non-Earth
 bodies appear as neutral-colored spheres. Earth political, city and river
 features are hidden on the others. Optional, externally supplied and
 source-attributed planetary textures can be normalized and installed by CMake;
-use `GLOBTOO_MOON_TEXTURE`, `GLOBTOO_MARS_TEXTURE` or
-`GLOBTOO_IO_TEXTURE` together with their required source license, longitude
+use `GLOBTOO_<BODY>_TEXTURE` (for example `GLOBTOO_TITAN_TEXTURE`) together with their required source license, longitude
 axis, planetocentric latitude and image-origin settings. See [planetary map guide](docs/PLANETARY_MAPS.md)
 for the preprocessing tool, source catalogs, caveats, and packaging example.
-No unverified planetary images are downloaded or bundled by default.
+Only the pinned, attributed sources in `flake.nix` are fetched by default.
 For locally acquired and documented planetary mosaics, use
 `python3 tools/prepare_planetary_map.py SOURCE OUTPUT --body ...`
 with explicit longitude, latitude, projection, citation, license, and optional
@@ -375,7 +382,7 @@ without embedding them or asserting unchecked hashes.
 
 The non-Earth **LANDMARKS** button (or **F**, including while controls are
 hidden) shows a small catalog of IAU-named craters, maria, mountains and
-volcanic features sourced from the USGS Gazetteer of Planetary Nomenclature.
+volcanic, chaos and icy features sourced from the USGS Gazetteer of Planetary Nomenclature.
 This overlay works even without a surface texture. Earth's country and city
 controls are replaced by planetary controls on the other bodies. Find the
 available names without starting SDL, then launch centered on one:

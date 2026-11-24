@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Audit the Moon/Mars/Io raster assets in an installed Globtoo prefix.
+"""Audit the planetary (non-Earth) raster assets in an installed Globtoo prefix.
 
 The flake runs this *after* CMake installation.  It checks the same layout the
 runtime reads: a manifest + full tile grid under imagery/<body>, and an
@@ -17,7 +17,10 @@ import sys
 
 from PIL import Image
 
-BODIES = ('moon', 'mars', 'io')
+if __package__:
+    from .planetary_bodies import BODIES
+else:
+    from planetary_bodies import BODIES
 TILE_NAME = re.compile(r'tile-[0-9]{3}-[0-9]{3}\.jpg\Z')
 
 

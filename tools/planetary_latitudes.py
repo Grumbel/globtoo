@@ -2,11 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Convert raster latitude sampling to Globtoo's planetocentric sphere.
 
-The USGS/IAU Gazetteer models the Moon and Io as spheres for cartographic
+The USGS/IAU Gazetteer models the Moon, Mercury, Venus, Pluto and every
+rendered moon (Io, Europa, Titan, Charon, ...) as spheres for cartographic
 nomenclature, so their planetographic latitude is *already* planetocentric
 on that reference surface. Mars has a biaxial reference ellipsoid. For Mars
   tan(phi_c) = (polar_radius / equatorial_radius)^2 * tan(phi_g)
 where phi_g is geodetic/planetographic and phi_c is planetocentric.
+
+The giant planets have no solid surface and strongly oblate cloud-top
+reference ellipsoids; their planetographic rasters are rejected rather than
+silently treated as spherical (no conversion is implemented for them).
 
 Only latitude is resampled, at *pixel centers*. This is not a general map
 projection or datum/control-network conversion. Input must already be a
@@ -21,12 +26,16 @@ import math
 
 from PIL import Image
 
+if __package__:
+    from .planetary_bodies import BODIES, BODY_INFO
+else:
+    from planetary_bodies import BODIES, BODY_INFO
+
 
 # NASA Mars Fact Sheet equatorial and polar radii (km); these are reference
 # ellipsoid parameters, NOT radii used for Globtoo's spherical distance ruler.
 MARS_EQUATORIAL_KM = 3396.2
 MARS_POLAR_KM = 3376.2
-BODIES = ('moon', 'mars', 'io')
 LATITUDE_TYPES = ('planetocentric', 'planetographic')
 
 
@@ -34,9 +43,12 @@ def validate_latitude_type(body, latitude):
     if latitude not in LATITUDE_TYPES:
         raise ValueError('latitude must be planetocentric or planetographic')
     if body is not None and body not in BODIES:
-        raise ValueError('body must be moon, mars or io')
+        raise ValueError(f'unsupported body: {body}')
     if latitude == 'planetographic' and body is None:
-        raise ValueError('planetographic latitude needs --body moon|mars|io')
+        raise ValueError('planetographic latitude needs --body')
+    if latitude == 'planetographic' and BODY_INFO[body]['surface'] != 'solid':
+        raise ValueError(f'planetographic latitude is not supported for {body} '
+                         '(oblate cloud-top reference; supply a planetocentric map)')
 
 
 def source_row(output_y, height, body, latitude):
