@@ -16,34 +16,23 @@
 
 namespace {
 struct Color { float r,g,b,a; };
-constexpr Color panel{.035f,.055f,.085f,.93f};
+constexpr Color panel{.035f,.055f,.085f,.90f};
+constexpr Color panel_edge{.32f,.45f,.58f,.38f};
 constexpr Color text{.92f,.96f,1.f,1.f};
-constexpr Color muted{.65f,.72f,.80f,1.f};
-constexpr Color active{.20f,.38f,.55f,1.f};
-constexpr Color inactive{.11f,.18f,.26f,1.f};
-constexpr Color hover{.22f,.29f,.38f,1.f};
+constexpr Color muted{.62f,.70f,.79f,1.f};
+constexpr Color dimmed{.62f,.70f,.79f,.42f};
+constexpr Color active{.18f,.36f,.53f,1.f};
+constexpr Color accent{.42f,.74f,1.f,1.f};
+constexpr Color inactive{.10f,.165f,.24f,1.f};
 constexpr Color needle_north{.98f,.38f,.28f,1.f};
 constexpr Color needle_south{.43f,.67f,.86f,1.f};
 constexpr float pi = 3.14159265358979323846f;
 
+Color lighten(Color c, float t) {
+    return {c.r+(1.f-c.r)*t, c.g+(1.f-c.g)*t, c.b+(1.f-c.b)*t, c.a};
+}
+
 struct Bounds { float x,y,w,h; };
-Bounds toolbar_panel(const Ui& ui) {
-    // Reserve the bottom edge for the mode/projection controls.
-    return {8.f, std::max(8.f,static_cast<float>(ui.viewport_h)-144.f),605.f,136.f};
-}
-Bounds compass_panel(const Ui& ui) {
-    const float x = std::max(8.f, static_cast<float>(ui.viewport_w) - 128.f);
-    return {x,8.f,120.f,249.f};
-}
-Bounds scale_panel(const Ui& ui) {
-    // Put the ruler directly below the compass, right aligned to its edge.
-    const auto c=compass_panel(ui);
-    return {std::max(8.f,c.x+c.w-264.f),c.y+c.h+8.f,264.f,83.f};
-}
-Bounds legend_panel(const Ui& ui) {
-    const auto s=scale_panel(ui);
-    return {s.x, s.y+s.h+8.f, s.w, 257.f};
-}
 bool contains(Bounds b, float x,float y) {
     return x>=b.x && x<b.x+b.w && y>=b.y && y<b.y+b.h;
 }
@@ -52,45 +41,165 @@ bool overlaps(Bounds a, Bounds b) {
            a.y<b.y+b.h && a.y+a.h>b.y;
 }
 
+// ---- Layout --------------------------------------------------------------
+// All controls are anchored to the bottom edge: the layer toolbar on the
+// left, the compass on the right and the scale bar between them (or above
+// the compass when the window is too narrow). The raster legend, the only
+// optional panel, takes the otherwise empty top-right corner.
+constexpr float margin=8.f, pad=8.f, gap=5.f;
+constexpr float button_h=30.f, header_h=24.f;
+constexpr float compass_button_h=28.f, compass_gap=4.f;
+constexpr float rose_area=100.f, compass_column=136.f;
+constexpr float scale_w=184.f, scale_h=66.f;
+constexpr float legend_w=264.f, legend_h=257.f;
+constexpr float toolbar_h=pad+header_h+gap+3*button_h+2*gap+pad;
+constexpr std::size_t body_name_chars=9; // "Enceladus", the longest name
 
-struct Button { const char* label; int x,y,w,h; int command; };
-// All hit rectangles and draw positions derive from the same layout.
-std::array<Button,19> buttons(const Ui& ui, BodyId body) {
-    std::array<Button,19> out{};
-    for (auto& b : out) b.command=-1;
-    std::size_t k=0;
-    const char* top[] = {"3D GLOBE", "PLATE", "MERCATOR", "MOLLWEIDE", "HAMMER", "-", "+"};
-    const int topw[] = {103,72,108,121,88,30,30};
-    const char* bottom[] = {"SHADING", "COUNTRIES", "BORDERS", "NAMES", "TEXTURE", "GRID"};
-    const int botw[] = {93,116,94,73,94,72};
-    const int botcmd[] = {7,8,9,10,11,15};
-    const auto panel=toolbar_panel(ui);
-    int x = static_cast<int>(panel.x+6);
-    for (int i=0;i<7;i++) { out[k++] = {top[i],x,static_cast<int>(panel.y+26),topw[i],30,i}; x += topw[i]+5; }
-    x = static_cast<int>(panel.x+6);
-    if (body!=BodyId::Earth) {
-        // Country and thematic layers have no meaning on an alien surface.
-        for (const auto& button : std::array<Button,3>{{
-             {"SHADING",0,0,93,30,7}, {"TEXTURE",0,0,94,30,11},
-             {"GRID",0,0,72,30,15}}}) {
-            out[k++]={button.label,x,static_cast<int>(panel.y+62),button.w,button.h,button.command};
-            x+=button.w+5;
-        }
-        if (body_has_planetary_features(body))
-            out[k++]={"LANDMARKS",static_cast<int>(panel.x+6),
-                      static_cast<int>(panel.y+98),136,30,24};
-        return out;
-    }
-    for (int i=0;i<6;i++) { out[k++] = {bottom[i],x,static_cast<int>(panel.y+62),botw[i],30,botcmd[i]}; x += botw[i]+5; }
-    const char* features[] = {"CAPITALS", "CITIES", "RIVERS", "RELIEF", "ELEV", "POP"};
-    const int widths[] = {112,90,90,100,85,75};
-    x=static_cast<int>(panel.x+6);
-    for (int i=0;i<6;i++) {
-        out[k++] = {features[i],x,static_cast<int>(panel.y+98),widths[i],30,17+i};
-        x+=widths[i]+5;
-    }
-    return out;
+// Width of a run of bitmap glyphs without the trailing inter-glyph space.
+float text_width(std::string_view s, int scale) {
+    return s.empty() ? 0.f : static_cast<float>(s.size()*6*scale-scale);
 }
+float button_width(std::string_view label, int scale=2) {
+    return std::max(30.f, text_width(label,scale)+18.f);
+}
+
+struct Button { std::string_view label; Bounds b; UiCommand command; int font=2; };
+struct RowItem { std::string_view label; UiCommand command; };
+using C = UiCommand;
+constexpr RowItem projection_row[]{
+    {"3D GLOBE",C::Globe},{"PLATE",C::Plate},{"MERCATOR",C::Mercator},
+    {"MOLLWEIDE",C::Mollweide},{"HAMMER",C::Hammer}};
+constexpr RowItem earth_layer_row[]{
+    {"SHADING",C::Shading},{"TEXTURE",C::Texture},{"COUNTRIES",C::Countries},
+    {"BORDERS",C::Borders},{"NAMES",C::Names},{"GRID",C::Grid}};
+constexpr RowItem earth_feature_row[]{
+    {"CAPITALS",C::Capitals},{"CITIES",C::Cities},{"RIVERS",C::Rivers},
+    {"RELIEF",C::Relief},{"ELEV",C::Elevation},{"POP",C::Population}};
+constexpr RowItem body_layer_row[]{
+    {"SHADING",C::Shading},{"TEXTURE",C::Texture},{"GRID",C::Grid}};
+constexpr RowItem landmark_row[]{{"LANDMARKS",C::Landmarks}};
+
+template <std::size_t N>
+float row_width(const RowItem (&row)[N]) {
+    float w=0;
+    for (const auto& item : row) w+=button_width(item.label)+gap;
+    return w-gap;
+}
+// The panel keeps the Earth width for every body, so switching bodies never
+// moves the compass or scale bar.
+float toolbar_width() {
+    const float zoom=2*30.f+gap+2*gap; // separated - / + pair
+    return pad+std::max({row_width(projection_row)+zoom,
+                         row_width(earth_layer_row),
+                         row_width(earth_feature_row)})+pad;
+}
+
+struct Panels { Bounds toolbar, compass, scale, legend; };
+Panels panels(const Ui& ui) {
+    const float vw=static_cast<float>(ui.viewport_w);
+    const float vh=static_cast<float>(ui.viewport_h);
+    Panels p{};
+    p.toolbar={margin,std::max(margin,vh-margin-toolbar_h),toolbar_width(),toolbar_h};
+    const float compass_w=pad+rose_area+pad+compass_column+pad;
+    p.compass={std::max(margin,vw-margin-compass_w),p.toolbar.y,compass_w,toolbar_h};
+    const bool narrow=p.toolbar.x+p.toolbar.w+margin>p.compass.x;
+    if (narrow) p.compass.y=std::max(margin,p.toolbar.y-margin-toolbar_h);
+    // Prefer the free bottom strip between the toolbar and compass.
+    const float beside=p.compass.x-margin-scale_w;
+    if (!narrow && beside>=p.toolbar.x+p.toolbar.w+margin)
+        p.scale={beside,p.compass.y+p.compass.h-scale_h,scale_w,scale_h};
+    else
+        p.scale={p.compass.x+p.compass.w-scale_w,
+                 std::max(margin,p.compass.y-margin-scale_h),scale_w,scale_h};
+    p.legend={std::max(margin,vw-margin-legend_w),margin,legend_w,legend_h};
+    return p;
+}
+
+struct Layout {
+    Panels panel;
+    Bounds rose;            // clickable compass rose (also North Up)
+    float rose_x=0, rose_y=0;
+    Bounds body_name;       // between the < and > body buttons
+    std::array<Button,32> buttons{};
+    std::size_t count=0;
+    void add(std::string_view label, Bounds b, UiCommand command, int font=2) {
+        buttons[count++]={label,b,command,font};
+    }
+    auto begin() const { return buttons.begin(); }
+    auto end() const { return buttons.begin()+count; }
+};
+
+Layout layout(const Ui& ui, BodyId body) {
+    Layout l{};
+    l.panel=panels(ui);
+    const Bounds t=l.panel.toolbar;
+    // Header: application name and the body selector.
+    float x=t.x+pad+text_width("GLOBTOO",2)+18.f;
+    const float hy=t.y+pad;
+    l.add("<",{x,hy,26.f,header_h},C::PreviousBody);
+    x+=26.f+4.f;
+    l.body_name={x,hy,static_cast<float>(body_name_chars*12-2)+16.f,header_h};
+    x+=l.body_name.w+4.f;
+    l.add(">",{x,hy,26.f,header_h},C::NextBody);
+
+    const auto row=[&](const auto& items, int index) {
+        float rx=t.x+pad;
+        const float ry=t.y+pad+header_h+gap+index*(button_h+gap);
+        for (const auto& item : items) {
+            const float w=button_width(item.label);
+            l.add(item.label,{rx,ry,w,button_h},item.command);
+            rx+=w+gap;
+        }
+        return rx;
+    };
+    const float after=row(projection_row,0)+2*gap;
+    const float ry=t.y+pad+header_h+gap;
+    l.add("-",{after,ry,30.f,button_h},C::ZoomOut);
+    l.add("+",{after+30.f+gap,ry,30.f,button_h},C::ZoomIn);
+    if (body==BodyId::Earth) {
+        row(earth_layer_row,1);
+        row(earth_feature_row,2);
+    } else {
+        // Country and thematic layers have no meaning on an alien surface.
+        row(body_layer_row,1);
+        if (body_has_planetary_features(body)) row(landmark_row,2);
+    }
+
+    const Bounds c=l.panel.compass;
+    l.rose={c.x+pad,c.y+pad,rose_area,c.h-2*pad};
+    l.rose_x=c.x+pad+rose_area*.5f;
+    l.rose_y=c.y+pad+50.f;
+    const float bx=c.x+pad+rose_area+pad;
+    const float column_h=4*compass_button_h+3*compass_gap;
+    float by=c.y+(c.h-column_h)*.5f;
+    for (const auto& [label,command] : std::array<RowItem,4>{{
+             {"NORTH UP",C::NorthUp},{"LOCK NORTH",C::NorthLock},
+             {"RESET",C::Reset},{"",C::ControlMode}}}) {
+        l.add(label,{bx,by,compass_column,compass_button_h},command);
+        by+=compass_button_h+compass_gap;
+    }
+    return l;
+}
+
+// Panels that hide map labels and markers beneath them.
+struct Occluders {
+    std::array<Bounds,4> b{};
+    std::size_t n=0;
+    explicit Occluders(const Ui& ui) {
+        if (!ui.visible) return;
+        const auto p=panels(ui);
+        b[n++]=p.toolbar; b[n++]=p.compass; b[n++]=p.scale;
+        if (ui.raster_legend_visible) b[n++]=p.legend;
+    }
+    bool hits(Bounds r) const {
+        for (std::size_t i=0;i<n;i++) if (overlaps(r,b[i])) return true;
+        return false;
+    }
+    bool hits(float x,float y) const {
+        for (std::size_t i=0;i<n;i++) if (contains(b[i],x,y)) return true;
+        return false;
+    }
+};
 
 void rect(Ui& ui, float x, float y, float w, float h, Color c) {
     if (w<=0 || h<=0) return;
@@ -99,6 +208,16 @@ void rect(Ui& ui, float x, float y, float w, float h, Color c) {
     };
     emit(x,y); emit(x+w,y); emit(x,y+h);
     emit(x+w,y); emit(x+w,y+h); emit(x,y+h);
+}
+void outline(Ui& ui, Bounds b, Color c) {
+    rect(ui,b.x,b.y,b.w,1,c);
+    rect(ui,b.x,b.y+b.h-1,b.w,1,c);
+    rect(ui,b.x,b.y+1,1,b.h-2,c);
+    rect(ui,b.x+b.w-1,b.y+1,1,b.h-2,c);
+}
+void draw_panel(Ui& ui, Bounds b) {
+    rect(ui,b.x,b.y,b.w,b.h,panel);
+    outline(ui,b,panel_edge);
 }
 
 void triangle(Ui& ui, float ax,float ay,float bx,float by,float cx,float cy,Color col) {
@@ -150,7 +269,9 @@ constexpr Glyph font[] = {
 {'(',{2,4,8,8,8,4,2}}, {')',{8,4,2,2,2,4,8}},
 {'?',{14,17,1,2,4,0,4}}, {':',{0,4,4,0,4,4,0}},
 {'+',{0,4,4,31,4,4,0}}, {',',{0,0,0,0,4,4,8}},
-{'_',{0,0,0,0,0,0,31}}, {'!',{4,4,4,4,4,0,4}}
+{'_',{0,0,0,0,0,0,31}}, {'!',{4,4,4,4,4,0,4}},
+{'<',{2,4,8,16,8,4,2}}, {'>',{8,4,2,1,2,4,8}},
+{'\x7f',{12,18,18,12,0,0,0}} // degree sign, see normalize_ascii
 };
 
 unsigned char normalize_ascii(std::string_view input, std::size_t& i) {
@@ -158,6 +279,11 @@ unsigned char normalize_ascii(std::string_view input, std::size_t& i) {
     if (c < 128) return static_cast<unsigned char>(std::toupper(c));
     // UTF-8 diacritics common in English Natural Earth names. Never split a
     // multibyte codepoint into multiple '?' characters.
+    if (c == 0xc2 && i+1 < input.size() &&
+        static_cast<unsigned char>(input[i+1]) == 0xb0) {
+        ++i;
+        return 0x7f; // U+00B0 DEGREE SIGN uses the otherwise unused DEL slot
+    }
     if ((c == 0xc3 || c == 0xc4 || c == 0xc5) && i+1 < input.size()) {
         const auto next = static_cast<unsigned char>(input[++i]);
         if (c == 0xc3) {
@@ -198,101 +324,129 @@ void draw_text(Ui& ui, float x,float y, std::string_view str, int scale, Color c
     }
 }
 
-void draw_compass(Ui& ui, const Camera& cam, const MapView& map) {
-    const auto box=compass_panel(ui);
-    rect(ui,box.x,box.y,box.w,box.h,panel);
-    const float x=box.x+box.w*.5f, y=box.y+48.f;
+// Centered single-line text inside a rectangle.
+void draw_centered(Ui& ui, Bounds b, std::string_view label, int scale, Color color) {
+    draw_text(ui,std::round(b.x+(b.w-text_width(label,scale))*.5f),
+              std::round(b.y+(b.h-7.f*scale)*.5f),label,scale,color);
+}
+
+std::string_view button_label(const Button& b, const Camera& cam) {
+    if (b.command==C::ControlMode)
+        return cam.mode==ControlMode::Grab ? "GRAB" : "ARCBALL";
+    return b.label;
+}
+
+bool command_on(UiCommand id, const Ui& ui, const MapView& m,
+                const Globe& g, const Countries& c) {
+    switch (id) {
+    case C::Globe: case C::Plate: case C::Mercator: case C::Mollweide: case C::Hammer:
+        return static_cast<int>(m.selected)==static_cast<int>(id);
+    case C::Shading: return g.shading;
+    case C::Countries: return c.fill_visible;
+    case C::Borders: return c.borders_visible;
+    case C::Names: return c.names_visible;
+    case C::Texture: return g.texture_visible;
+    case C::Grid: return ui.grid_visible;
+    case C::NorthLock: return m.north_locked;
+    case C::Capitals: return ui.capitals_visible;
+    case C::Cities: return ui.cities_visible;
+    case C::Rivers: return ui.rivers_visible;
+    case C::Landmarks: return ui.planetary_features_visible;
+    case C::Relief: return g.surface==SurfaceLayer::Relief && g.relief.valid();
+    case C::Elevation: return g.surface==SurfaceLayer::Elevation && g.elevation.valid();
+    case C::Population: return g.surface==SurfaceLayer::Population && g.population.valid();
+    default: return false; // one-shot actions
+    }
+}
+
+// Optional raster datasets may not be installed; their buttons stay
+// clickable (and explain why on stderr) but are drawn dimmed.
+bool command_available(UiCommand id, const Globe& g) {
+    switch (id) {
+    case C::Relief: return g.relief.valid();
+    case C::Elevation: return g.elevation.valid();
+    case C::Population: return g.population.valid();
+    default: return true;
+    }
+}
+
+void draw_button(Ui& ui, const Button& b, std::string_view label,
+                 bool on, bool available) {
+    Color fill=on ? active : inactive;
+    if (ui.hover==static_cast<int>(b.command)) fill=lighten(fill,.14f);
+    rect(ui,b.b.x,b.b.y,b.b.w,b.b.h,fill);
+    if (on) rect(ui,b.b.x,b.b.y+b.b.h-2,b.b.w,2,accent);
+    draw_centered(ui,b.b,label,b.font,available ? text : dimmed);
+}
+
+void draw_compass(Ui& ui, const Layout& l, const MapView& map, const Camera& cam) {
+    const float x=l.rose_x, y=l.rose_y;
     const float bearing=static_cast<float>(map_north_heading(map,cam));
-    ring(ui,x,y,29.f,muted);
+    if (ui.hover==static_cast<int>(C::NorthUp))
+        ring(ui,x,y,36.f,accent);
+    ring(ui,x,y,30.f,muted);
     // Tick marks stay fixed on screen; cardinal letters and needle turn with
     // true geographic north, not with the window or an arbitrary world axis.
     for (int i=0;i<12;i++) {
         const float a=2*pi*i/12;
-        stroke(ui,x+29*std::sin(a),y-29*std::cos(a),
-              x+(i%3==0 ? 34.f : 32.f)*std::sin(a),
-              y-(i%3==0 ? 34.f : 32.f)*std::cos(a),1.f,muted);
+        const float outer=i%3==0 ? 35.f : 33.f;
+        stroke(ui,x+30*std::sin(a),y-30*std::cos(a),
+              x+outer*std::sin(a),y-outer*std::cos(a),1.f,muted);
     }
     const float nx=std::sin(bearing), ny=-std::cos(bearing);
     const float px=-ny, py=nx;
-    triangle(ui,x+nx*25,y+ny*25,
-             x+px*4.5f,y+py*4.5f,x-px*4.5f,y-py*4.5f,needle_north);
-    triangle(ui,x-nx*23,y-ny*23,
-             x+px*4.5f,y+py*4.5f,x-px*4.5f,y-py*4.5f,needle_south);
+    triangle(ui,x+nx*26,y+ny*26,
+             x+px*5.f,y+py*5.f,x-px*5.f,y-py*5.f,needle_north);
+    triangle(ui,x-nx*24,y-ny*24,
+             x+px*5.f,y+py*5.f,x-px*5.f,y-py*5.f,needle_south);
     rect(ui,x-2,y-2,4,4,text);
     constexpr const char* letters="NESW";
     for (int i=0;i<4;i++) {
         const float a=bearing+i*pi*.5f;
         const char label[2]={letters[i],0};
-        draw_text(ui,x+std::sin(a)*40-2.5f,
-                  y-std::cos(a)*40-3.5f,label,1,i==0 ? needle_north : text);
+        draw_text(ui,std::round(x+std::sin(a)*42-2.5f),
+                  std::round(y-std::cos(a)*42-3.5f),label,1,i==0 ? needle_north : text);
     }
     int degrees=static_cast<int>(std::lround(bearing*180.f/pi));
     degrees=(degrees%360+360)%360;
     char heading[24];
-    std::snprintf(heading,sizeof(heading),"N %03d DEG",degrees);
-    draw_text(ui,x-27.f,box.y+97.f,heading,1,muted);
-    const Button north{"NORTH UP",static_cast<int>(box.x+7),
-                       static_cast<int>(box.y+107),106,24,14};
-    const Button reset{"RESET",static_cast<int>(box.x+7),
-                       static_cast<int>(box.y+135),106,24,13};
-    const Button mode{cam.mode == ControlMode::Grab ? "GRAB" : "ARCBALL",
-                      static_cast<int>(box.x+7),static_cast<int>(box.y+163),
-                      106,24,12};
-    const Button lock{map.north_locked ? "NORTH LOCK ON" : "NORTH LOCK OFF",
-                      static_cast<int>(box.x+7),static_cast<int>(box.y+191),
-                      106,24,16};
-    // The body row is split: previous / next in catalog (heliocentric) order.
-    const Button prev_body{"< PREV",static_cast<int>(box.x+7),
-                           static_cast<int>(box.y+219),51,24,25};
-    const Button next_body{"NEXT >",static_cast<int>(box.x+62),
-                           static_cast<int>(box.y+219),51,24,23};
-    for (auto b : {north,reset,mode,lock,prev_body,next_body}) {
-        rect(ui,b.x,b.y,b.w,b.h,ui.hover==b.command ? hover :
-             ((b.command==12 && cam.mode==ControlMode::Grab) ||
-              (b.command==16 && map.north_locked) ? active : inactive));
-        const bool small = b.command==16 || b.command==23 || b.command==25;
-        const int font_scale = small ? 1 : 2;
-        draw_text(ui,b.x+(b.w-6.f*font_scale*std::char_traits<char>::length(b.label))*.5f,
-                  b.y+(small ? 9.f : 6.f),b.label,font_scale,text);
-    }
+    std::snprintf(heading,sizeof(heading),"HDG %03d\x7f",degrees);
+    draw_centered(ui,{l.rose.x,l.rose.y+l.rose.h-10.f,l.rose.w,8.f},heading,1,muted);
 }
 
-bool command_active(int id, const Camera& cam, const MapView& m,
-                    const Globe& g, const Countries& c) {
-    if (id<=4) return static_cast<int>(m.selected)==id;
+void execute(UiCommand id, Ui& ui, Camera& cam, MapView& m, Globe& g, Countries& c,
+             InputState& in) {
     switch (id) {
-    case 7: return g.shading;
-    case 8: return c.fill_visible;
-    case 9: return c.borders_visible;
-    case 10: return c.names_visible;
-    case 11: return g.texture_visible;
-    case 20: return g.surface==SurfaceLayer::Relief && g.relief.valid();
-    case 21: return g.surface==SurfaceLayer::Elevation && g.elevation.valid();
-    case 22: return g.surface==SurfaceLayer::Population && g.population.valid();
-    case 12: return cam.mode == ControlMode::Grab;
-    case 15: return false; // GRID uses the Ui state, handled by the caller
-    }
-    return false;
-}
-
-void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState& in) {
-    if (id<=4) {
+    case C::Globe: case C::Plate: case C::Mercator: case C::Mollweide: case C::Hammer:
         input_set_trackball(in,false);
-        map_select(m,static_cast<MapProjection>(id),cam);
-        return;
+        map_select(m,static_cast<MapProjection>(static_cast<int>(id)),cam);
+        break;
+    case C::ZoomOut: if (m.flat_goal>.5f) map_zoom(m,-1.f); else camera_apply_zoom(cam,-1.f); break;
+    case C::ZoomIn: if (m.flat_goal>.5f) map_zoom(m,1.f); else camera_apply_zoom(cam,1.f); break;
+    case C::Shading: g.shading = !g.shading; break;
+    case C::Countries: c.fill_visible = !c.fill_visible; break;
+    case C::Borders: c.borders_visible = !c.borders_visible; break;
+    case C::Names: c.names_visible = !c.names_visible; break;
+    case C::Texture: g.texture_visible = !g.texture_visible; break;
+    case C::Grid: ui.grid_visible = !ui.grid_visible; break;
+    case C::Capitals: ui.capitals_visible = !ui.capitals_visible; break;
+    case C::Cities: ui.cities_visible = !ui.cities_visible; break;
+    case C::Rivers: ui.rivers_visible = !ui.rivers_visible; break;
+    case C::Landmarks: ui.planetary_features_visible = !ui.planetary_features_visible; break;
+    case C::Relief: case C::Elevation: case C::Population: {
+        const auto layer = id==C::Relief ? SurfaceLayer::Relief :
+            id==C::Elevation ? SurfaceLayer::Elevation : SurfaceLayer::Population;
+        if (command_available(id,g)) {
+            g.surface = g.surface==layer ? SurfaceLayer::Imagery : layer;
+            g.texture_visible=true;
+        } else std::fprintf(stderr,"%s layer is not installed.\n",
+            id==C::Relief ? "Relief" : id==C::Elevation ? "Elevation" : "Population");
+        break;
     }
-    switch (id) {
-    case 5: if (m.flat_goal>.5f) map_zoom(m,-1.f); else camera_apply_zoom(cam,-1.f); break;
-    case 6: if (m.flat_goal>.5f) map_zoom(m,1.f); else camera_apply_zoom(cam,1.f); break;
-    case 7: g.shading = !g.shading; break;
-    case 8: c.fill_visible = !c.fill_visible; break;
-    case 9: c.borders_visible = !c.borders_visible; break;
-    case 10: c.names_visible = !c.names_visible; break;
-    case 11: g.texture_visible = !g.texture_visible; break;
-    case 12:
+    case C::ControlMode:
         cam.mode = cam.mode == ControlMode::Grab ? ControlMode::Arcball : ControlMode::Grab;
         camera_grab_end(cam); camera_grab_kill_inertia(cam); break;
-    case 13: {
+    case C::Reset: {
         input_set_trackball(in,false);
         camera_grab_end(cam);
         camera_grab_kill_inertia(cam);
@@ -307,17 +461,13 @@ void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState
         m.zoom=1.f;
         break;
     }
-    case 14:
+    case C::NorthUp:
         camera_grab_end(cam);
         map_align_north(m,cam);
         break;
-    case 23:
-        globe_select_body(g,next_body(g.body));
-        break;
-    case 25:
-        globe_select_body(g,previous_body(g.body));
-        break;
-    case 16:
+    case C::NextBody: globe_select_body(g,next_body(g.body)); break;
+    case C::PreviousBody: globe_select_body(g,previous_body(g.body)); break;
+    case C::NorthLock:
         m.north_locked = !m.north_locked;
         camera_grab_kill_inertia(cam);
         map_enforce_north(m,cam);
@@ -325,10 +475,34 @@ void execute(int id, Camera& cam, MapView& m, Globe& g, Countries& c, InputState
     }
 }
 
-bool inside(const Button& button, float x,float y) {
-    return x>=button.x && x<button.x+button.w && y>=button.y && y<button.y+button.h;
+std::string upper(std::string_view s) {
+    std::string out(s);
+    for (auto& ch : out) ch=static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+    return out;
 }
 } // namespace
+
+bool ui_command_center(const Ui& ui, BodyId body, UiCommand command,
+                       float& x, float& y) {
+    for (const auto& b : layout(ui,body)) {
+        if (b.command!=command) continue;
+        x=b.b.x+b.b.w*.5f;
+        y=b.b.y+b.b.h*.5f;
+        return true;
+    }
+    return false;
+}
+
+UiPanels ui_panels(const Ui& ui) {
+    const auto p=panels(ui);
+    const auto copy=[](Bounds b, float (&out)[4]) {
+        out[0]=b.x; out[1]=b.y; out[2]=b.w; out[3]=b.h;
+    };
+    UiPanels out{};
+    copy(p.toolbar,out.toolbar); copy(p.compass,out.compass);
+    copy(p.scale,out.scale); copy(p.legend,out.legend);
+    return out;
+}
 
 bool ui_init(Ui& ui) {
     ui.shader = load_shader("shaders/ui.vert","shaders/ui.frag");
@@ -371,13 +545,12 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
         x=e.button.x; y=e.button.y;
     } else SDL_GetMouseState(&x,&y);
 
-    const auto cp=compass_panel(ui);
-    const bool on_toolbar=contains(toolbar_panel(ui),x,y);
-    const bool on_compass=contains(cp,x,y);
-    const bool on_scale=contains(scale_panel(ui),x,y);
-    const bool on_legend=ui.raster_legend_visible && contains(legend_panel(ui),x,y);
+    const auto l=layout(ui,globe.body);
+    const bool on_controls=contains(l.panel.toolbar,x,y) || contains(l.panel.compass,x,y);
+    const bool on_passive=contains(l.panel.scale,x,y) ||
+        (ui.raster_legend_visible && contains(l.panel.legend,x,y));
     ui.hover=-1;
-    if (!on_toolbar && !on_compass && !on_scale && !on_legend) return false;
+    if (!on_controls && !on_passive) return false;
     if (e.type==SDL_EVENT_MOUSE_BUTTON_UP && e.button.button==SDL_BUTTON_LEFT) {
         input.dragging=false;
         input.drag_button=0;
@@ -386,57 +559,19 @@ bool ui_event(Ui& ui,const SDL_Event& e,Camera& cam,MapView& map,
     // All visible control surfaces consume input, including the compass
     // needle and the spaces between buttons, so no globe drag can begin.
     // Wheel zoom should still work with the pointer over the passive ruler.
-    if (on_scale || on_legend) return e.type!=SDL_EVENT_MOUSE_WHEEL;
-    if (on_compass) {
-        const Bounds north{cp.x+7,cp.y+107,106,24};
-        const Bounds reset{cp.x+7,cp.y+135,106,24};
-        const Bounds mode{cp.x+7,cp.y+163,106,24};
-        const Bounds lock{cp.x+7,cp.y+191,106,24};
-        const Bounds prev_body{cp.x+7,cp.y+219,51,24};
-        const Bounds next_body{cp.x+62,cp.y+219,51,24};
-        // Clicking the compass rose itself is also a North-up shortcut.
-        const bool rose=contains({cp.x+13,cp.y+4,94,94},x,y);
-        const int command=contains(next_body,x,y) ? 23 :
-                          contains(prev_body,x,y) ? 25 :
-                          contains(reset,x,y) ? 13 :
-                          contains(mode,x,y) ? 12 :
-                          contains(lock,x,y) ? 16 :
-                          (contains(north,x,y) || rose ? 14 : -1);
-        ui.hover=command;
-        if (command>=0 && e.type==SDL_EVENT_MOUSE_BUTTON_DOWN &&
-            e.button.button==SDL_BUTTON_LEFT) {
-            input.dragging=false;
-            input.drag_button=0;
-            execute(command,cam,map,globe,countries,input);
-        }
-        return true;
-    }
-    for (const auto& b:buttons(ui,globe.body)) {
-        if (b.command<0) continue;
-        if (!inside(b,x,y)) continue;
-        ui.hover=b.command;
-        if (e.type==SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button==SDL_BUTTON_LEFT) {
-            input.dragging=false;
-            input.drag_button=0;
-            camera_grab_end(cam);
-            if (b.command == 24) ui.planetary_features_visible = !ui.planetary_features_visible;
-            else if (b.command == 15) ui.grid_visible = !ui.grid_visible;
-            else if (b.command == 17) ui.capitals_visible = !ui.capitals_visible;
-            else if (b.command == 18) ui.cities_visible = !ui.cities_visible;
-            else if (b.command == 19) ui.rivers_visible = !ui.rivers_visible;
-            else if (b.command == 20 || b.command == 21 || b.command == 22) {
-                const auto layer = b.command==20 ? SurfaceLayer::Relief :
-                    b.command==21 ? SurfaceLayer::Elevation : SurfaceLayer::Population;
-                const auto& cache = b.command==20 ? globe.relief :
-                    b.command==21 ? globe.elevation : globe.population;
-                if (cache.valid()) {
-                    globe.surface = globe.surface==layer ? SurfaceLayer::Imagery : layer;
-                    globe.texture_visible=true;
-                } else fprintf(stderr,"%s layer is not installed.\n", b.command==20 ? "Relief" : b.command==21 ? "Elevation" : "Population");
-            }
-            else execute(b.command,cam,map,globe,countries,input);
-        }
-        break;
+    if (!on_controls) return e.type!=SDL_EVENT_MOUSE_WHEEL;
+    int command=-1;
+    for (const auto& b : l)
+        if (contains(b.b,x,y)) { command=static_cast<int>(b.command); break; }
+    // Clicking the compass rose itself is also a North-up shortcut.
+    if (command<0 && contains(l.rose,x,y)) command=static_cast<int>(UiCommand::NorthUp);
+    ui.hover=command;
+    if (command>=0 && e.type==SDL_EVENT_MOUSE_BUTTON_DOWN &&
+        e.button.button==SDL_BUTTON_LEFT) {
+        input.dragging=false;
+        input.drag_button=0;
+        camera_grab_end(cam);
+        execute(static_cast<UiCommand>(command),ui,cam,map,globe,countries,input);
     }
     return true;
 }
@@ -496,10 +631,20 @@ LocalScale local_scale(const Ui& ui, const Camera& cam, const MapView& map,
 }
 
 void draw_scale_bar(Ui& ui) {
-    if (ui.scale_bar_km <= 0. || ui.scale_bar_pixels <= 1.f) return;
-    const Bounds b=scale_panel(ui);
-    rect(ui,b.x,b.y,b.w,b.h,panel);
-    draw_text(ui,b.x+12,b.y+8,"SCALE AT CENTER",1,muted);
+    const Bounds b=panels(ui).scale;
+    draw_panel(ui,b);
+    draw_text(ui,b.x+10,b.y+8,"SCALE",1,muted);
+    if (ui.grid_visible) {
+        // The adaptive graticule spacing belongs with the distance scale.
+        char step[48];
+        std::snprintf(step,sizeof(step),"GRID %.3g\x7f/%.3g\x7f",
+                      ui.grid_lat_step,ui.grid_lon_step);
+        draw_text(ui,b.x+b.w-10-text_width(step,1),b.y+8,step,1,muted);
+    }
+    if (ui.scale_bar_km <= 0. || ui.scale_bar_pixels <= 1.f) {
+        draw_text(ui,b.x+10,b.y+22,"--",2,muted);
+        return;
+    }
     char units[48];
     if (ui.scale_bar_km < 1.)
         std::snprintf(units,sizeof(units),"%.0f M",ui.scale_bar_km*1000.);
@@ -507,20 +652,14 @@ void draw_scale_bar(Ui& ui) {
         std::snprintf(units,sizeof(units),"%.1f KM",ui.scale_bar_km);
     else
         std::snprintf(units,sizeof(units),"%.0f KM",ui.scale_bar_km);
-    draw_text(ui,b.x+12,b.y+24,units,2,text);
-    const float x=b.x+12, bar_y=b.y+59;
-    const float width=std::clamp(ui.scale_bar_pixels,1.f,b.w-24.f);
+    draw_text(ui,b.x+10,b.y+22,units,2,text);
+    const float x=std::round(b.x+12), bar_y=b.y+b.h-12;
+    const float width=std::round(std::clamp(ui.scale_bar_pixels,1.f,b.w-24.f));
+    rect(ui,x-1,bar_y-7,width+2,8,{.01f,.02f,.04f,1.f});
     for (int i=0;i<4;i++)
-        rect(ui,x+i*width/4,bar_y-6,width/4,6,
-             (i%2==0) ? text : inactive);
-    stroke(ui,x,bar_y-9,x,bar_y+2,1.3f,text);
-    stroke(ui,x+width,bar_y-9,x+width,bar_y+2,1.3f,text);
-    if (ui.grid_visible) {
-        char step[48];
-        std::snprintf(step,sizeof(step),"LAT %.3g / LON %.3g DEG",
-                      ui.grid_lat_step,ui.grid_lon_step);
-        draw_text(ui,b.x+12,b.y+70,step,1,muted);
-    }
+        rect(ui,x+i*width/4,bar_y-6,width/4,6,(i%2==0) ? text : active);
+    stroke(ui,x,bar_y-10,x,bar_y+2,1.5f,text);
+    stroke(ui,x+width,bar_y-10,x+width,bar_y+2,1.5f,text);
 }
 } // namespace
 
@@ -614,8 +753,8 @@ Color legend_color(const RasterLegend& legend, float value) {
 }
 void draw_raster_legend(Ui& ui, const RasterLegend& legend) {
     if (!legend.valid()) return;
-    const auto box=legend_panel(ui);
-    rect(ui,box.x,box.y,box.w,box.h,panel);
+    const auto box=panels(ui).legend;
+    draw_panel(ui,box);
     draw_text(ui,box.x+8,box.y+8,legend.title,1,text);
     draw_text(ui,box.x+8,box.y+21,legend.units,1,muted);
     const int range_low=legend.stops.front().value;
@@ -666,34 +805,34 @@ void draw_raster_legend(Ui& ui, const RasterLegend& legend) {
 void ui_draw(Ui& ui, const Camera& cam, const MapView& map, const Globe& globe,
              const Countries& countries) {
     if (!ui.visible) return;
-    const Bounds toolbar=toolbar_panel(ui);
-    rect(ui,toolbar.x,toolbar.y,toolbar.w,toolbar.h,panel);
-    draw_text(ui,toolbar.x+6,toolbar.y+7,"GLOBTOO   VIEW",2,text);
-    for (const auto& b : buttons(ui,globe.body)) {
-        if (b.command<0) continue;
-        const bool enabled = b.command==24 ? ui.planetary_features_visible :
-            b.command==15 ? ui.grid_visible :
-            b.command==17 ? ui.capitals_visible :
-            b.command==18 ? ui.cities_visible :
-            b.command==19 ? ui.rivers_visible :
-            command_active(b.command,cam,map,globe,countries);
-        Color color = enabled ? active : inactive;
-        if (ui.hover==b.command) color=hover;
-        rect(ui,b.x,b.y,b.w,b.h,color);
-        const float namewidth = static_cast<float>(std::char_traits<char>::length(b.label)*6);
-        const int scale=2;
-        draw_text(ui,b.x+(b.w-namewidth*scale)*.5f,b.y+8,b.label,scale,text);
-    }
-    draw_text(ui,toolbar.x+420.f,toolbar.y+9.f,body_info(globe.body).name,1,muted);
-    const char* mode = map.selected==MapProjection::Globe ? "SPHERE" : "FLAT MAP";
-    draw_text(ui,toolbar.x+205.f,toolbar.y+9.f,mode,1,muted);
-    if (globe.surface==SurfaceLayer::Relief && globe.relief.valid())
-        draw_text(ui,toolbar.x+320.f,toolbar.y+9.f,"RELIEF",1,muted);
-    if (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid())
-        draw_text(ui,toolbar.x+320.f,toolbar.y+9.f,"ELEVATION",1,muted);
-    if (globe.surface==SurfaceLayer::Population && globe.population.valid())
-        draw_text(ui,toolbar.x+320.f,toolbar.y+9.f,"POPULATION",1,muted);
-    draw_compass(ui,cam,map);
+    const auto l=layout(ui,globe.body);
+    const Bounds toolbar=l.panel.toolbar;
+    draw_panel(ui,toolbar);
+    draw_panel(ui,l.panel.compass);
+    // Header: title, body selector, body kind and the current view summary.
+    const float hy=l.body_name.y, hh=l.body_name.h;
+    draw_text(ui,toolbar.x+pad,std::round(hy+(hh-14.f)*.5f),"GLOBTOO",2,text);
+    const auto& info=body_info(globe.body);
+    rect(ui,l.body_name.x,l.body_name.y,l.body_name.w,l.body_name.h,{.01f,.02f,.04f,.85f});
+    draw_centered(ui,l.body_name,upper(info.name),2,text);
+    for (const auto& b : l)
+        draw_button(ui,b,button_label(b,cam),
+                    command_on(b.command,ui,map,globe,countries),
+                    command_available(b.command,globe));
+    std::string status=map.selected==MapProjection::Globe ? "SPHERE" : "FLAT MAP";
+    if (globe.surface==SurfaceLayer::Relief && globe.relief.valid()) status+=" / RELIEF";
+    if (globe.surface==SurfaceLayer::Elevation && globe.elevation.valid()) status+=" / ELEVATION";
+    if (globe.surface==SurfaceLayer::Population && globe.population.valid()) status+=" / POPULATION";
+    const float status_x=toolbar.x+toolbar.w-pad-text_width(status,1);
+    const float text_y=std::round(hy+(hh-7.f)*.5f);
+    draw_text(ui,status_x,text_y,status,1,muted);
+    std::string kind=upper(body_kind_name(info.kind));
+    if (info.parent!=info.id) kind+=" OF "+upper(body_info(info.parent).name);
+    const float kind_x=l.body_name.x+l.body_name.w+4.f+26.f+12.f;
+    if (kind_x+text_width(kind,1)+12.f<status_x)
+        draw_text(ui,kind_x,text_y,kind,1,muted);
+
+    draw_compass(ui,l,map,cam);
     draw_scale_bar(ui);
     if (ui.raster_legend_visible)
         draw_raster_legend(ui,globe.surface==SurfaceLayer::Population ?
@@ -705,6 +844,7 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
     if (!countries.names_visible) return;
     const auto& gpu = countries.using_high ? countries.high : countries.low;
     if (gpu.labels.empty()) return;
+    const Occluders blocked(ui);
     const bool dense = cam.distance<2.1f || (map.globe_to_flat>.5f && map.zoom>2.f);
     const int scale = dense ? 2 : 1;
     struct Candidate { float x,y,dist; const CountryGeometry::Label* label; };
@@ -716,9 +856,7 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         const float x=(nx+1.f)*ui.viewport_w*.5f;
         const float y=(1.f-ny)*ui.viewport_h*.5f;
         if (x<10 || y<10 || x>ui.viewport_w-10 || y>ui.viewport_h-10 ||
-            (ui.visible && (contains(toolbar_panel(ui),x,y) || contains(compass_panel(ui),x,y) ||
-                            contains(scale_panel(ui),x,y) ||
-                             (ui.raster_legend_visible && contains(legend_panel(ui),x,y))))) continue;
+            blocked.hits(x,y)) continue;
         candidates.push_back({x,y,nx*nx+ny*ny,&l});
     }
     std::sort(candidates.begin(), candidates.end(), [](const auto& a,const auto& b) {
@@ -735,10 +873,7 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
         const Bounds b{candidate.x-tw*.5f-3,candidate.y-th*.5f-2,
                        candidate.x+tw*.5f+3,candidate.y+th*.5f+2};
         if (b.l<1 || b.r>ui.viewport_w-1 || b.t<1 || b.b>ui.viewport_h-1 ||
-            (ui.visible && (overlaps({b.l,b.t,b.r-b.l,b.b-b.t},toolbar_panel(ui)) ||
-                            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},compass_panel(ui)) ||
-                            overlaps({b.l,b.t,b.r-b.l,b.b-b.t},scale_panel(ui)) ||
-                            (ui.raster_legend_visible && overlaps({b.l,b.t,b.r-b.l,b.b-b.t},legend_panel(ui)))))) continue;
+            blocked.hits({b.l,b.t,b.r-b.l,b.b-b.t})) continue;
         bool clash=false;
         for (const auto& other: occupied) {
             if (b.l<other.r+3 && b.r>other.l-3 && b.t<other.b+3 && b.b>other.t-3) {
@@ -756,6 +891,7 @@ void ui_draw_country_names(Ui& ui, const Countries& countries, const Camera& cam
 void ui_draw_places(Ui& ui, const GeographicFeatures& geography, const Camera& cam,
                     const MapView& map, float aspect) {
     if ((!ui.capitals_visible && !ui.cities_visible) || geography.places.empty()) return;
+    const Occluders blocked(ui);
     const bool flat=map.flat_goal>.5f;
     const unsigned rank=geographic_detail_rank(cam.distance,map.zoom,flat);
     struct Candidate { float x,y; const GeographicPlace* place; };
@@ -770,10 +906,7 @@ void ui_draw_places(Ui& ui, const GeographicFeatures& geography, const Camera& c
         const float x=(nx+1.f)*ui.viewport_w*.5f;
         const float y=(1.f-ny)*ui.viewport_h*.5f;
         if (x<6 || y<6 || x>ui.viewport_w-6 || y>ui.viewport_h-6) continue;
-        if (ui.visible && (contains(toolbar_panel(ui),x,y) ||
-                           contains(compass_panel(ui),x,y) ||
-                           contains(scale_panel(ui),x,y) ||
-                           (ui.raster_legend_visible && contains(legend_panel(ui),x,y)))) continue;
+        if (blocked.hits(x,y)) continue;
         visible.push_back({x,y,&p});
     }
     // Avoid engulfing the globe in pins at global scale. Prefer the
@@ -811,9 +944,7 @@ void ui_draw_places(Ui& ui, const GeographicFeatures& geography, const Camera& c
         if (x+w>ui.viewport_w-3) x=c.x-radius-6-w;
         if (x<3 || y<3 || x+w>=ui.viewport_w-3 || y+h>=ui.viewport_h-3) continue;
         const Bounds r{x,y,w,h};
-        if (ui.visible && (overlaps(r,toolbar_panel(ui)) || overlaps(r,compass_panel(ui)) ||
-                           overlaps(r,scale_panel(ui)) ||
-                           (ui.raster_legend_visible && overlaps(r,legend_panel(ui))))) continue;
+        if (blocked.hits(r)) continue;
         bool collision=false;
         for (const auto& other:ui.label_boxes) {
             if (overlaps({r.x-3,r.y-3,r.w+6,r.h+6},
@@ -836,6 +967,7 @@ void ui_draw_markers(Ui& ui, const std::vector<Marker>& markers, const Camera& c
     // projection morph and seam handling as country names and the grid.
     // Markers are fixed-size screen-space annotations, not Earth geometry.
     struct LabelBounds { float x,y,w,h; };
+    const Occluders blocked(ui);
     std::vector<LabelBounds> occupied;
     for (const auto& marker : markers) {
         float ndc_x=0,ndc_y=0;
@@ -871,10 +1003,7 @@ void ui_draw_markers(Ui& ui, const std::vector<Marker>& markers, const Camera& c
         const float ly=std::clamp(y-h*.5f,4.f,std::max(4.f,ui.viewport_h-h-4.f));
         const LabelBounds box{lx,ly,w,h};
         if (lx<4.f || lx+w>ui.viewport_w-4.f ||
-            (ui.visible && (overlaps({lx,ly,w,h},toolbar_panel(ui)) ||
-                            overlaps({lx,ly,w,h},compass_panel(ui)) ||
-                            overlaps({lx,ly,w,h},scale_panel(ui)) ||
-                            (ui.raster_legend_visible && overlaps({lx,ly,w,h},legend_panel(ui)))))) continue;
+            blocked.hits(Bounds{lx,ly,w,h})) continue;
         bool overlap=false;
         for (const auto& other : occupied)
             if (overlaps({lx-4,ly-4,w+8,h+8}, {other.x,other.y,other.w,other.h})) {

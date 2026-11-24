@@ -24,4 +24,5 @@ Data-oriented / ECS-ish: plain structs + free functions, no class hierarchies.
 - `TODO.md` — current tip and open work (read this first on session start)
 
 ## Handover
-Deliverables are cumulative git bundles only. See user instructions for naming and authorship.
+Claude Code commits directly to the repository. Cumulative git bundles are
+only for Grok Web hand-offs; see user instructions there for naming and authorship.

@@ -229,10 +229,13 @@ source checksum and an actual Nix build.
 
 ## Controls
 
-Globtoo has an on-screen toolbar along the **bottom** edge. Press **Tab** to hide or restore the
-GUI (toolbar, compass, and scale bar) for an unobstructed map view. Country
+All on-screen controls sit along the **bottom** edge: the toolbar on the
+left, the compass on the right and the scale bar between them (in narrow
+windows the compass and scale stack above the toolbar). Press **Tab** to hide
+or restore the GUI for an unobstructed map view. Country
 names, markers, and the optional geographic grid remain visible.
 
+- **< BODY >** (toolbar header): previous / next planet or moon.
 - **3D Globe**: classic tactile, inertia-based sphere.
 - **Plate**: equirectangular geographic map.
 - **Mercator**: cylindrical conformal projection (latitude clipped at 85°).
@@ -253,8 +256,9 @@ names, markers, and the optional geographic grid remain visible.
 - **Cities**: toggle dots and labels for other Natural Earth populated places.
   The display adds smaller cities as you zoom closer; rank and population
   determine their priority.
-- **Relief**: switch between standard imagery and the optional high-resolution
-  NASA topography/bathymetry raster (only usable when data is installed).
+- **Relief / Elev / Pop**: switch between standard imagery and the optional
+  high-resolution NASA relief, measured elevation or population-density
+  rasters. The buttons are dimmed when the dataset is not installed.
 - **Rivers**: toggle major rivers and lake centerlines, in blue. Additional
   tributaries are revealed as you zoom in. River segments follow the same
   rotating geography and moving map seam as the country outlines.
@@ -263,16 +267,17 @@ names, markers, and the optional geographic grid remain visible.
   follow the actual geographic meridians/parallels, including polar rotation;
   these are angles and **not** equally spaced kilometer lines, particularly
   near the geographic poles.
-- **Scale bar (right, below compass)**: local great-circle distance measured at the
-  view center, automatically displayed in km or m. The graduated bar updates
+- **Scale bar (bottom, left of the compass)**: local great-circle distance measured at the
+  view center, automatically displayed in km or m. With the grid enabled it
+  also shows the current latitude/longitude grid spacing. The graduated bar updates
   with zoom, projection, and globe/map transitions. Its value applies at the
   **center**; on projections, distortion increases away from the center.
-- **Grab / Arcball (below Reset)**: switch the 3D globe mouse-control mode.
+- **Grab / Arcball (compass panel, below Reset)**: switch the 3D globe mouse-control mode.
   The button shows the currently selected mode; `G` is its shortcut.
-- **Compass (upper-right)**: live geographic N/E/S/W heading for the globe and every 2D projection.
+- **Compass (lower-right)**: live geographic N/E/S/W heading for the globe and every 2D projection.
 - **North Up**: click the button or compass rose to straighten the view without panning or changing zoom (also works after a polar crossing).
 - **North Lock**: toggle continuous North-up correction while turning the globe or reprojecting the map. When locked, manual roll gestures are disabled; click again to unlock.
-- **Reset**: below the compass; restore the timezone-relative viewpoint, North-up orientation, and default zoom without changing the selected projection.
+- **Reset**: in the compass panel; restore the timezone-relative viewpoint, North-up orientation, and default zoom without changing the selected projection.
 
 Mouse: **left-drag** spins the globe or rotates/reprojects the Earth in 2D;
 **middle-drag** grabs and slides a 2D map like a paper sheet, while on the
@@ -353,8 +358,8 @@ with `nix develop -c reuse lint`).
 ### Planetary bodies (experimental)
 
 `--body NAME` selects a body at startup; `--list-bodies` prints all of them
-(slug, name, kind, parent and mean radius). `M` / `Shift+M` or the compass
-**NEXT >** / **< PREV** buttons cycle forward and backward through the
+(slug, name, kind, parent and mean radius). `M` / `Shift+M` or the
+**<** / **>** buttons around the body name in the toolbar header cycle forward and backward through the
 catalog, which is ordered by distance from the Sun with each planet followed
 by its moons. Gas giants are rendered at their cloud tops and have no
 landmarks. Use `--body-texture mars=/path/to/map.jpg`

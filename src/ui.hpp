@@ -15,11 +15,20 @@
 #include <vector>
 
 struct UiVertex { float x,y,r,g,b,a; };
+
+// Every on-screen button issues exactly one command. Drawing, hit testing and
+// tests all derive button rectangles from the same layout.
+enum class UiCommand {
+    Globe, Plate, Mercator, Mollweide, Hammer, ZoomOut, ZoomIn,
+    Shading, Countries, Borders, Names, Texture, ControlMode, Reset, NorthUp,
+    Grid, NorthLock, Capitals, Cities, Rivers, Relief, Elevation, Population,
+    NextBody, Landmarks, PreviousBody
+};
 struct Ui {
     Shader shader{};
     GLuint vbo = 0;
     int viewport_w = 1280, viewport_h = 800;
-    int hover = -1;
+    int hover = -1; // static_cast<int>(UiCommand), or -1
     bool visible = true; // Tab toggles screen-space controls, not map overlays
     bool grid_visible = false;
     bool planetary_features_visible = true;
@@ -36,6 +45,12 @@ struct Ui {
 
 bool ui_init(Ui& ui);
 void ui_shutdown(Ui& ui);
+// Screen-space center of a visible button for `body`; false if not shown.
+bool ui_command_center(const Ui& ui, BodyId body, UiCommand command,
+                       float& x, float& y);
+// Panel rectangles (toolbar, compass, scale, legend), for layout tests.
+struct UiPanels { float toolbar[4], compass[4], scale[4], legend[4]; };
+UiPanels ui_panels(const Ui& ui);
 // Return true if the event was consumed (keeps UI clicks away from globe drag).
 bool ui_event(Ui& ui, const SDL_Event& event, Camera& cam, MapView& map,
               Globe& globe, Countries& countries, InputState& input);

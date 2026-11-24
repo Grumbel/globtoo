@@ -23,6 +23,12 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Bottom-anchored GUI: toolbar left, compass lower-right, scale bar between
+      them (stacked above the toolbar in narrow windows); raster legend top-right.
+      Body selector moved into the toolbar header; one shared layout drives
+      drawing, hit-testing, label occlusion and tests (`ui_command_center`).
+      Auto-sized buttons, active accent, hover highlight, dimmed unavailable
+      raster layers, `<` `>` and degree glyphs.
 - [x] Tab hides/restores screen-space controls without hiding geographic overlays; move Grab / Arcball below compass Reset (G shortcut)
 - [x] CMake install target and Nix packaging through standard cmake install
 - [x] Desktop launcher and AppStream metadata; custom multi-size icon and SDL window icon

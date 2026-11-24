@@ -7,6 +7,29 @@
 #include <cassert>
 #include <cmath>
 
+namespace {
+// Press the left button at the center of the button for `command`.
+void click_at(SDL_Event& event, const Ui& ui, BodyId body, UiCommand command) {
+    float x=0,y=0;
+    const bool shown=ui_command_center(ui,body,command,x,y);
+    assert(shown);
+    event = {};
+    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button = SDL_BUTTON_LEFT;
+    event.button.x = x;
+    event.button.y = y;
+}
+bool inside(const float (&r)[4], float x, float y) {
+    return x>=r[0] && x<r[0]+r[2] && y>=r[1] && y<r[1]+r[3];
+}
+bool overlap(const float (&a)[4], const float (&b)[4]) {
+    return a[0]<b[0]+b[2] && a[0]+a[2]>b[0] && a[1]<b[1]+b[3] && a[1]+a[3]>b[1];
+}
+bool within(const float (&r)[4], int w, int h) {
+    return r[0]>=0 && r[1]>=0 && r[0]+r[2]<=w && r[1]+r[3]<=h;
+}
+} // namespace
+
 int main() {
     Ui ui{};
     ui.viewport_w = 1280;
@@ -33,13 +56,9 @@ int main() {
 
     // With GUI hidden, pointer events should reach the map even when
     // positioned over the toolbar or compass.
-    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
-    event.button.button = SDL_BUTTON_LEFT;
-    event.button.x = 40.f;
-    event.button.y = 50.f;
+    click_at(event,ui,globe.body,UiCommand::Grid);
     assert(!ui_event(ui,event,cam,map,globe,countries,input));
-    event.button.x = 1175.f;
-    event.button.y = 178.f;
+    click_at(event,ui,globe.body,UiCommand::ControlMode);
     assert(!ui_event(ui,event,cam,map,globe,countries,input));
     assert(cam.mode == ControlMode::Grab);
 
@@ -53,11 +72,30 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(ui.visible);
 
-    // Grab / Arcball now lives below Reset, inside the compass panel.
-    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
-    event.button.button = SDL_BUTTON_LEFT;
-    event.button.x = 1175.f;
-    event.button.y = 179.f;
+    // All controls are anchored to the bottom edge: toolbar on the left,
+    // compass on the right, scale bar in between; none of them overlap.
+    {
+        const auto p=ui_panels(ui);
+        assert(p.toolbar[0]<p.scale[0] && p.scale[0]<p.compass[0]);
+        assert(p.toolbar[1]+p.toolbar[3]==p.compass[1]+p.compass[3]);
+        assert(p.scale[1]+p.scale[3]==p.compass[1]+p.compass[3]);
+        assert(p.toolbar[1]+p.toolbar[3]>ui.viewport_h-16);
+        assert(!overlap(p.toolbar,p.scale) && !overlap(p.scale,p.compass) &&
+               !overlap(p.toolbar,p.compass));
+        assert(p.legend[1]<100 && !overlap(p.legend,p.compass));
+        // A narrow window stacks the compass and scale above the toolbar.
+        Ui narrow=ui;
+        narrow.viewport_w=800;
+        narrow.viewport_h=600;
+        const auto n=ui_panels(narrow);
+        assert(!overlap(n.toolbar,n.compass) && !overlap(n.toolbar,n.scale) &&
+               !overlap(n.scale,n.compass));
+        assert(within(n.toolbar,800,600) && within(n.compass,800,600) &&
+               within(n.scale,800,600));
+    }
+
+    // Grab / Arcball lives in the compass panel.
+    click_at(event,ui,globe.body,UiCommand::ControlMode);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(cam.mode == ControlMode::Arcball);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
@@ -72,35 +110,33 @@ int main() {
     input_handle_event(input,cam,map,globe,countries,event);
     assert(globe.body==BodyId::Moon);
     assert(globe.surface==SurfaceLayer::Imagery);
-    event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
-    event.button.button=SDL_BUTTON_LEFT;
-    event.button.x=1240.f;
-    event.button.y=238.f; // NEXT >, right half of the row below NORTH LOCK
+    // The < BODY > selector sits in the toolbar header.
+    click_at(event,ui,globe.body,UiCommand::NextBody);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.body==BodyId::Mars);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.body==BodyId::Jupiter);
     // Gas giants have no named surface features, so no LANDMARKS button.
     {
+        float lx=0,ly=0;
+        assert(!ui_command_center(ui,BodyId::Jupiter,UiCommand::Landmarks,lx,ly));
+        assert(ui_command_center(ui,BodyId::Io,UiCommand::Landmarks,lx,ly));
         SDL_Event probe=event;
-        probe.button.x=40.f;
-        probe.button.y=772.f;
+        probe.button.x=lx;
+        probe.button.y=ly;
         const bool before=ui.planetary_features_visible;
         assert(ui_event(ui,probe,cam,map,globe,countries,input)); // toolbar consumes
         assert(ui.planetary_features_visible==before);
     }
-    event.button.x=1175.f; // < PREV, left half
+    click_at(event,ui,globe.body,UiCommand::PreviousBody);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.body==BodyId::Mars);
-    event.button.x=1240.f;
+    click_at(event,ui,globe.body,UiCommand::NextBody);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.body==BodyId::Io);
     // The non-Earth third row has a landmark toggle, not Earth cities.
-    event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
-    event.button.button=SDL_BUTTON_LEFT;
-    event.button.x=40.f;
-    event.button.y=772.f;
+    click_at(event,ui,globe.body,UiCommand::Landmarks);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(!ui.planetary_features_visible);
     event.type=SDL_EVENT_KEY_DOWN;
@@ -109,10 +145,7 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(ui.planetary_features_visible);
     // Resetting Io is its prime meridian, never the machine timezone.
-    event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
-    event.button.button=SDL_BUTTON_LEFT;
-    event.button.x=1175.f;
-    event.button.y=148.f;
+    click_at(event,ui,globe.body,UiCommand::Reset);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(std::abs(map.center_lon)<1e-6);
     assert(std::abs(map.center_lat)<1e-6);
@@ -137,26 +170,26 @@ int main() {
     event.button.y = 85.f;
     assert(!ui_event(ui,event,cam,map,globe,countries,input));
 
-    // Main toolbar has moved to the bottom; hit-testing follows drawing.
-    event.button.y = 731.f;
+    // Main toolbar is at the bottom; hit-testing follows drawing.
+    click_at(event,ui,globe.body,UiCommand::Grid);
+    assert(event.button.y>ui.viewport_h-160);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(ui.grid_visible);
 
     // New third-row overlays are independent, and can be toggled separately.
-    event.button.y = 772.f;
-    event.button.x = 40.f;
+    click_at(event,ui,globe.body,UiCommand::Capitals);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(!ui.capitals_visible && ui.cities_visible && ui.rivers_visible);
-    event.button.x = 160.f;
+    click_at(event,ui,globe.body,UiCommand::Cities);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(!ui.cities_visible);
-    event.button.x = 260.f;
+    click_at(event,ui,globe.body,UiCommand::Rivers);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(!ui.rivers_visible);
 
     // Optional Relief layer is selectable without affecting political fills.
     // The default/absent dataset must not silently select nonexistent tiles.
-    event.button.x=343.f;
+    click_at(event,ui,globe.body,UiCommand::Relief);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.surface==SurfaceLayer::Imagery);
     globe.relief.preview.id=1; // simulate a validated, installed tile set
@@ -168,8 +201,7 @@ int main() {
     assert(globe.surface==SurfaceLayer::Imagery);
 
     // Measured elevation is independent of the photographic Relief layer.
-    event.button.x=453.f;
-    event.button.y=772.f;
+    click_at(event,ui,globe.body,UiCommand::Elevation);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.surface==SurfaceLayer::Imagery); // missing optional dataset
     globe.elevation.preview.id=1;
@@ -180,8 +212,7 @@ int main() {
     assert(globe.surface==SurfaceLayer::Imagery);
 
     // A population-density layer has an independent toggle and visibility.
-    event.button.x=535.f;
-    event.button.y=772.f;
+    click_at(event,ui,globe.body,UiCommand::Population);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.surface==SurfaceLayer::Imagery); // no dataset
     globe.population.preview.id=1;
@@ -191,17 +222,29 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(globe.surface==SurfaceLayer::Imagery);
 
-    // The ruler begins below the compass (whose bottom is y=257).
-    // A click in the gap is map input, but a click within the ruler is consumed.
-    event.button.x = 1100.f;
-    event.button.y = 245.f;
-    assert(!ui_event(ui,event,cam,map,globe,countries,input));
-    event.button.y = 285.f;
-    assert(ui_event(ui,event,cam,map,globe,countries,input));
+    // The passive ruler consumes clicks, but the map gap above it does not.
+    {
+        const auto p=ui_panels(ui);
+        event.button.x = p.scale[0]+p.scale[2]*.5f;
+        event.button.y = p.scale[1]+p.scale[3]*.5f;
+        assert(ui_event(ui,event,cam,map,globe,countries,input));
+        event.button.y = p.scale[1]-4.f;
+        assert(!inside(p.toolbar,event.button.x,event.button.y));
+        assert(!ui_event(ui,event,cam,map,globe,countries,input));
+    }
 
-    // North Lock is a separate button below Grab/Arcball.
-    event.button.x = 1175.f;
-    event.button.y = 207.f;
+    // Clicking the compass rose aligns North up, like the NORTH UP button.
+    {
+        const auto p=ui_panels(ui);
+        map.roll=.6;
+        event.button.x = p.compass[0]+40.f;
+        event.button.y = p.compass[1]+40.f;
+        assert(ui_event(ui,event,cam,map,globe,countries,input));
+        assert(ui.hover==static_cast<int>(UiCommand::NorthUp));
+    }
+
+    // North Lock is a separate compass button.
+    click_at(event,ui,globe.body,UiCommand::NorthLock);
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(map.north_locked);
     map.flat_goal=map.globe_to_flat=1.f;
