@@ -62,7 +62,7 @@ void geographic_overlay_draw_rivers(const GeographicOverlay& overlay,
     if (sphere) {
         glEnable(GL_STENCIL_TEST);
         glStencilMask(0);
-        glStencilFunc(GL_EQUAL,1,0xff);
+        glStencilFunc(GL_EQUAL,1,0x01); // bit 0: globe silhouette
         glStencilOp(GL_KEEP,GL_KEEP,GL_KEEP);
     } else glDisable(GL_STENCIL_TEST);
     glDepthMask(GL_FALSE);

@@ -38,13 +38,13 @@ def hash_file(path: Path) -> tuple[str, int]:
 
 if __package__:
     from .planetary_bodies import BODIES
+    from .raster_manifest import TILE_RE, parse_manifest
 else:
     from planetary_bodies import BODIES
+    from raster_manifest import TILE_RE, parse_manifest
 HASH_RE = re.compile(r'[0-9a-f]{64}\Z')
-TILE_RE = re.compile(r'tile-\d{3}-\d{3}\.jpg\Z')
 FIXED_FILES = {'manifest.txt', 'preview.jpg', 'preview-small.jpg',
                'source.txt', 'alignment.png', 'alignment.json'}
-MAX_TILES = 8192
 
 
 def data_root(data_home: Path | None = None) -> Path:
@@ -112,24 +112,14 @@ def verify_prepared_map(source: Path, body: str | None = None) -> dict:
         if hash_file(path)[0] != expected:
             raise ValueError(f'SHA-256 mismatch in prepared map file: {name}')
 
-    manifest_lines = (source / 'manifest.txt').read_text(encoding='ascii').splitlines()
-    if len(manifest_lines) != 2 or manifest_lines[0] != 'GLOBTOO_RASTER_TILES 1':
-        raise ValueError('invalid tile manifest header')
-    try:
-        width, height, size, gutter, columns, rows = map(int, manifest_lines[1].split())
-    except ValueError as exc:
-        raise ValueError('invalid tile manifest dimensions') from exc
-    if not (width == 2 * height and width > 0 and
-            width == record.get('source_width') and height == record.get('source_height') and
-            size in (64, 128, 256, 512, 1024, 2048) and 2 <= gutter <= 16 and
-            gutter * 2 < size and columns > 0 and rows > 0 and
-            columns * rows <= MAX_TILES and
-            columns == (width + (size - 2*gutter) - 1) // (size - 2*gutter) and
-            rows == (height + (size - 2*gutter) - 1) // (size - 2*gutter)):
+    manifest = source / 'manifest.txt'
+    if manifest.stat().st_size > 4096:
+        raise ValueError('oversized tile manifest')
+    layout = parse_manifest(manifest.read_text(encoding='ascii'))
+    if (layout.width != record.get('source_width') or
+            layout.height != record.get('source_height')):
         raise ValueError('invalid tile manifest geometry')
-    expected_tiles = {f'tile-{y:03d}-{x:03d}.jpg'
-                      for y in range(rows) for x in range(columns)}
-    if names - FIXED_FILES != expected_tiles:
+    if names - FIXED_FILES != layout.expected_tiles():
         raise ValueError('tile files do not match manifest grid')
     return record
 

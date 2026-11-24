@@ -388,9 +388,11 @@ planetographic/planetocentric latitude; `--latitude planetographic` with
 `--body-imagery-dir moon=DIR`, `mars=DIR`, and `earth=DIR` can be repeated,
 so the `M` key and NEXT BODY button retain separate tile sources. The legacy
 `--imagery-dir DIR` remains the Earth shortcut. An explicit source directory
-must contain `manifest.txt`, `preview.jpg`, and `tile-NNN-NNN.jpg` files.
-For normal startup and mid-projection morphs the small preview is used; at
-close zoom, tiles are loaded lazily with the existing bounded GPU cache. The
+must contain `manifest.txt`, `preview.jpg`, and `tile-NNN-NNN.jpg` files
+(plus `tile-lK-NNN-NNN.jpg` pyramid levels for sources wider than 2048).
+For distant views and mid-projection morphs the preview is used; as soon as
+the preview is less sharp than the screen, tiles of the matching pyramid
+level stream in (see `docs/RASTER_LAYERS.md`). The
 application never accesses the network while drawing or changing bodies.
 
 CMake can also package the mosaics under

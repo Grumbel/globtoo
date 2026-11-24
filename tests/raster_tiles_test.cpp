@@ -34,6 +34,24 @@ int main(int argc, char** argv) {
     assert(!raster_tiles_parse("GLOBTOO_RASTER_TILES 1\n21600 10800 1024 4 22 12",t,error));
     assert(!raster_tiles_parse("GLOBTOO_RASTER_TILES 1\n21600 10800 1000 4 22 11",t,error));
     assert(!raster_tiles_parse("GLOBTOO_RASTER_TILES 2\n21600 10800 1024 4 22 11",t,error));
+    assert(!raster_tiles_parse("GLOBTOO_RASTER_TILES 2\n21600 10800 1024 4 22 11 1",t,error));
+    assert(!raster_tiles_parse("GLOBTOO_RASTER_TILES 1\n21600 10800 1024 4 22 11 4",t,error));
+    // Pyramid: 21600 -> 10800 -> 5400 -> 2700 wide, matching the Python tiler.
+    assert(raster_tiles_parse("GLOBTOO_RASTER_TILES 2\n21600 10800 1024 4 22 11 4\n",t,error));
+    assert(t.levels==4 && t.level_width(3)==2700 && t.level_height(3)==1350);
+    assert(t.level_columns(1)==11 && t.level_rows(1)==6);
+    assert(t.level_columns(3)==3 && t.level_rows(3)==2);
+    assert(t.level_offset(1)==242 && t.tile_count()==242+66+18+6);
+    assert(raster_tile_filename(8,4,1)=="tile-l1-004-008.jpg");
+    for (int level=0;level<t.levels;++level) {
+        const auto end=raster_tile_region(t,t.level_columns(level)-1,
+                                          t.level_rows(level)-1,level);
+        assert(end.u1==1 && end.v1==1 && end.u0<1 && end.v0<1);
+    }
+    assert(raster_tile_region(t,3,0,3).angular_radius==0); // out of range
+    // Odd heights round up: 4097 rows -> 2049 -> 1025.
+    assert(raster_tiles_parse("GLOBTOO_RASTER_TILES 2\n8194 4097 1024 4 9 5 3",t,error));
+    assert(t.level_height(1)==2049 && t.level_width(2)==2050);
     assert(!raster_tiles_parse("GLOBTOO_RASTER_TILES 1\n21600 10800 1024 4 22 11 xyz",t,error));
     if (argc>1) {
         assert(raster_tiles_read(argv[1],t,error));

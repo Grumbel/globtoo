@@ -10,6 +10,24 @@
 
 namespace {
 constexpr double pi=3.14159265358979323846;
+int ceil_div(int a,int b) { return (a+b-1)/b; }
+}
+
+int RasterTiles::level_height(int level) const {
+    int h=height;
+    for (int i=0;i<level;++i) h=(h+1)/2;
+    return h;
+}
+int RasterTiles::level_columns(int level) const {
+    return level==0 ? columns : ceil_div(level_width(level),content_size());
+}
+int RasterTiles::level_rows(int level) const {
+    return level==0 ? rows : ceil_div(level_height(level),content_size());
+}
+int RasterTiles::level_offset(int level) const {
+    int offset=0;
+    for (int i=0;i<level;++i) offset+=level_columns(i)*level_rows(i);
+    return offset;
 }
 
 bool raster_tiles_parse(std::string_view data, RasterTiles& out, std::string& error) {
@@ -18,10 +36,17 @@ bool raster_tiles_parse(std::string_view data, RasterTiles& out, std::string& er
     std::string magic, trailing;
     int version=0;
     RasterTiles tmp{};
-    if (!(stream >> magic >> version >> tmp.width >> tmp.height >>
-          tmp.tile_size >> tmp.gutter >> tmp.columns >> tmp.rows) ||
-        magic!="GLOBTOO_RASTER_TILES" || version!=1 || (stream >> trailing)) {
-        error="invalid tiled raster manifest (expected GLOBTOO_RASTER_TILES 1)";
+    const bool header=static_cast<bool>(stream >> magic >> version) &&
+                      magic=="GLOBTOO_RASTER_TILES" && (version==1 || version==2);
+    if (!header || !(stream >> tmp.width >> tmp.height >> tmp.tile_size >>
+                     tmp.gutter >> tmp.columns >> tmp.rows) ||
+        (version==2 && !(stream >> tmp.levels)) || (stream >> trailing)) {
+        error="invalid tiled raster manifest (expected GLOBTOO_RASTER_TILES 1 or 2)";
+        return false;
+    }
+    // Version 1 is a single level; version 2 must actually be a pyramid.
+    if (version==2 && (tmp.levels < 2 || tmp.levels > RasterTiles::max_levels)) {
+        error="invalid level count in raster manifest";
         return false;
     }
     // Put strict bounds on hostile/corrupt input before allocating GPU assets.
@@ -32,7 +57,7 @@ bool raster_tiles_parse(std::string_view data, RasterTiles& out, std::string& er
         tmp.columns <= 0 || tmp.rows <= 0 || tmp.columns > 256 || tmp.rows > 256 ||
         (tmp.width + tmp.content_size()-1)/tmp.content_size() != tmp.columns ||
         (tmp.height + tmp.content_size()-1)/tmp.content_size() != tmp.rows ||
-        tmp.tile_count() > 8192) {
+        tmp.tile_count() > RasterTiles::max_tiles) {
         error="invalid dimensions or tile grid in raster manifest";
         return false;
     }
@@ -49,14 +74,16 @@ bool raster_tiles_read(const std::string& filename, RasterTiles& out, std::strin
     return raster_tiles_parse(data,out,error);
 }
 
-RasterTileRegion raster_tile_region(const RasterTiles& t, int col, int row) {
-    if (col<0 || row<0 || col>=t.columns || row>=t.rows || t.width==0) return {};
+RasterTileRegion raster_tile_region(const RasterTiles& t, int col, int row, int level) {
+    if (level<0 || level>=t.levels || t.width==0 || col<0 || row<0 ||
+        col>=t.level_columns(level) || row>=t.level_rows(level)) return {};
     const int c=t.content_size();
+    const int width=t.level_width(level), height=t.level_height(level);
     const int x0=col*c, y0=row*c;
-    const int x1=std::min(x0+c,t.width), y1=std::min(y0+c,t.height);
+    const int x1=std::min(x0+c,width), y1=std::min(y0+c,height);
     RasterTileRegion r{};
-    r.u0=double(x0)/t.width; r.u1=double(x1)/t.width;
-    r.v0=double(y0)/t.height; r.v1=double(y1)/t.height;
+    r.u0=double(x0)/width; r.u1=double(x1)/width;
+    r.v0=double(y0)/height; r.v1=double(y1)/height;
     r.tex_u0=double(t.gutter)/t.tile_size;
     r.tex_v0=double(t.gutter)/t.tile_size;
     r.tex_u1=double(t.gutter+x1-x0)/t.tile_size;
@@ -71,9 +98,11 @@ RasterTileRegion raster_tile_region(const RasterTiles& t, int col, int row) {
     return r;
 }
 
-std::string raster_tile_filename(int col,int row) {
+std::string raster_tile_filename(int col,int row,int level) {
     std::ostringstream os;
-    os << "tile-" << std::setfill('0') << std::setw(3) << row
+    os << "tile-";
+    if (level>0) os << 'l' << level << '-';
+    os << std::setfill('0') << std::setw(3) << row
        << '-' << std::setw(3) << col << ".jpg";
     return os.str();
 }

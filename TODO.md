@@ -23,6 +23,20 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Raster tile pyramid and screen-space LOD. `GLOBTOO_RASTER_TILES 2`
+      adds coarser levels (`tile-lK-RRR-CCC.jpg`) down to the preview
+      resolution; v1 manifests stay valid. Tiles are chosen by on-screen
+      texel density over the horizon/viewport cap instead of a fixed
+      distance (1.44) / zoom (15) switch, which kept the 2048-px Moon base
+      long after it was blurry and never showed Earth tiles (34 needed vs.
+      a 24-tile cap). Background JPEG decoding, 32-tile LRU, and stencil
+      composition (finest loaded tile per pixel, base underneath) replace the
+      all-or-nothing preview fallback. Overlays test only the silhouette
+      stencil bit.
+- [x] Grid lines, labels and markers used a fixed `dot > 0.2` horizon and
+      were drawn behind the globe at d < 5; now `dot >= 1/d`.
+- [x] Removed the desktop-only `GL_VERTEX_PROGRAM_POINT_SIZE` (GLES2
+      `GL_INVALID_ENUM`). CMake Python tests keep the dev shell's PYTHONPATH.
 - [x] Bottom-anchored GUI: toolbar left, compass lower-right, scale bar between
       them (stacked above the toolbar in narrow windows); raster legend top-right.
       Body selector moved into the toolbar header; one shared layout drives
@@ -124,6 +138,10 @@ silently download large maps or satellite data on an existing installation.
       as one giant GPU texture; choose visible/LOD tiles at zoom.
       NASA Blue Marble Next Generation 21600×10800 topography/bathymetry:
       https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/
+      The renderer side is done (pyramid + LOD; tested with a local
+      21600×10800 `--imagery-dir`). Remaining: pin the source in its own
+      flake derivation like the planetary maps (eoimages.gsfc.nasa.gov was
+      unreachable from the build sandbox when last tried, so no hash yet).
 - [x] Add numerical ocean relief/bathymetry together with land elevation,
       including separate land/sea color ramps and documented depth units;
       source NOAA ETOPO1:

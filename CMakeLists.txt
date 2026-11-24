@@ -244,6 +244,7 @@ foreach(body IN LISTS GLOBTOO_PLANETARY_BODIES)
           --body "${body}"
         DEPENDS "${GLOBTOO_${upper}_IMAGERY_TEXTURE}"
           "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+          "${CMAKE_SOURCE_DIR}/tools/raster_manifest.py"
           "${CMAKE_SOURCE_DIR}/tools/planetary_latitudes.py"
           "${CMAKE_SOURCE_DIR}/tools/planetary_bodies.py"
           "${CMAKE_SOURCE_DIR}/data/bodies.tsv"
@@ -399,6 +400,7 @@ if(GLOBTOO_IMAGERY_TEXTURE)
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
       "${GLOBTOO_IMAGERY_TEXTURE}" "${CMAKE_BINARY_DIR}/generated-imagery"
     DEPENDS "${GLOBTOO_IMAGERY_TEXTURE}" "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+      "${CMAKE_SOURCE_DIR}/tools/raster_manifest.py"
     COMMENT "Preparing high-resolution true-color Earth imagery tiles"
     VERBATIM)
   add_custom_target(imagery_tiles ALL DEPENDS "${IMAGERY_OUTPUT}")
@@ -425,6 +427,7 @@ if(GLOBTOO_RELIEF_TEXTURE)
       "${GLOBTOO_RELIEF_TEXTURE}" "${CMAKE_BINARY_DIR}/generated-relief"
     DEPENDS "${GLOBTOO_RELIEF_TEXTURE}"
       "${CMAKE_SOURCE_DIR}/tools/build_raster_tiles.py"
+      "${CMAKE_SOURCE_DIR}/tools/raster_manifest.py"
     COMMENT "Preparing high-resolution relief/bathymetry GLES2 tiles"
     VERBATIM)
   add_custom_target(relief_tiles ALL DEPENDS "${RELIEF_OUTPUT}")
@@ -770,38 +773,44 @@ if(BUILD_TESTING)
     add_test(NAME raster_tiles_manifest COMMAND raster_tiles_test "${RELIEF_OUTPUT}")
   endif()
   if(Python3_Interpreter_FOUND)
+    # The Pillow/numpy probes below see the configure-time PYTHONPATH (as in
+    # the Nix dev shell); keep it for the tests too instead of replacing it.
+    set(_globtoo_test_pythonpath "${CMAKE_SOURCE_DIR}")
+    if(DEFINED ENV{PYTHONPATH} AND NOT "$ENV{PYTHONPATH}" STREQUAL "")
+      string(APPEND _globtoo_test_pythonpath ":$ENV{PYTHONPATH}")
+    endif()
     execute_process(COMMAND ${Python3_EXECUTABLE} -c "from PIL import Image"
       RESULT_VARIABLE _globtoo_test_pillow ERROR_QUIET)
     execute_process(COMMAND ${Python3_EXECUTABLE} -c "import numpy; from PIL import Image"
       RESULT_VARIABLE _globtoo_test_numpy ERROR_QUIET)
     if(_globtoo_test_numpy EQUAL 0)
       add_test(NAME population_tiles_compiler
-        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${_globtoo_test_pythonpath}"
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/population_tiles_compiler_test.py")
       add_test(NAME elevation_tiles_compiler
-        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${_globtoo_test_pythonpath}"
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/elevation_tiles_compiler_test.py")
     endif()
     if(_globtoo_test_pillow EQUAL 0)
       add_test(NAME planetary_package_audit
-        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${_globtoo_test_pythonpath}"
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/verify_packaged_planets_test.py")
       add_test(NAME prepare_planetary_map
-        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${_globtoo_test_pythonpath}"
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/prepare_planetary_map_test.py")
       add_test(NAME planetary_alignment
-        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${_globtoo_test_pythonpath}"
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/planetary_alignment_test.py")
       add_test(NAME planetary_texture_orientation
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/planet_texture_test.py")
       add_test(NAME raster_tiles_compiler
-        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${_globtoo_test_pythonpath}"
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/raster_tiles_compiler_test.py")
       add_test(NAME fit_plate_carree
-        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${_globtoo_test_pythonpath}"
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/fit_plate_carree_test.py")
       add_test(NAME planetary_latitudes
-        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${_globtoo_test_pythonpath}"
           ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tests/planetary_latitudes_test.py")
     endif()
   endif()

@@ -6,6 +6,51 @@
 #include "texture.hpp"
 #include <cstdio>
 
+namespace {
+void upload_rgba(Texture& t, const unsigned char* data, bool repeat) {
+    glGenTextures(1, &t.id);
+    glBindTexture(GL_TEXTURE_2D, t.id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, repeat ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t.width, t.height, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+}
+} // namespace
+
+bool decode_image_rgba(const char* path, int expected_width, int expected_height,
+                       ImageRGBA& out) {
+    out = {};
+    // stb_image keeps its flip flag and failure reason thread-local
+    // (STBI_THREAD_LOCAL), and the flip default is off, as required here.
+    int width = 0, height = 0, channels = 0;
+    if (!stbi_info(path, &width, &height, &channels) ||
+        width != expected_width || height != expected_height)
+        return false;
+    unsigned char* data = stbi_load(path, &width, &height, &channels, 4);
+    if (!data) return false;
+    out.pixels.assign(data, data + static_cast<size_t>(width) * height * 4);
+    out.width = width;
+    out.height = height;
+    stbi_image_free(data);
+    return true;
+}
+
+Texture upload_texture_rgba(const ImageRGBA& image, bool repeat) {
+    Texture t{};
+    if (image.pixels.size() != static_cast<size_t>(image.width) * image.height * 4 ||
+        image.pixels.empty())
+        return t;
+    t.width = image.width;
+    t.height = image.height;
+    upload_rgba(t, image.pixels.data(), repeat);
+    return t;
+}
+
 Texture load_texture(const char* path, bool repeat) {
     Texture t{};
     int channels = 0;
@@ -40,18 +85,7 @@ Texture load_texture(const char* path, bool repeat) {
         return t;
     }
 
-    glGenTextures(1, &t.id);
-    glBindTexture(GL_TEXTURE_2D, t.id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, repeat ? GL_REPEAT : GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t.width, t.height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
+    upload_rgba(t, data, repeat);
     stbi_image_free(data);
     fprintf(stderr, "Loaded texture %s (%dx%d, requested RGBA, source had %d ch)\n",
             path, t.width, t.height, channels);

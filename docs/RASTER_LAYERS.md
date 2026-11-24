@@ -110,26 +110,50 @@ add a new Nix fetch with an unverified hash.
 - `tools/build_raster_tiles.py` cuts a full-world JPEG into 1,024×1,024,
   power-of-two JPEG tiles. Each has four pixels of cyclic/clamped gutter for
   filtering at seams. The final column/row is edge-padded to 1,024 pixels.
-- `manifest.txt` records original dimensions, tile size, gutters, columns and
-  rows (`GLOBTOO_RASTER_TILES 1`). `preview.jpg` is a 2048×1024 world map with a 1024×512
-  `preview-small.jpg` fallback for smaller GLES2 devices.
+- Sources wider than 2048 pixels also get a **tile pyramid**: every coarser
+  level halves the height (rounding up, keeping exact 2:1) until a level
+  would no longer be sharper than the 2048-pixel preview. A 21600×10800
+  source gives levels of 21600, 10800, 5400 and 2700 pixels; an 8192 Moon
+  gives 8192 and 4096. Level 0 keeps the `tile-RRR-CCC.jpg` names, level
+  *k* uses `tile-lK-RRR-CCC.jpg` in the same flat directory.
+- `manifest.txt` records original dimensions, tile size, gutters, level-0
+  columns and rows, and the level count (`GLOBTOO_RASTER_TILES 2`, shared by
+  `tools/raster_manifest.py` and `src/tiled_raster.cpp`). Single-level
+  `GLOBTOO_RASTER_TILES 1` manifests (no level count) remain valid; elevation
+  and population tiles still use them. `preview.jpg` is a 2048×1024 world
+  map with a 1024×512 `preview-small.jpg` fallback for smaller GLES2 devices.
   The source raster is not installed or committed to Git.
-- In distant globe views, flat-map overviews and while morphing projections,
-  one base image (the regular 4K Earth map where available, otherwise the
-  cache preview) uses a single draw call. The detailed tiles are chosen by
-  geographic angular bounds for sufficiently close views and uploaded lazily
-  from local disk, at most three tiles per frame. A 24-tile LRU cache bounds
-  GPU memory; until every needed tile is ready, the corresponding base map
-  (or the preview when no base texture is available) remains visible.
+- Tile selection is by **on-screen texel density**, not a fixed zoom
+  threshold. For every tile that can be visible (the globe's horizon cap,
+  tightened to the viewport's corner rays up close; in flat maps a cap
+  around the map centre), the renderer computes the pixels per radian of
+  surface at the tile's nearest and farthest visible points and requests
+  every level that some visible point needs: the coarsest level that is
+  still at least as sharp as the screen. Nothing is requested where the
+  base image (the regular 4K Earth map where available, otherwise the
+  preview) is already sharp enough. If a selection would exceed the
+  32-tile GPU cache (~170 MiB with mipmaps), the whole selection is
+  coarsened one level at a time.
+- JPEG decoding runs on a background thread per tile set; the render thread
+  uploads at most two decoded tiles per frame. The LRU cache only evicts
+  tiles the current frame does not need.
+- Every loaded visible tile is drawn, finest level first, and stencil bit 1
+  marks covered pixels, so each pixel shows the finest loaded tile and the
+  base image fills the rest. While a tile streams in, coarser tiles or the
+  base stay visible instead of the whole view waiting for the last tile.
+  Projection morphs deform the surface (it may overlap itself) and draw the
+  base image only. Stencil bit 0 still marks the globe silhouette for
+  country, river and border overlays.
+- Tile meshes are tessellated proportionally to their angular size
+  (about 1.5° per segment), so coarse tiles keep a round limb.
 - Each tile is drawn as a region of the **same sphere/projection geometry**, not
   an independent planar billboard. Border overlays, cities, rivers and
   markers continue to use the shared geographic frame.
 - Detailed tiles require a GPU reporting `GL_MAX_TEXTURE_SIZE >= 1024`.
   There is no networking, progress bar or terrain displacement in this
   preview/tile pipeline; numerical elevation and population density have
-  separate measured-data layers. Tiled visuals across projection
-  seams and the globe limb still need an interactive GPU test, especially on
-  older GLES2 devices. Disk loading is bounded per frame but synchronous.
+  separate measured-data layers. Tiled visuals still need testing on
+  older GLES2 devices.
 
 **Credit:** NASA Earth Observatory / Reto Stöckli and NASA Blue Marble
 Next Generation; underlying bathymetric shading uses GEBCO data. See

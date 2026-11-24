@@ -63,8 +63,14 @@ bool scene_project(const Camera& camera, float aspect, const MapView& map,
          {static_cast<float>(xyz[0]),static_cast<float>(xyz[1]),
           static_cast<float>(xyz[2]),1.f});
     const Vec3 forward=camera_view_to_world(camera,{0,0,1});
+    // A unit-sphere point is in front of the limb iff dot(p, eye_dir) >= 1/d.
+    // The old fixed 0.2 cut-off drew grid lines/labels behind the globe
+    // whenever d < 5 and clipped them early at the limb when d > 5.
+    // Fade the test out while morphing to a flat map, as before.
+    const double horizon=1./std::max(1.0001f,camera.distance);
+    const double morph=map.globe_to_flat;
     if (xyz[0]*forward.x+xyz[1]*forward.y+xyz[2]*forward.z <
-        .2-1.2*map.globe_to_flat) return false;
+        horizon*(1.-morph)-1.01*morph) return false;
     const auto ll=map_relative_lonlat(map,lon_deg*geo::to_rad,lat_deg*geo::to_rad);
     const double t=map.projection_blend;
     const bool bounded=map.from==MapProjection::Mollweide ||

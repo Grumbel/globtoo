@@ -125,43 +125,60 @@ void globe_draw(Globe& g, const Camera& cam, float aspect,
     else { glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); }
     glDepthMask(flat ? GL_FALSE : GL_TRUE);
     if (sphere) {
-        glEnable(GL_STENCIL_TEST);
-        glStencilMask(0xff);
-        glStencilFunc(GL_ALWAYS, 1, 0xff);
-        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
     } else {
-        glDisable(GL_STENCIL_TEST);
         glDisable(GL_CULL_FACE);
     }
+    // The whole-world texture under any tiles: the original (e.g. 4K)
+    // imagery source when present, otherwise the tile set's own preview.
+    const Texture* base = nullptr;
+    if (textured) {
+        base = tiled && (g.surface != SurfaceLayer::Imagery || !g.texture.id)
+             ? &raster->preview : &g.texture;
+    }
+    // Stencil bit 0 marks the globe silhouette (overlays test it), bit 1
+    // marks pixels already covered by a tile. Tiles are drawn finest level
+    // first, so every pixel keeps the finest loaded tile, and the base
+    // sphere fills whatever is still uncovered (tiles streaming, outside the
+    // tiled area, gaps at a coarsely tessellated limb). Morphs deform the
+    // surface so it may overlap itself; they draw the base texture only.
+    const bool composite = tiled && (sphere || flat);
+    if (sphere || composite) {
+        glEnable(GL_STENCIL_TEST);
+        glStencilFunc(GL_NOTEQUAL, 0x03, 0x02);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    } else {
+        glDisable(GL_STENCIL_TEST);
+    }
+    if (composite) {
+        GLint viewport[4]{};
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        RasterView view{};
+        view.aspect = aspect;
+        view.viewport_height = viewport[3];
+        view.base_width = base ? base->width : 0;
+        glStencilMask(0x03);
+        raster_cache_draw(*raster, cam, map, view, g.shader);
+    }
+    glStencilMask(0x01);
+    if (base) bind_texture(*base, 0);
     // Reproject a single rotated Earth, not mirrored north/south map bands.
     // Additional horizontal copies are required only for wide flat views.
-    bool detailed=false;
-    if (tiled) detailed=raster_cache_draw(*raster,cam,map,aspect,g.shader);
-    if (!detailed) {
-        if (textured) {
-            // The full-resolution imagery is tiled; its small preview serves
-            // as the fallback whenever tiles are loading or the map morphs.
-            // For normal imagery overviews retain the original 4K source
-            // instead (better detail than the 2K tiled preview).
-            if (tiled && (g.surface != SurfaceLayer::Imagery || !g.texture.id))
-                bind_texture(raster->preview,0);
-            else bind_texture(g.texture,0);
-        }
-        const bool copies=flat && scene_map_seam_visible(map,aspect);
-        for (int copy=(copies ? -1 : 0);copy<=(copies ? 1 : 0);copy++) {
-            scene_uniforms(g.shader,cam,aspect,map,static_cast<float>(copy));
-            draw_mesh(g.mesh,!sphere);
-        }
+    const bool copies=flat && scene_map_seam_visible(map,aspect);
+    for (int copy=(copies ? -1 : 0);copy<=(copies ? 1 : 0);copy++) {
+        scene_uniforms(g.shader,cam,aspect,map,static_cast<float>(copy));
+        draw_mesh(g.mesh,!sphere);
     }
     // Keep the stencil test enabled for political geometry. It limits the
     // overlay to the globe's visible silhouette, even where its slight radial
     // lift would otherwise make islands peek beyond the horizon.
     if (sphere) {
         glStencilMask(0x00);
-        glStencilFunc(GL_EQUAL, 1, 0xff);
+        glStencilFunc(GL_EQUAL, 0x01, 0x01);
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+    } else {
+        glDisable(GL_STENCIL_TEST);
     }
     glDepthMask(GL_TRUE);
 }

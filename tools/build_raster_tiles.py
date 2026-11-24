@@ -13,10 +13,14 @@ from PIL import Image, ImageOps
 
 if __package__:
     from .planetary_bodies import BODIES
+    from .raster_manifest import (MAX_TILES, RasterLayout, format_manifest,
+                                  pyramid_levels, tile_name)
     from .planetary_latitudes import (row_indices, reproject_latitude_rows,
                                       validate_latitude_type)
 else:
     from planetary_bodies import BODIES
+    from raster_manifest import (MAX_TILES, RasterLayout, format_manifest,
+                                 pyramid_levels, tile_name)
     from planetary_latitudes import (row_indices, reproject_latitude_rows,
                                      validate_latitude_type)
 
@@ -79,6 +83,69 @@ def _oriented_preview(image, positive, left, top='north'):
     return image
 
 
+def _write_level(image, destination, level, tile_size, gutter, positive,
+                 left, latitude, body, top_edge):
+    """Tile one pyramid level; `image` is the (resized) unoriented source."""
+    width, height = image.size
+    content = tile_size - 2 * gutter
+    columns, rows = math.ceil(width / content), math.ceil(height / content)
+    # Every tile is tile_size², including small final edge cells, making
+    # GL_LINEAR_MIPMAP_LINEAR legal even on strict GLES2 NPOT hardware.
+    for row in range(rows):
+        for column in range(columns):
+            tile_left, top = column * content, row * content
+            cell_w = min(content, width - tile_left)
+            cell_h = min(content, height - top)
+            tile = Image.new('RGB', (tile_size, tile_size))
+            # Copy contiguous strips, wrapping at the longitude seam.
+            # All operations are Pillow block copies (no Python per-pixel
+            # loops, even for a 21600x10800 NASA image).
+            x_begin, x_end = tile_left - gutter, tile_left + cell_w + gutter
+            y_begin, y_end = top - gutter, top + cell_h + gutter
+            y0, y1 = max(0, y_begin), min(height, y_end)
+            if latitude == 'planetographic' and body == 'mars':
+                # Geodetic Mars maps have nonlinear Y spacing relative
+                # to the viewer's centric sphere. Sample each canonical
+                # output scanline from at most two source scanlines, never
+                # allocating a second full-resolution mosaic. Longitude
+                # reorientation still uses the seam-aware strip copier.
+                valid_w, valid_h = cell_w + 2*gutter, cell_h + 2*gutter
+                for dst_y in range(valid_h):
+                    a, b, fraction = row_indices(y_begin + dst_y, height,
+                                                 body, latitude)
+                    first = Image.new('RGB', (valid_w, 1))
+                    _oriented_strip(image, first, x_begin, x_end,
+                                    a, a+1, a, positive, left, top_edge)
+                    if b != a and fraction > 0:
+                        second = Image.new('RGB', (valid_w, 1))
+                        _oriented_strip(image, second, x_begin, x_end,
+                                        b, b+1, b, positive, left, top_edge)
+                        first = Image.blend(first, second, fraction)
+                    tile.paste(first, (0, dst_y))
+            elif y0 < y1:
+                _oriented_strip(image, tile, x_begin, x_end, y0, y1,
+                                y_begin, positive, left, top_edge)
+            valid_w, valid_h = cell_w+2*gutter, cell_h+2*gutter
+            if y_begin < 0 and not (latitude == 'planetographic' and body == 'mars'):
+                edge = tile.crop((0, -y_begin, valid_w, -y_begin+1))
+                tile.paste(edge.resize((valid_w, -y_begin)), (0, 0))
+            if y_end > height and not (latitude == 'planetographic' and body == 'mars'):
+                from_y = height - y_begin
+                edge = tile.crop((0, from_y-1, valid_w, from_y))
+                tile.paste(edge.resize((valid_w, valid_h-from_y)), (0, from_y))
+            # Pad incomplete last row/column with the closest real texel.
+            valid_w = cell_w + 2*gutter
+            valid_h = cell_h + 2*gutter
+            if valid_w < tile_size:
+                edge = tile.crop((valid_w-1, 0, valid_w, valid_h))
+                tile.paste(edge.resize((tile_size-valid_w, valid_h)), (valid_w, 0))
+            if valid_h < tile_size:
+                edge = tile.crop((0, valid_h-1, tile_size, valid_h))
+                tile.paste(edge.resize((tile_size, tile_size-valid_h)), (0, valid_h))
+            tile.save(destination / tile_name(level, row, column),
+                      quality=93, subsampling=0)
+
+
 def build(source, destination, tile_size=1024, gutter=4,
           positive='east', left=180, latitude='planetocentric', body=None,
           top_edge='north'):
@@ -102,63 +169,19 @@ def build(source, destination, tile_size=1024, gutter=4,
         image = image.convert('RGB')
         content = tile_size - 2 * gutter
         columns, rows = math.ceil(width / content), math.ceil(height / content)
-        if columns * rows > 8192:
+        layout = RasterLayout(width, height, tile_size, gutter, columns, rows,
+                              pyramid_levels(width, height))
+        if layout.tile_count() > MAX_TILES:
             raise ValueError("too many raster tiles")
-        # Every tile is tile_size², including small final edge cells, making
-        # GL_LINEAR_MIPMAP_LINEAR legal even on strict GLES2 NPOT hardware.
-        for row in range(rows):
-            for column in range(columns):
-                tile_left, top = column * content, row * content
-                cell_w = min(content, width - tile_left)
-                cell_h = min(content, height - top)
-                tile = Image.new('RGB', (tile_size, tile_size))
-                # Copy contiguous strips, wrapping at the longitude seam.
-                # All operations are Pillow block copies (no Python per-pixel
-                # loops, even for a 21600x10800 NASA image).
-                x_begin, x_end = tile_left - gutter, tile_left + cell_w + gutter
-                y_begin, y_end = top - gutter, top + cell_h + gutter
-                y0, y1 = max(0, y_begin), min(height, y_end)
-                if latitude == 'planetographic' and body == 'mars':
-                    # Geodetic Mars maps have nonlinear Y spacing relative
-                    # to the viewer's centric sphere. Sample each canonical
-                    # output scanline from at most two source scanlines, never
-                    # allocating a second full-resolution mosaic. Longitude
-                    # reorientation still uses the seam-aware strip copier.
-                    valid_w, valid_h = cell_w + 2*gutter, cell_h + 2*gutter
-                    for dst_y in range(valid_h):
-                        a, b, fraction = row_indices(y_begin + dst_y, height,
-                                                     body, latitude)
-                        first = Image.new('RGB', (valid_w, 1))
-                        _oriented_strip(image, first, x_begin, x_end,
-                                        a, a+1, a, positive, left, top_edge)
-                        if b != a and fraction > 0:
-                            second = Image.new('RGB', (valid_w, 1))
-                            _oriented_strip(image, second, x_begin, x_end,
-                                            b, b+1, b, positive, left, top_edge)
-                            first = Image.blend(first, second, fraction)
-                        tile.paste(first, (0, dst_y))
-                elif y0 < y1:
-                    _oriented_strip(image, tile, x_begin, x_end, y0, y1,
-                                    y_begin, positive, left, top_edge)
-                valid_w, valid_h = cell_w+2*gutter, cell_h+2*gutter
-                if y_begin < 0 and not (latitude == 'planetographic' and body == 'mars'):
-                    edge = tile.crop((0, -y_begin, valid_w, -y_begin+1))
-                    tile.paste(edge.resize((valid_w, -y_begin)), (0, 0))
-                if y_end > height and not (latitude == 'planetographic' and body == 'mars'):
-                    from_y = height - y_begin
-                    edge = tile.crop((0, from_y-1, valid_w, from_y))
-                    tile.paste(edge.resize((valid_w, valid_h-from_y)), (0, from_y))
-                # Pad incomplete last row/column with the closest real texel.
-                valid_w = cell_w + 2*gutter
-                valid_h = cell_h + 2*gutter
-                if valid_w < tile_size:
-                    edge = tile.crop((valid_w-1, 0, valid_w, valid_h))
-                    tile.paste(edge.resize((tile_size-valid_w, valid_h)), (valid_w, 0))
-                if valid_h < tile_size:
-                    edge = tile.crop((0, valid_h-1, tile_size, valid_h))
-                    tile.paste(edge.resize((tile_size, tile_size-valid_h)), (0, valid_h))
-                tile.save(destination / f'tile-{row:03d}-{column:03d}.jpg',
-                          quality=93, subsampling=0)
+        # Level 0 is full resolution. Coarser levels are resized from the
+        # source *before* reorientation: mirroring and the half-turn shift
+        # commute with resampling because every level width is even.
+        for level in range(layout.levels):
+            level_image = image if level == 0 else image.resize(
+                layout.level_size(level), Image.Resampling.LANCZOS)
+            _write_level(level_image, destination, level, tile_size, gutter,
+                         positive, left, latitude, body, top_edge)
+            del level_image
         # Use a small preview for zoomed-out views; loading its full resolution
         # cannot exceed GLES2's ubiquitous 2048x2048 limit.
         preview = reproject_latitude_rows(_oriented_preview(
@@ -169,9 +192,8 @@ def build(source, destination, tile_size=1024, gutter=4,
             image.resize((1024, 512), Image.Resampling.LANCZOS), positive, left, top_edge),
             body, latitude)
         preview_small.save(destination / 'preview-small.jpg', quality=90)
-        (destination / 'manifest.txt').write_text(
-            f'GLOBTOO_RASTER_TILES 1\n{width} {height} {tile_size} {gutter} {columns} {rows}\n',
-            encoding='ascii')
+        (destination / 'manifest.txt').write_text(format_manifest(layout),
+                                                  encoding='ascii')
     return columns, rows
 
 

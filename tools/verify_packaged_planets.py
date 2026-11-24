@@ -20,10 +20,11 @@ from PIL import Image
 if __package__:
     from .install_planetary_map import verify_prepared_map
     from .planetary_bodies import BODIES
+    from .raster_manifest import TILE_RE, parse_manifest
 else:
     from install_planetary_map import verify_prepared_map
     from planetary_bodies import BODIES
-TILE_NAME = re.compile(r'tile-[0-9]{3}-[0-9]{3}\.jpg\Z')
+    from raster_manifest import TILE_RE, parse_manifest
 
 
 def _file(path: Path) -> Path:
@@ -53,22 +54,11 @@ def verify_body(prefix: Path, body: str) -> int:
     manifest = _file(imagery / 'manifest.txt')
     if manifest.stat().st_size > 4096:
         raise ValueError(f'oversized manifest: {manifest}')
-    words = manifest.read_text(encoding='ascii').split()
-    if len(words) != 8 or words[:2] != ['GLOBTOO_RASTER_TILES', '1']:
-        raise ValueError(f'invalid tile manifest: {manifest}')
     try:
-        width, height, tile_size, gutter, cols, rows = map(int, words[2:])
+        layout = parse_manifest(manifest.read_text(encoding='ascii'))
     except ValueError as exc:
-        raise ValueError(f'invalid tile manifest integers: {manifest}') from exc
-    content = tile_size - 2 * gutter
-    if not (2 <= width <= 100000 and height >= 1 and width == 2 * height and
-            64 <= tile_size <= 2048 and tile_size & (tile_size - 1) == 0 and
-            2 <= gutter <= 16 and content > 0 and
-            1 <= cols <= 256 and 1 <= rows <= 256 and
-            cols * rows <= 8192 and
-            cols == (width + content - 1) // content and
-            rows == (height + content - 1) // content):
-        raise ValueError(f'impossible tile layout: {manifest}')
+        raise ValueError(f'{exc}: {manifest}') from exc
+    tile_size = layout.tile_size
 
     preview_size = _jpeg(imagery / 'preview-small.jpg')
     if not (preview_size[0] == 2 * preview_size[1] and
@@ -93,9 +83,8 @@ def verify_body(prefix: Path, body: str) -> int:
                                  'Source latitude type', 'Output')):
             raise ValueError(f'missing source or coordinate attribution for {body}')
 
-    expected = {f'tile-{r:03d}-{c:03d}.jpg'
-                for r in range(rows) for c in range(cols)}
-    actual = {p.name for p in imagery.iterdir() if TILE_NAME.fullmatch(p.name)}
+    expected = layout.expected_tiles()
+    actual = {p.name for p in imagery.iterdir() if TILE_RE.fullmatch(p.name)}
     if actual != expected:
         raise ValueError(f'incomplete or unexpected tile grid for {body}: '
                          f'missing={sorted(expected - actual)[:4]}, '

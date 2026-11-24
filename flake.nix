@@ -355,6 +355,7 @@
           fileset = pkgs.lib.fileset.unions [
             ./tools/prepare_planetary_map.py
             ./tools/build_raster_tiles.py
+            ./tools/raster_manifest.py
             ./tools/planetary_alignment.py
             ./tools/normalize_planet_texture.py
             ./tools/planetary_bodies.py

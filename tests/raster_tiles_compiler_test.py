@@ -124,5 +124,36 @@ class RasterTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'2:1'):
                 build(src,pathlib.Path(d)/'out')
 
+    def test_pyramid_levels_and_manifest(self):
+        # Sources wider than the 2048-pixel preview get coarser levels until
+        # a level would no longer be sharper than that preview.
+        from tools.raster_manifest import parse_manifest, pyramid_levels, tile_name
+        self.assertEqual(pyramid_levels(2048, 1024), 1)
+        self.assertEqual(pyramid_levels(8192, 4096), 2)
+        self.assertEqual(pyramid_levels(21600, 10800), 4)
+        width, height = 4352, 2176
+        image = Image.new('RGB', (width, height))
+        # West half red, east half blue: survives resampling at every level.
+        image.paste((220, 30, 30), (0, 0, width // 2, height))
+        image.paste((30, 30, 220), (width // 2, 0, width, height))
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            source = root / 'wide.png'
+            image.save(source)
+            build(source, root / 'out', 256, 4, positive='west', left=0)
+            layout = parse_manifest((root / 'out' / 'manifest.txt').read_text())
+            self.assertEqual((layout.levels, layout.columns, layout.rows), (2, 18, 9))
+            self.assertEqual(layout.level_size(1), (2176, 1088))
+            self.assertEqual(layout.level_grid(1), (9, 5))
+            names = {p.name for p in (root / 'out').glob('tile-*.jpg')}
+            self.assertEqual(names, layout.expected_tiles())
+            self.assertIn(tile_name(1, 4, 8), names)
+            # west-positive / 0-left source: its first half (red) covers
+            # 0..180 W, which is the canonical *left* half after normalizing.
+            first = Image.open(root / 'out' / tile_name(1, 2, 0)).getpixel((100, 100))
+            last = Image.open(root / 'out' / tile_name(1, 2, 8)).getpixel((20, 100))
+            self.assertGreater(first[0], 150)
+            self.assertGreater(last[2], 150)
+
 if __name__ == '__main__':
     unittest.main()

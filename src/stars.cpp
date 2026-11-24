@@ -349,9 +349,8 @@ void stars_draw(const Stars& s, const Camera& cam, float aspect) {
     glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp.m);
 
     glDisable(GL_DEPTH_TEST);
-#ifdef GL_VERTEX_PROGRAM_POINT_SIZE
-    glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-#endif
+    // GLES2 always honours gl_PointSize; desktop GL_VERTEX_PROGRAM_POINT_SIZE
+    // is not a GLES2 enum and would only raise GL_INVALID_ENUM.
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
