@@ -530,14 +530,17 @@
         apps.default = {
           type = "app";
           program = "${self.packages.${system}.default}/bin/globtoo";
+          meta.description = "globtoo with Earth imagery, full geographic data and all bundled planet/moon textures";
         };
         apps.globtoo-lite = {
           type = "app";
           program = "${self.packages.${system}.globtoo-lite}/bin/globtoo";
+          meta.description = "globtoo lite build without bundled imagery and with reduced geographic data";
         };
         apps.globtoo-earth = {
           type = "app";
           program = "${self.packages.${system}.globtoo-earth}/bin/globtoo";
+          meta.description = "globtoo with Earth imagery and full geographic data, without planetary textures";
         };
       });
 }
