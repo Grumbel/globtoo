@@ -70,6 +70,10 @@ set(GLOBTOO_EARTH_TEXTURE "" CACHE FILEPATH "Real equirectangular Earth image to
 # Optional higher-resolution *imagery*, unlike the independently selected
 # visual relief layer. Build-time tiles, not a huge runtime GL texture.
 set(GLOBTOO_IMAGERY_TEXTURE "" CACHE FILEPATH "High-resolution equirectangular Earth imagery to tile for close zoom")
+# Alternatively, an Earth imagery directory already tiled by
+# tools/build_raster_tiles.py (manifest.txt, tiles, previews), e.g. a separate
+# Nix derivation, so app rebuilds do not re-tile hundreds of megapixels.
+set(GLOBTOO_IMAGERY_TILES "" CACHE PATH "Prepared Earth imagery tile directory containing manifest.txt")
 # Optional full-world topographic/bathymetric source, converted to GLES2-safe
 # 1024px tiles at build time. Never package the untiled source image.
 set(GLOBTOO_RELIEF_TEXTURE "" CACHE FILEPATH "NASA Blue Marble topography/bathymetry raster (north-up equirectangular)")
@@ -100,6 +104,14 @@ endif()
 
 if(GLOBTOO_IMAGERY_TEXTURE AND NOT EXISTS "${GLOBTOO_IMAGERY_TEXTURE}")
   message(FATAL_ERROR "GLOBTOO_IMAGERY_TEXTURE does not exist: ${GLOBTOO_IMAGERY_TEXTURE}")
+endif()
+if(GLOBTOO_IMAGERY_TILES)
+  if(GLOBTOO_IMAGERY_TEXTURE)
+    message(FATAL_ERROR "GLOBTOO_IMAGERY_TILES cannot be combined with GLOBTOO_IMAGERY_TEXTURE")
+  endif()
+  if(NOT EXISTS "${GLOBTOO_IMAGERY_TILES}/manifest.txt")
+    message(FATAL_ERROR "GLOBTOO_IMAGERY_TILES has no manifest.txt: ${GLOBTOO_IMAGERY_TILES}")
+  endif()
 endif()
 if(GLOBTOO_RELIEF_TEXTURE AND NOT EXISTS "${GLOBTOO_RELIEF_TEXTURE}")
   message(FATAL_ERROR "GLOBTOO_RELIEF_TEXTURE does not exist: ${GLOBTOO_RELIEF_TEXTURE}")
@@ -255,7 +267,8 @@ foreach(body IN LISTS GLOBTOO_PLANETARY_BODIES)
   endif()
 endforeach()
 
-if(GLOBTOO_BUILD_APP AND NOT GLOBTOO_EARTH_TEXTURE AND NOT GLOBTOO_IMAGERY_TEXTURE)
+if(GLOBTOO_BUILD_APP AND NOT GLOBTOO_EARTH_TEXTURE AND NOT GLOBTOO_IMAGERY_TEXTURE
+   AND NOT GLOBTOO_IMAGERY_TILES)
   message(STATUS "No Earth image configured; globe will use solid color unless --texture is specified")
 endif()
 find_path(GEOS_INCLUDE_DIR geos_c.h REQUIRED)
@@ -294,6 +307,8 @@ add_executable(globtoo
   src/resources.cpp
   src/geographic_features.cpp
   src/geographic_overlay.cpp
+  src/planet_rings.cpp
+  src/ring_profile.cpp
   src/tiled_raster.cpp
   src/raster_cache.cpp
   src/raster_legend.cpp
@@ -388,7 +403,11 @@ endif()
 # The original GLOBTOO_EARTH_TEXTURE is retained for distant views, morphs,
 # and transient missing tiles. Only the generated tiles are installed.
 set(IMAGERY_OUTPUT "")
-if(GLOBTOO_IMAGERY_TEXTURE)
+set(IMAGERY_DIR "${CMAKE_BINARY_DIR}/generated-imagery")
+if(GLOBTOO_IMAGERY_TILES)
+  set(IMAGERY_DIR "${GLOBTOO_IMAGERY_TILES}")
+  set(IMAGERY_OUTPUT "${GLOBTOO_IMAGERY_TILES}/manifest.txt")
+elseif(GLOBTOO_IMAGERY_TEXTURE)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   execute_process(COMMAND ${Python3_EXECUTABLE} -c "from PIL import Image"
     RESULT_VARIABLE _globtoo_imagery_pillow ERROR_QUIET)
@@ -527,7 +546,7 @@ if(GLOBTOO_BUILD_APP)
   if(IMAGERY_OUTPUT)
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_BINARY_DIR}/generated-imagery" "$<TARGET_FILE_DIR:globtoo>/imagery"
+        "${IMAGERY_DIR}" "$<TARGET_FILE_DIR:globtoo>/imagery"
       VERBATIM)
   endif()
   if(RELIEF_OUTPUT)
@@ -618,7 +637,7 @@ if(GLOBTOO_BUILD_APP)
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/elevation")
   endif()
   if(IMAGERY_OUTPUT)
-    install(DIRECTORY "${CMAKE_BINARY_DIR}/generated-imagery/"
+    install(DIRECTORY "${IMAGERY_DIR}/"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/imagery")
   endif()
   if(RELIEF_OUTPUT)
@@ -826,6 +845,10 @@ if(BUILD_TESTING)
     GLOBTOO_BODIES_TSV="${CMAKE_SOURCE_DIR}/data/bodies.tsv")
   target_compile_options(bodies_test PRIVATE -Wall -Wextra -UNDEBUG)
   add_test(NAME bodies COMMAND bodies_test)
+  add_executable(ring_profile_test tests/ring_profile_test.cpp src/ring_profile.cpp)
+  target_include_directories(ring_profile_test PRIVATE src)
+  target_compile_options(ring_profile_test PRIVATE -Wall -Wextra -UNDEBUG)
+  add_test(NAME ring_profile COMMAND ring_profile_test)
   add_executable(markers_test tests/markers_test.cpp src/markers.cpp)
   target_include_directories(markers_test PRIVATE src)
   target_compile_options(markers_test PRIVATE -Wall -Wextra -UNDEBUG)

@@ -15,6 +15,8 @@
 struct RasterTiles {
     static constexpr int max_levels = 8;
     static constexpr int max_tiles = 8192;
+    // Widest accepted source: the 109164-pixel LROC WAC 100 m Moon mosaic.
+    static constexpr int max_width = 131072;
     int width = 0, height = 0;
     int tile_size = 0, gutter = 0;
     int columns = 0, rows = 0;

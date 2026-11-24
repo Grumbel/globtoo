@@ -51,7 +51,7 @@ bool raster_tiles_parse(std::string_view data, RasterTiles& out, std::string& er
     }
     // Put strict bounds on hostile/corrupt input before allocating GPU assets.
     if (tmp.width < 2 || tmp.height < 1 || tmp.width != 2LL * tmp.height ||
-        tmp.width > 100000 || tmp.tile_size < 64 || tmp.tile_size > 2048 ||
+        tmp.width > RasterTiles::max_width || tmp.tile_size < 64 || tmp.tile_size > 2048 ||
         (tmp.tile_size & (tmp.tile_size-1)) ||
         tmp.gutter < 2 || tmp.gutter > 16 || tmp.content_size() <= 0 ||
         tmp.columns <= 0 || tmp.rows <= 0 || tmp.columns > 256 || tmp.rows > 256 ||

@@ -76,6 +76,8 @@ Shader load_shader(const char* vert_path, const char* frag_path) {
     glBindAttribLocation(s.program, 1, "a_bright"); // stars; same slot
     glBindAttribLocation(s.program, 1, "a_color");  // country fill
     glBindAttribLocation(s.program, 3, "a_anchor");
+    glBindAttribLocation(s.program, 2, "a_other");  // river ribbons
+    glBindAttribLocation(s.program, 4, "a_corner");
     glLinkProgram(s.program);
 
     GLint ok = 0;

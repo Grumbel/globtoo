@@ -23,6 +23,18 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Keep 50m at distance and 10m at close zoom, both from identical border/fill meshes
 
 ## Done
+- [x] Close-zoom Earth imagery by default: NASA BMNG 21600×10800 (July
+      2004) tiled in its own `earth-imagery` derivation and installed via
+      `GLOBTOO_IMAGERY_TILES`. `globtoo-max` adds the 86400×43200 BMNG
+      (eight 21600² tiles, `--mosaic 4x2`) and the 100 m/pixel USGS LROC WAC
+      Moon mosaic. The tiler reads >250 MP sources and mosaics through
+      libvips with threaded tile writing; raster width limit 131072.
+- [x] Saturn's rings: procedural radial profile (D/C/B/A rings, Cassini
+      Division, Colombo/Maxwell/Huygens/Encke/Keeler gaps, F ring) in a
+      2048×1 strip, slant-path opacity, depth-tested against the globe. The
+      projection's near/far planes follow `Camera::content_radius`.
+- [x] Rivers drawn as screen-expanded quads: width in km by Natural Earth
+      scale rank (2 km for the largest) with a 1–2 px minimum, square caps.
 - [x] Raster tile pyramid and screen-space LOD. `GLOBTOO_RASTER_TILES 2`
       adds coarser levels (`tile-lK-RRR-CCC.jpg`) down to the preview
       resolution; v1 manifests stay valid. Tiles are chosen by on-screen
@@ -215,8 +227,11 @@ silently download large maps or satellite data on an existing installation.
       an interactive GLES2 session and check the logarithmic scale visually.
 - [ ] Test optional NOAA ETOPO1 grid with the complete 21601x10801 dataset,
       including signed colour range, poles, and source attribution.
-- [ ] Pin and verify NASA high-resolution Imagery/Relief source hashes for Nix; test the
-      complete fat package and visually check tile seams against the preview.
+- [ ] Pin and verify NASA high-resolution Relief source hashes for Nix (Imagery
+      is pinned); visually check `globtoo-max` tile seams against the preview.
+- [ ] Saturn: screen-space graticule and landmark labels are occluded only by
+      the globe horizon, not by rings in front of it; no ring shadow on the
+      planet or planet shadow on the rings (invisible under the headlight).
 - [ ] Benchmark upload stutter, LRU size and visual transitions on real GLES2
       hardware; consider off-thread image decoding and per-tile frustum bounds.
 - [ ] Verify Nix fetch hashes for 10m places/rivers and test full interactive

@@ -33,13 +33,28 @@ transitions; `imagery/` contains the optional close-up tiles. The tiles are
 zoom into Imagery. Country colors, borders, and graticules still work over them.
 The preview is also a fallback when the baseline image does not fit the GPU.
 
-For example, NASA's [Blue Marble Next Generation base map](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/)
-offers north-up, global 21,600×10,800 JPEG imagery. Download and verify the
-source file yourself, then run:
+The Nix packages ship NASA's
+[Blue Marble Next Generation base map](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/)
+(July 2004, north-up, public domain) as checksum-pinned tiles:
+
+| Package | Earth imagery | Moon imagery |
+|---|---|---|
+| `default`, `globtoo-earth` | BMNG 21,600×10,800 (1′, ~1.9 km/pixel; 336 files, ~44 MB) | NASA SVS 2K color |
+| `globtoo-max` | BMNG 86,400×43,200 (15″, ~460 m/pixel) from the eight 21,600² A1…D2 tiles | USGS LRO LROC WAC 100 m mosaic (109,164×54,582) |
+
+`nix build .#earth-imagery`, `.#earth-imagery-max` and
+`.#planetary-map-moon-max` build only the tile sets. `globtoo-max` needs
+roughly 20 GB of downloads and tens of GB of temporary space while tiling;
+`nix run .#globtoo-max` starts it.
+
+To tile a source yourself, download and verify it, then run:
 
 ```sh
-python3 tools/build_raster_tiles.py /path/to/world.200412.3x21600x10800.jpg \
+python3 tools/build_raster_tiles.py /path/to/world.200407.3x21600x10800.jpg \
   /tmp/globtoo-imagery
+# A row-major mosaic of equally sized parts (NASA's A1 B1 C1 D1 A2 ... D2):
+python3 tools/build_raster_tiles.py world.200407.3x21600x21600.{A,B,C,D}1.jpg \
+  world.200407.3x21600x21600.{A,B,C,D}2.jpg /tmp/globtoo-imagery-max --mosaic 4x2
 # Start any installed Globtoo and supply these tiles directly:
 globtoo --imagery-dir /tmp/globtoo-imagery
 ```
@@ -61,14 +76,15 @@ This is compatible with the existing `--texture FILE` single-image override.
 For truly close views, use the tiles instead of trying to upload one huge
 21,600×10,800 RGBA texture through GLES2.
 
-The `flake.nix` default remains reproducible with its already-pinned 4K
-`fetchurl`. To include high-resolution imagery in a Nix derivation, supply a
-**separately checksum-verified** source to the same
-`-DGLOBTOO_IMAGERY_TEXTURE=/nix/store/...` CMake setting and add
-`python3Packages.pillow` to `nativeBuildInputs`. This source has deliberately
-not been enabled in the default flake without an independently verified
-SHA-256 digest and a full Nix build. No network request occurs at application
-startup.
+An already tiled directory (such as a Nix `earth-imagery` output) can be
+installed without re-tiling via `-DGLOBTOO_IMAGERY_TILES=/path/to/tiles`
+(mutually exclusive with `GLOBTOO_IMAGERY_TEXTURE`). No network request
+occurs at application startup.
+
+Sources above 250 megapixels, and mosaics, are read through libvips
+(`pyvips`, included in the dev shell) and tiled with `--jobs` worker threads;
+smaller single images use Pillow. Both backends produce identical level-0
+tiles. Sources may be up to 131,072 pixels wide and 8 gigapixels.
 
 ## Preparing NASA Blue Marble relief
 

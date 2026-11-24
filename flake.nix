@@ -62,6 +62,38 @@
           name = "earth.jpg";
         };
 
+        # True-color close-zoom Earth imagery: NASA Blue Marble Next
+        # Generation, July 2004, without topography shading (public domain;
+        # NASA Earth Observatory / Reto Stöckli). The 4k image above stays
+        # the base for distant views and projection morphs.
+        bmngBase = "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/july";
+        bmngLicense = "Public domain (NASA Earth Observatory, Blue Marble Next Generation)";
+        bmngRaster = tag: file: sha256: pkgs.fetchurl {
+          url = "${bmngBase}/${file}";
+          inherit sha256;
+          name = "earth-bmng-${tag}.jpg";
+        };
+        # 21600x10800 (1 arc-minute, ~1.9 km at the equator): default package.
+        bmng21600 = [
+          (bmngRaster "21600" "world.200407.3x21600x10800.jpg"
+            "1qk1dppyfv3fz1mqxvg905wqw5waa1dcij70pkwgb4sgibfb9a6y")
+        ];
+        # 86400x43200 (15 arc-seconds, ~460 m) as eight 21600x21600
+        # quadrants: A..D are 90-degree columns from 180W eastwards, 1 is the
+        # northern and 2 the southern half. Listed row-major for the tiler's
+        # --mosaic 4x2. globtoo-max only.
+        bmng86400 = map ({ tile, sha256 }:
+          bmngRaster tile "world.200407.3x21600x21600.${tile}.jpg" sha256) [
+          { tile = "A1"; sha256 = "0ml40c48vnwp26fvqc366gmkrr0ydpijya5nhnivajpv4jjdnnq4"; }
+          { tile = "B1"; sha256 = "09fniyng64jmm1wig3ra5d7m74g4hpqh12ghimvzy0506yh55rag"; }
+          { tile = "C1"; sha256 = "0mp976jms5sjknzl4f2mqrxyxykjq3jjcbhqc4ibnqqga5lvii0q"; }
+          { tile = "D1"; sha256 = "0s6yrap3v09qhf49hi79g5j5qhjnwig4ba21242pki6bqsbq2dfj"; }
+          { tile = "A2"; sha256 = "026ilzl0ddq9mq8k2y3i27c1flk3kmyp5gwb9f7z5apkws708kbd"; }
+          { tile = "B2"; sha256 = "16cyr0kcm5h2q07fsxc7hgv2898lprlpsnjbswa8x1glkr5qwzxs"; }
+          { tile = "C2"; sha256 = "18b612n0r9nxawxyvfapr73ph77s1f47svd7jmikyyyvkmjm1zhm"; }
+          { tile = "D2"; sha256 = "17fg80havffsbnlb2ni0fh1jg1v1y8svva2k6wqd83dfmi5q0nss"; }
+        ];
+
         # Natural Earth Admin-0 countries (public domain). The 50m mesh is
         # used at a distance; 10m is switched in when zooming closer. Both
         # are triangulated into binary meshes at build time, not on launch.
@@ -101,6 +133,9 @@
         # These pins identify the bytes; scientifically exact registration still
         # requires comparison with planetary control-network maps.
         pythonWithPillow = pkgs.python3.withPackages (ps: [ ps.pillow ps.numpy ]);
+        # Sources above 250 megapixels (globtoo-max only) are tiled through
+        # libvips; default builds never pull it in.
+        pythonWithVips = pkgs.python3.withPackages (ps: [ ps.pillow ps.numpy ps.pyvips ]);
         sssLicense = "SolarSystemScope-CC-BY-4.0-display-mosaic";
         sssRaster = file: hash: pkgs.fetchurl {
           url = "https://www.solarsystemscope.com/textures/download/${file}";
@@ -369,7 +404,7 @@
         # per-file SHA-256, alignment QA sheet), the same format as a manual
         # tools/prepare_planetary_map.py run and GLOBTOO_<BODY>_PREPARED_MAP.
         mkPlanetaryMap = body: image: pkgs.runCommand "globtoo-map-${body}" {
-            nativeBuildInputs = [ pythonWithPillow ];
+            nativeBuildInputs = [ (image.python or pythonWithPillow) ];
           } ''
             # prepare stages next to its destination; the store is read-only.
             python3 ${mapToolsSrc}/tools/prepare_planetary_map.py \
@@ -387,11 +422,51 @@
           '';
         bundledMaps = builtins.mapAttrs mkPlanetaryMap planetaryRasters;
 
+        # globtoo-max Moon: LROC WAC global 100 m/pixel mosaic, 109164x54582
+        # 8-bit grayscale, an uncompressed 6 GB BigTIFF (public domain; NASA/
+        # GSFC/Arizona State University, distributed by USGS Astrogeology).
+        # SimpleCylindrical, upper-left corner at 180W/90N, east-positive.
+        moonMaxMap = mkPlanetaryMap "moon" {
+          source = pkgs.fetchurl {
+            url = "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Lunar_LRO_LROC-WAC_Mosaic_global_100m_June2013.tif";
+            sha256 = "0mgx6rcmf153ad9wn168grq2n0j31737x5bycjxk3bl832nrw5c7";
+            name = "moon-lroc-wac-100m.tif";
+          };
+          url = "https://astrogeology.usgs.gov/search/map/moon_lro_lroc_wac_global_morphology_mosaic_100m";
+          license = "Public domain (NASA/GSFC/Arizona State University LROC; USGS Astrogeology)";
+          positive = "east"; left = "180"; latitude = "planetocentric";
+          python = pythonWithVips;
+        };
+
+        # Earth close-zoom imagery, tiled once in its own derivation (like the
+        # planetary maps) and passed to CMake as GLOBTOO_IMAGERY_TILES.
+        mkEarthImagery = name: sources: mosaic: python:
+          pkgs.runCommand "globtoo-earth-imagery-${name}" {
+            nativeBuildInputs = [ python ];
+          } ''
+            python3 ${mapToolsSrc}/tools/build_raster_tiles.py \
+              ${pkgs.lib.escapeShellArgs sources} "$out" --mosaic ${mosaic}
+            {
+              echo "Body: earth"
+              echo "Source: NASA Blue Marble Next Generation, July 2004 (${bmngBase}/)"
+              echo "License: ${bmngLicense}"
+              echo "Credit: NASA Earth Observatory / Reto Stöckli"
+              ${pkgs.lib.concatMapStrings (source: ''
+                echo "Original file: ${source.url} (SHA-256 ${builtins.convertHash {
+                  hash = source.outputHash; hashAlgo = "sha256"; toHashFormat = "base16"; }})"
+              '') sources}
+            } > "$out/source.txt"
+          '';
+        earthImagery = mkEarthImagery "21600" bmng21600 "1x1" pythonWithPillow;
+        earthImageryMax = mkEarthImagery "86400" bmng86400 "4x2" pythonWithVips;
+
         # A supplied audited map replaces the corresponding bundled one;
         # a caller does not have to build, install or manually copy assets.
         # Passing {} uses all bundled maps in the full build.
         mkPackage = { lite ? false, planetaryMaps ? {},
-                      includePlanetaryTextures ? !lite }:
+                      includePlanetaryTextures ? !lite,
+                      earthTiles ? (if lite then null else earthImagery),
+                      pname ? (if lite then "globtoo-lite" else "globtoo") }:
           let
             # Only selected assets are fetched; lite has no planetary fetches
             # unless an audited map was explicitly supplied by the caller.
@@ -403,8 +478,7 @@
               "-DGLOBTOO_${pkgs.lib.strings.toUpper body}_PREPARED_MAP=${maps.${body}}"
             ) activeBodies;
           in pkgs.stdenv.mkDerivation {
-          pname = if lite then "globtoo-lite" else "globtoo";
-          inherit version;
+          inherit pname version;
           src = ./.;
 
           nativeBuildInputs = with pkgs; [
@@ -427,6 +501,8 @@
             "-DGLOBTOO_ENABLE_DOWNLOADS=${if lite then "ON" else "OFF"}"
           ] ++ bodyFlags ++ pkgs.lib.optionals (!lite) [
             "-DGLOBTOO_EARTH_TEXTURE=${earthTexture}"
+          ] ++ pkgs.lib.optionals (earthTiles != null) [
+            "-DGLOBTOO_IMAGERY_TILES=${earthTiles}"
           ];
 
           doCheck = true;
@@ -473,6 +549,16 @@
           globtoo-lite = mkPackage { lite = true; };
           # Full geographic data and Earth image without planetary tile assets.
           globtoo-earth = mkPackage { includePlanetaryTextures = false; };
+          # Maximum-resolution imagery: Earth BMNG 86400x43200 and the LROC
+          # WAC 100 m Moon (6 GB download, several GB of tiles). Not a check.
+          globtoo-max = mkPackage {
+            pname = "globtoo-max";
+            earthTiles = earthImageryMax;
+            planetaryMaps = { moon = moonMaxMap; };
+          };
+          earth-imagery = earthImagery;
+          earth-imagery-max = earthImageryMax;
+          planetary-map-moon-max = moonMaxMap;
           # All bundled prepared planetary maps; each body is also exposed as
           # `planetary-map-<body>`. Built independently of the app, so code
           # changes reuse them from the store instead of re-tiling.
@@ -508,7 +594,7 @@
         devShells.default = pkgs.mkShell {
           packages = (with pkgs; [
             cmake pkg-config python3 python3Packages.pillow python3Packages.numpy
-            python3Packages.rasterio
+            python3Packages.rasterio python3Packages.pyvips
             sdl3 geos libGL libglvnd mesa reuse
             gdb clang-tools curl openssl
           ]) ++ sdl3PcDeps;
@@ -520,10 +606,9 @@
             echo "Signed numeric ETOPO1 can be tiled with tools/build_elevation_tiles.py."
             echo "GPWv4 density can be tiled with tools/build_population_tiles.py (optional)."
             echo "See docs/RASTER_LAYERS.md (Pillow is included in this shell)."
-            echo "For a local high-res texture without rebuilding the flake:"
-            echo "  curl -L -o /tmp/globtoo-earth.jpg \\"
-            echo "    https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg"
-            echo "  cmake -S . -B build -DGLOBTOO_EARTH_TEXTURE=/tmp/globtoo-earth.jpg"
+            echo "Prebuilt Earth tiles for a local build:"
+            echo "  nix build .#earth-imagery -o /tmp/globtoo-imagery"
+            echo "  cmake -S . -B build -DGLOBTOO_IMAGERY_TILES=/tmp/globtoo-imagery"
           '';
         };
 
@@ -536,6 +621,11 @@
           type = "app";
           program = "${self.packages.${system}.globtoo-lite}/bin/globtoo";
           meta.description = "globtoo lite build without bundled imagery and with reduced geographic data";
+        };
+        apps.globtoo-max = {
+          type = "app";
+          program = "${self.packages.${system}.globtoo-max}/bin/globtoo";
+          meta.description = "globtoo with maximum-resolution Earth (86400x43200) and Moon (LROC WAC 100 m) imagery";
         };
         apps.globtoo-earth = {
           type = "app";

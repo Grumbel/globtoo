@@ -19,6 +19,10 @@ struct Camera {
     // Distance 1.08 gives almost twice the linear magnification of 1.15.
     float min_dist = 1.08f;
     float max_dist = 8.0f;
+    // Radius around the origin occupied by this frame's geometry: the unit
+    // globe, or more when it has rings. Bounds the near and far planes,
+    // keeping depth precision concentrated on the visible scene.
+    float content_radius = 1.0f;
 
     ControlMode mode = ControlMode::Grab;
 

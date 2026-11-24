@@ -79,7 +79,7 @@ static bool check_pair(const std::string& dir, const std::string& name) {
 int main() {
     const std::string dir = GLOBTOO_SHADER_SOURCE_DIR;
     bool ok = true;
-    for (const auto* name : {"globe", "fill", "borders", "stars", "ui"})
+    for (const auto* name : {"globe", "fill", "borders", "rivers", "rings", "stars", "ui"})
         ok = check_pair(dir, name) && ok;
     if (ok) std::puts("GLES2 shader precision interfaces match across all programs");
     return ok ? 0 : 1;

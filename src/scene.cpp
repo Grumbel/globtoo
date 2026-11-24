@@ -19,8 +19,8 @@ void setmat(GLint loc, const Mat4& m) {
 }
 Mat4 scene_projection(const Camera& camera, float aspect, const MapView& map) {
     if (map.globe_to_flat<=.0001f) return camera.proj_matrix(aspect);
-    const float near_plane=std::max(.05f,(camera.distance-1.01f)*.5f);
-    const float far_plane=std::max(9.f,camera.distance+1.1f);
+    const float near_plane=std::max(.05f,(camera.distance-camera.content_radius-.01f)*.5f);
+    const float far_plane=std::max(9.f,camera.distance+camera.content_radius+.1f);
     return Mat4::perspective(.7f,aspect,near_plane,far_plane);
 }
 Vec4 mul(const Mat4& a, Vec4 p) {

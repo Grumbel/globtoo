@@ -12,6 +12,15 @@ SPDX-License-Identifier: GPL-3.0-or-later
   meshes and compact point/line feature asset.
 - **Earth imagery:** NASA Blue Marble–derived image, public domain; fetched by
   the Nix build. Credit: NASA Earth Observatory / Reto Stöckli. No placeholder Earth texture is distributed in the source tree.
+- **Close-zoom Earth imagery:** NASA Blue Marble Next Generation, July 2004
+  (21,600×10,800 by default; the 86,400×43,200 A1…D2 tiles in `globtoo-max`),
+  public domain. Credit: NASA Earth Observatory / Reto Stöckli. Fetched at
+  pinned hashes and installed only as derived tiles.
+- **Moon, `globtoo-max` only:** USGS Astrogeology LRO LROC WAC Global
+  Morphology Mosaic, 100 m/pixel, public domain. Credit: NASA/GSFC/Arizona
+  State University. Installed only as derived tiles.
+- **Saturn's rings:** generated procedurally from published ring and gap
+  radii; no third-party ring imagery is used.
 - **Optional relief/bathymetry imagery:** NASA Blue Marble Next Generation
   topography and bathymetry visualization (public domain), credited to NASA
   Earth Observatory / Reto Stöckli, using GEBCO ocean bathymetry. The high-res

@@ -25,8 +25,8 @@ Mat4 Camera::proj_matrix(float aspect) const {
     // A fixed 0.05..200 frustum wastes most of the 24-bit depth buffer and
     // causes the near-surface political overlay to flicker at the limb.
     // Stars use their own projection and are drawn with depth disabled.
-    const float near_plane = std::max(0.05f, (distance - 1.01f) * 0.9f);
-    const float far_plane  = distance + 1.1f;
+    const float near_plane = std::max(0.05f, (distance - content_radius - 0.01f) * 0.9f);
+    const float far_plane  = distance + content_radius + 0.1f;
     return Mat4::perspective(0.7f, aspect, near_plane, far_plane);
 }
 

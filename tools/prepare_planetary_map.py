@@ -27,15 +27,16 @@ import tempfile
 from PIL import Image
 
 if __package__:
-    from .build_raster_tiles import build
+    from .build_raster_tiles import LARGE_PIXEL_LIMIT, build, source_size
     from .planetary_alignment import render
     from .planetary_bodies import BODIES
 else:
-    from build_raster_tiles import build
+    from build_raster_tiles import LARGE_PIXEL_LIMIT, build, source_size
     from planetary_alignment import render
     from planetary_bodies import BODIES
 
-MAX_SOURCE_BYTES = 1024 * 1024 * 1024
+# Large enough for the 6 GB uncompressed LROC WAC 100 m Moon BigTIFF.
+MAX_SOURCE_BYTES = 8 * 1024 * 1024 * 1024
 SHA256_PATTERN = re.compile(r'^[0-9a-fA-F]{64}$')
 
 
@@ -94,10 +95,10 @@ def prepare(source: Path, destination: Path, *, body: str, source_url: str,
     digest, size = hash_file(source)
     if expected_sha256 and digest != expected_sha256.lower():
         raise ValueError(f'source SHA-256 mismatch: got {digest}, expected {expected_sha256.lower()}')
-    with Image.open(source) as image:
-        width, height = image.size
-    if width != 2 * height or width * height > 250_000_000 or height < 1:
-        raise ValueError('source must be a full-world 2:1 raster, at most 250 megapixels')
+    # Header-only probe; sources above 250 megapixels are tiled by libvips.
+    width, height = source_size(source)
+    if width != 2 * height or width * height > LARGE_PIXEL_LIMIT or height < 1:
+        raise ValueError('source must be a full-world 2:1 raster, at most 8 gigapixels')
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f'.{destination.name}.staging-',

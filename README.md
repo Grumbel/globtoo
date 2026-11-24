@@ -15,6 +15,7 @@ Tactile free-spinning Earth globe (globtoo) for Linux.
 - Zoom-aware capitals, cities, and major rivers from Natural Earth 10m
 - All eight planets, Pluto and 19 major moons: pinned raster sources are tiled and installed by the default Nix package; optional custom planetary maps and Blue Marble relief are supported
 - Optional measured elevation/depth and population density (people/km²) layers
+- Saturn's rings, with the C, B and A rings, Cassini Division, Encke gap and F ring
 
 ![Globtoo showing the 3D globe with country colors, English labels, compass and distance scale](docs/screenshots/globtoo.png)
 
@@ -42,6 +43,7 @@ Available packages:
 ```sh
 nix build .#default        # Earth + all other bodies, packaged offline
 nix build .#globtoo-earth  # Full Earth maps, without planetary rasters
+nix build .#globtoo-max    # 86400x43200 Earth and 100 m/pixel Moon (very large)
 nix build .#globtoo-lite   # Lean package; explicitly download Earth on demand
 nix build .#planetary-maps # Only the tiled planetary imagery (cached separately)
 nix run .#default -- --body mars
@@ -122,9 +124,8 @@ Or development shell:
 ```bash
 nix develop
 mkdir build && cd build
-curl -L -o /tmp/globtoo-earth.jpg \
-  https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg
-cmake .. -DGLOBTOO_EARTH_TEXTURE=/tmp/globtoo-earth.jpg
+nix build ..#earth-imagery -o /tmp/globtoo-imagery   # optional close-zoom tiles
+cmake .. -DGLOBTOO_IMAGERY_TILES=/tmp/globtoo-imagery
 make -j
 # Optional: provide assets/countries_50m.geojson and/or
 # assets/countries_10m.geojson, then re-run cmake to precompile their meshes.
@@ -261,7 +262,8 @@ names, markers, and the optional geographic grid remain visible.
   high-resolution NASA relief, measured elevation or population-density
   rasters. The buttons are dimmed when the dataset is not installed.
 - **Rivers**: toggle major rivers and lake centerlines, in blue. Additional
-  tributaries are revealed as you zoom in. River segments follow the same
+  tributaries are revealed as you zoom in. Lines have a geographic width
+  (about 2 km for the largest rivers) with a minimum on-screen thickness. River segments follow the same
   rotating geography and moving map seam as the country outlines.
 - **Grid**: toggle the adaptive geographic latitude/longitude graticule in
   all globe and map projections. Intervals get finer when zoomed in. Lines

@@ -459,7 +459,7 @@ existing smaller package without planetary mosaics.
 
 ## Promising data catalogs (not bundled or verified downloads)
 
-- **Moon:** [USGS LRO LROC WAC Global Morphology Mosaic](https://astrogeology.usgs.gov/search/map/moon_lro_lroc_wac_global_morphology_mosaic_100m).
+- **Moon:** [USGS LRO LROC WAC Global Morphology Mosaic](https://astrogeology.usgs.gov/search/map/moon_lro_lroc_wac_global_morphology_mosaic_100m) (pinned and tiled in `globtoo-max`).
 - **Mars:** [USGS Viking Colorized Global Mosaic](https://astrogeology.usgs.gov/search/map/mars_viking_colorized_global_mosaic_232m); its published cylindrical files use east longitude and planetocentric latitude.
 - **Io:** [USGS Galileo SSI/Voyager Color Merged Global Mosaic](https://astrogeology.usgs.gov/search/map/io_galileo_ssi_voyager_color_merged_global_mosaic_1km); some published Io maps use west-positive longitudes, so check the **specific dataset**.
 - [USGS planetary coordinate/projection guidance](https://astrogeology.usgs.gov/docs/concepts/camera-geometry-and-projections/learning-about-map-projections/) and [PDS longitude-direction metadata](https://pds.nasa.gov/datastandards/documents/dd/current/PDS4_PDS_DD_1J00/webhelp/all/ch07s45.html).
@@ -534,8 +534,10 @@ Charon have large unimaged regions (black or filled), which is how the
 original products are published.
 
 The package choices are `default` (Earth and all other bodies),
-`globtoo-earth` (full Earth assets only), and `globtoo-lite` (no bundled
-textures; the explicit Earth downloader is retained). Changing the map
+`globtoo-earth` (full Earth assets only), `globtoo-lite` (no bundled
+textures; the explicit Earth downloader is retained) and `globtoo-max`
+(the default set, with 86,400×43,200 Earth imagery and the USGS LROC WAC
+100 m/pixel Moon mosaic replacing the 2K Moon map). Changing the map
 source or its hash in `flake.nix` should be accompanied by verifying the
 source's licensing and cartographic coordinate convention. A Nix hash
 ensures byte identity; it does not establish scientific georegistration.

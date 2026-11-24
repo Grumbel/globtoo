@@ -15,6 +15,8 @@ import re
 MAGIC = 'GLOBTOO_RASTER_TILES'
 MAX_LEVELS = 8
 MAX_TILES = 8192
+# Widest accepted source: the 109164-pixel LROC WAC 100 m Moon mosaic.
+MAX_WIDTH = 131072
 # A coarser level is only worth storing while it is still sharper than the
 # 2048-pixel preview that the runtime always keeps resident.
 PREVIEW_WIDTH = 2048
@@ -92,7 +94,7 @@ def parse_manifest(text: str) -> RasterLayout:
         raise ValueError('invalid tile manifest integers') from exc
     layout = RasterLayout(*values) if len(values) == 7 else RasterLayout(*values, 1)
     content = layout.content
-    if not (2 <= layout.width <= 100000 and layout.height >= 1 and
+    if not (2 <= layout.width <= MAX_WIDTH and layout.height >= 1 and
             layout.width == 2 * layout.height and
             64 <= layout.tile_size <= 2048 and
             layout.tile_size & (layout.tile_size - 1) == 0 and

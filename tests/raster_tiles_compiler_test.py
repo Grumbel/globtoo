@@ -6,6 +6,11 @@ import tempfile
 import unittest
 from PIL import Image
 from tools.build_raster_tiles import build
+
+try:
+    import pyvips  # noqa: F401  optional large-raster backend
+except ImportError:
+    pyvips = None
 from tools.normalize_planet_texture import normalize
 
 
@@ -154,6 +159,66 @@ class RasterTest(unittest.TestCase):
             last = Image.open(root / 'out' / tile_name(1, 2, 8)).getpixel((20, 100))
             self.assertGreater(first[0], 150)
             self.assertGreater(last[2], 150)
+
+    @unittest.skipIf(pyvips is None, 'pyvips not installed')
+    def test_vips_backend_and_mosaic_match_pillow(self):
+        from PIL import ImageChops
+        # Wide enough for a second pyramid level (above the 2048 preview).
+        width, height = 4352, 2176
+        gradient = Image.linear_gradient('L')
+        im = Image.merge('RGB', (gradient.rotate(90).resize((width, height)),
+                                 gradient.resize((width, height)),
+                                 Image.effect_noise((width, height), 64)))
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            whole = root/'whole.png'
+            im.save(whole)
+            # 4x2 mosaic in row-major order, like NASA's A1..D2 BMNG tiles.
+            parts = []
+            side = width // 4
+            for row in range(2):
+                for column in range(4):
+                    part = root/f'part-{row}-{column}.png'
+                    im.crop((column*side, row*side, (column+1)*side, (row+1)*side)).save(part)
+                    parts.append(part)
+            for positive, left in (('east', 180), ('west', 0)):
+                outputs = {}
+                for name, source, mosaic, backend in (
+                        ('pil', whole, (1, 1), 'pil'),
+                        ('vips', whole, (1, 1), 'vips'),
+                        ('mosaic', parts, (4, 2), 'auto')):
+                    out = root/f'{name}-{positive}'
+                    build(source, out, 256, 4, positive, left, mosaic=mosaic,
+                          backend=backend, workers=3)
+                    outputs[name] = out
+                reference = outputs['pil']
+                names = sorted(f.name for f in reference.iterdir())
+                self.assertIn('tile-l1-004-008.jpg', names)
+                for name in ('vips', 'mosaic'):
+                    self.assertEqual(sorted(f.name for f in outputs[name].iterdir()), names)
+                    self.assertEqual((outputs[name]/'manifest.txt').read_text(),
+                                     (reference/'manifest.txt').read_text())
+                    # Level 0 is a pure copy: identical source pixels give
+                    # identical JPEGs. Coarser levels and previews may differ
+                    # by resampler rounding only.
+                    for f in names:
+                        if not f.endswith('.jpg'):
+                            continue
+                        with Image.open(reference/f) as a, Image.open(outputs[name]/f) as b:
+                            extrema = ImageChops.difference(a.convert('RGB'),
+                                                            b.convert('RGB')).getextrema()
+                        limit = 0 if f.startswith('tile-0') else 40
+                        self.assertLessEqual(max(hi for _, hi in extrema), limit,
+                                             f'{name} {positive} {f}')
+
+    def test_mosaic_shape_is_checked(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            part = root/'part.png'
+            Image.new('RGB', (64, 64)).save(part)
+            with self.assertRaises(ValueError):
+                build([part, part, part], root/'out', 64, 4, mosaic=(2, 2))
+
 
 if __name__ == '__main__':
     unittest.main()

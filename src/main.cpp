@@ -20,6 +20,7 @@
 #include "markers.hpp"
 #include "planetary_features.hpp"
 #include "geographic_overlay.hpp"
+#include "planet_rings.hpp"
 #include "resources.hpp"
 #ifdef GLOBTOO_ENABLE_DOWNLOADS
 #include "asset_download.hpp"
@@ -209,6 +210,10 @@ int main(int argc, char** argv) {
     GeographicOverlay geography{};
     geographic_overlay_init(geography);
 
+    PlanetRings saturn_rings{};
+    if (!planet_rings_init(saturn_rings, BodyId::Saturn))
+        fprintf(stderr, "Warning: Saturn's rings failed to init\n");
+
     // Build once: these small, source-attributed gazetteer features are
     // independent of imagery availability and selected at render time.
     std::array<std::vector<Marker>,body_catalog.size()> feature_markers{};
@@ -263,8 +268,11 @@ int main(int argc, char** argv) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         float aspect = (float)input.viewport_w / (float)input.viewport_h;
+        cam.content_radius = planet_rings_content_radius(saturn_rings, globe.body);
         stars_draw(stars, cam, aspect);
         globe_draw(globe, cam, aspect, map);
+        // After the globe, whose depth hides the ring's far side.
+        planet_rings_draw(saturn_rings, globe.body, cam, aspect, map);
         // Preserve globe depth: it occludes political geometry behind the horizon.
         if (globe.body==BodyId::Earth) countries_draw(countries, cam, aspect, map, globe.shading,
                        country_fill_opacity(globe.texture_visible,
@@ -294,6 +302,7 @@ int main(int argc, char** argv) {
     }
 
     ui_shutdown(ui);
+    planet_rings_shutdown(saturn_rings);
     geographic_overlay_shutdown(geography);
     countries_shutdown(countries);
     stars_shutdown(stars);
