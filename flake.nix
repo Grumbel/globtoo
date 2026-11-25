@@ -628,25 +628,35 @@
           '';
         };
 
-        apps.default = {
-          type = "app";
-          program = "${self.packages.${system}.default}/bin/globtoo";
-          meta.description = "globtoo with Earth imagery, full geographic data and all bundled planet/moon textures";
-        };
-        apps.globtoo-lite = {
-          type = "app";
-          program = "${self.packages.${system}.globtoo-lite}/bin/globtoo";
-          meta.description = "globtoo lite build without bundled imagery and with reduced geographic data";
-        };
-        apps.globtoo-max = {
-          type = "app";
-          program = "${self.packages.${system}.globtoo-max}/bin/globtoo";
-          meta.description = "globtoo with maximum-resolution Earth (86400x43200) and Moon (LROC WAC 100 m) imagery";
-        };
-        apps.globtoo-earth = {
-          type = "app";
-          program = "${self.packages.${system}.globtoo-earth}/bin/globtoo";
-          meta.description = "globtoo with Earth imagery and full geographic data, without planetary textures";
+        apps = {
+          default = {
+            type = "app";
+            program = "${self.packages.${system}.default}/bin/globtoo";
+            meta.description = "globtoo with Earth imagery, full geographic data and all bundled planet/moon textures";
+          };
+          globtoo-lite = {
+            type = "app";
+            program = "${self.packages.${system}.globtoo-lite}/bin/globtoo";
+            meta.description = "globtoo lite build without bundled imagery and with reduced geographic data";
+          };
+          globtoo-max = {
+            type = "app";
+            program = "${self.packages.${system}.globtoo-max}/bin/globtoo";
+            meta.description = "globtoo with maximum-resolution Earth (86400x43200) and Moon (LROC WAC 100 m) imagery";
+          };
+          globtoo-earth = {
+            type = "app";
+            program = "${self.packages.${system}.globtoo-earth}/bin/globtoo";
+            meta.description = "globtoo with Earth imagery and full geographic data, without planetary textures";
+          };
+        } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          install-globtoo-android = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "install-globtoo-android" ''
+              exec ${pkgs.android-tools}/bin/adb install -r ${portablePackages.globtoo-android}/globtoo.apk
+            '');
+            meta.description = "Install the Globtoo APK on a connected Android device with adb";
+          };
         };
       });
 }

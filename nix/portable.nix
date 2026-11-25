@@ -96,6 +96,7 @@ let
     '';
     dontStrip = true;
   };
+  r36s = import ./r36s.nix { inherit pkgs version src appFlags; };
 in {
   globtoo-win32 = mkWindows "win32" pkgs.pkgsCross.mingw-msvcrt-i686;
   globtoo-win64 = mkWindows "win64" pkgs.pkgsCross.mingw-msvcrt-x86_64;
@@ -104,5 +105,5 @@ in {
     pkgs = androidPkgs;
     inherit version versionCode src resources appFlags;
   };
-  globtoo-r36s = import ./r36s.nix { inherit pkgs version src appFlags; };
-}
+  globtoo-r36s = r36s;
+} // import ./portmaster.nix { inherit pkgs version r36s; }

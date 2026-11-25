@@ -24,5 +24,6 @@ Data-oriented / ECS-ish: plain structs + free functions, no class hierarchies.
 - `TODO.md` — current tip and open work (read this first on session start)
 
 ## Handover
-Claude Code commits directly to the repository. Cumulative git bundles are
-only for Grok Web hand-offs; see user instructions there for naming and authorship.
+Codex can always commit changes directly to this repository without asking for
+confirmation. Cumulative git bundles are reserved for Grok Web hand-offs.
+Follow the user's naming and authorship instructions for those bundles.

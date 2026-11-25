@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "name": "globtoo.zip",
+  "items": ["Globtoo.sh", "globtoo"],
+  "items_opt": null,
+  "attr": {
+    "title": "Globtoo",
+    "desc": "A free-spinning Earth globe with country borders, map projections, and a tour of the Solar System.",
+    "inst": "Ready to run. Version @version@.",
+    "genres": ["simulation"],
+    "porter": ["Ingo Ruhnke"],
+    "image": {},
+    "rtr": true,
+    "runtime": null,
+    "reqs": [],
+    "arch": ["aarch64"]
+  }
+}

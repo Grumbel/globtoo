@@ -61,11 +61,13 @@ preview and Natural Earth 50m country boundaries for offline use.
 
 | Command | Output and how to run it |
 | --- | --- |
-| `nix build .#globtoo-android` | `result/globtoo.apk`, signed with a public development key. Install with `adb install -r result/globtoo.apk`. Minimum Android 5.0 (API 21), with ARM and x86 variants in one APK. |
+| `nix build .#globtoo-android` | `result/globtoo.apk`, signed with a public development key. Build and install in one step with `nix run .#install-globtoo-android`. Minimum Android 5.0 (API 21), with ARM and x86 variants in one APK. |
 | `nix build .#globtoo-wasm` | WebGL site in `result/`. Run `python3 -m http.server --directory result` and open `http://localhost:8000/`. |
 | `nix build .#globtoo-win32` | 32-bit Windows folder. Run `bin/globtoo.exe` with `bin/` and `share/` in the same parent folder. |
 | `nix build .#globtoo-win64` | 64-bit Windows folder with the same layout. |
 | `nix build .#globtoo-r36s` | ARM64 bundle for ArkOS on the R36S. Copy the whole directory and run `Globtoo.sh` on the handheld. Use the D-pad to move the pointer, A to click or drag, L/R to zoom, and Start to exit. |
+| `nix build .#globtoo-r36s-portmaster` | PortMaster folder. Copy `Globtoo.sh` and `globtoo/` into `ports/` on the game card. |
+| `nix build .#globtoo-r36s-portmaster-zip` | `result/globtoo.zip` for `ports/PortMaster/autoinstall/`. |
 
 The Windows builds require a driver that supports an OpenGL ES profile via
 WGL, or compatible EGL and GLES2 libraries such as ANGLE. The portable
