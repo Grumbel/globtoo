@@ -546,6 +546,17 @@
           };
         };
 
+        portablePackages = import ./nix/portable.nix {
+          inherit pkgs version countries50m;
+          earthTexture = earthTextureFallback;
+          versionCode = self.revCount or 1;
+          androidPkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+            config.android_sdk.accept_license = true;
+          };
+        };
+
       in
       {
         packages = {
@@ -569,7 +580,8 @@
           planetary-maps = pkgs.linkFarm "globtoo-planetary-maps"
             (pkgs.lib.mapAttrsToList (name: path: { inherit name path; }) bundledMaps);
         } // pkgs.lib.mapAttrs' (body: prepared:
-          pkgs.lib.nameValuePair "planetary-map-${body}" prepared) bundledMaps;
+          pkgs.lib.nameValuePair "planetary-map-${body}" prepared) bundledMaps
+        // pkgs.lib.optionalAttrs (system == "x86_64-linux") portablePackages;
 
         # Reproducible opt-in package composition for downstream Nix flakes.
         # Input maps must be locally prepared/pinned store paths; CMake

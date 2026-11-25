@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.Grumbel.globtoo"
+    android:versionCode="@versionCode@" android:versionName="@version@">
+    <uses-sdk android:minSdkVersion="@minSdk@" android:targetSdkVersion="28" />
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+    <application android:label="Globtoo" android:icon="@drawable/icon"
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
+        android:allowBackup="false">
+        <activity android:name=".GlobtooActivity" android:exported="true"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

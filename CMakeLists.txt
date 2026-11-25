@@ -51,6 +51,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
 
 option(GLOBTOO_BUILD_APP "Build the SDL3 + GLES2 globe viewer" ON)
+option(GLOBTOO_PRECOMPILED_COUNTRIES "Use only precompiled country meshes" OFF)
+set(GLOBTOO_COUNTRY_MESH_DIR "" CACHE PATH "Directory containing host-generated country meshes")
+set(GLOBTOO_SDL_SOURCE "" CACHE PATH "Optional SDL3 source tree to build with the application")
+option(GLOBTOO_R36S "Build for the R36S handheld" OFF)
 option(GLOBTOO_ENABLE_DOWNLOADS "Enable explicit libcurl/SSL asset download command" OFF)
 if(GLOBTOO_ENABLE_DOWNLOADS)
   # pkg-config carries the transitive link dependencies of static libcurl
@@ -271,14 +275,23 @@ if(GLOBTOO_BUILD_APP AND NOT GLOBTOO_EARTH_TEXTURE AND NOT GLOBTOO_IMAGERY_TEXTU
    AND NOT GLOBTOO_IMAGERY_TILES)
   message(STATUS "No Earth image configured; globe will use solid color unless --texture is specified")
 endif()
-find_path(GEOS_INCLUDE_DIR geos_c.h REQUIRED)
-find_library(GEOS_C_LIB geos_c REQUIRED)
+if(NOT GLOBTOO_PRECOMPILED_COUNTRIES)
+  find_path(GEOS_INCLUDE_DIR geos_c.h REQUIRED)
+  find_library(GEOS_C_LIB geos_c REQUIRED)
+endif()
 
 if(GLOBTOO_BUILD_APP)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(SDL3 REQUIRED sdl3)
-find_library(GLES2_LIB GLESv2 REQUIRED)
-find_library(EGL_LIB EGL REQUIRED)
+if(GLOBTOO_SDL_SOURCE)
+  add_subdirectory("${GLOBTOO_SDL_SOURCE}" sdl)
+endif()
+if(NOT TARGET SDL3::SDL3)
+  find_package(SDL3 CONFIG REQUIRED)
+endif()
+if(ANDROID)
+  set(GLES2_LIB GLESv2)
+elseif(NOT WIN32 AND NOT EMSCRIPTEN AND NOT GLOBTOO_R36S)
+  find_library(GLES2_LIB GLESv2 REQUIRED)
+endif()
 
 # Input/UI event tests exercise real body changes. Keep the body's texture
 # switching implementation separate from the full renderer so both tests and
@@ -286,9 +299,13 @@ find_library(EGL_LIB EGL REQUIRED)
 add_library(globtoo_body STATIC src/globe_body.cpp src/texture.cpp)
 target_include_directories(globtoo_body PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/external")
-target_link_libraries(globtoo_body PUBLIC ${GLES2_LIB})
+target_link_libraries(globtoo_body PUBLIC SDL3::SDL3 ${GLES2_LIB})
+if(WIN32 OR GLOBTOO_R36S)
+  target_sources(globtoo_body PRIVATE src/gles2.cpp)
+  target_compile_definitions(globtoo_body PUBLIC GLOBTOO_LOAD_GLES2)
+endif()
 
-add_executable(globtoo
+set(globtoo_sources
   src/main.cpp
   src/globe.cpp
   src/camera.cpp
@@ -297,7 +314,6 @@ add_executable(globtoo
   src/shader.cpp
   src/stars.cpp
   src/countries.cpp
-  src/country_geometry.cpp
   src/country_mesh_io.cpp
   src/math.cpp
   src/map_view.cpp
@@ -314,27 +330,50 @@ add_executable(globtoo
   src/raster_legend.cpp
 )
 
+if(ANDROID)
+  add_library(globtoo SHARED ${globtoo_sources})
+  set_target_properties(globtoo PROPERTIES OUTPUT_NAME main)
+else()
+  add_executable(globtoo ${globtoo_sources})
+endif()
+if(GLOBTOO_PRECOMPILED_COUNTRIES)
+  target_compile_definitions(globtoo PRIVATE GLOBTOO_PRECOMPILED_COUNTRIES)
+else()
+  target_sources(globtoo PRIVATE src/country_geometry.cpp)
+  target_include_directories(globtoo PRIVATE "${GEOS_INCLUDE_DIR}")
+  target_link_libraries(globtoo PRIVATE ${GEOS_C_LIB})
+endif()
+if(GLOBTOO_R36S)
+  target_compile_definitions(globtoo PRIVATE GLOBTOO_R36S)
+endif()
+
 target_include_directories(globtoo PRIVATE
-  ${SDL3_INCLUDE_DIRS}
-  ${GEOS_INCLUDE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/external
 )
 
-target_link_libraries(globtoo PRIVATE
-  ${SDL3_LIBRARIES}
-  globtoo_body
-  ${GEOS_C_LIB}
-  ${GLES2_LIB}
-  ${EGL_LIB}
-  m
-)
+target_link_libraries(globtoo PRIVATE globtoo_body)
+if(NOT EMSCRIPTEN)
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+  find_package(Threads REQUIRED)
+  target_link_libraries(globtoo PRIVATE Threads::Threads)
+endif()
 
 if(GLOBTOO_ENABLE_DOWNLOADS)
   target_compile_definitions(globtoo PRIVATE GLOBTOO_ENABLE_DOWNLOADS=1)
   target_link_libraries(globtoo PRIVATE globtoo_asset_download)
 endif()
 
+if(EMSCRIPTEN)
+  if(NOT IS_DIRECTORY "${GLOBTOO_WEB_RESOURCES}")
+    message(FATAL_ERROR "Set GLOBTOO_WEB_RESOURCES to the browser resource directory")
+  endif()
+  set_target_properties(globtoo PROPERTIES SUFFIX ".html")
+  target_link_options(globtoo PRIVATE
+    "-sASYNCIFY"
+    "-sALLOW_MEMORY_GROWTH=1"
+    "--preload-file" "${GLOBTOO_WEB_RESOURCES}@${CMAKE_INSTALL_FULL_DATADIR}/globtoo")
+endif()
 target_compile_options(globtoo PRIVATE -Wall -Wextra -O2)
 target_compile_definitions(globtoo PRIVATE
   GLOBTOO_VERSION="${PROJECT_VERSION_FULL}"
@@ -346,30 +385,39 @@ endif()
 # In Nix these GeoJSON inputs are pinned fetchurl derivations injected by
 # postPatch. A plain local CMake build also works with no downloaded maps:
 # it can use the legacy assets/countries.geojson at runtime.
-add_executable(country_mesh_compiler
-  tools/build_country_mesh.cpp src/country_geometry.cpp src/country_mesh_io.cpp)
-target_include_directories(country_mesh_compiler PRIVATE src ${GEOS_INCLUDE_DIR})
-target_link_libraries(country_mesh_compiler PRIVATE ${GEOS_C_LIB})
-target_compile_options(country_mesh_compiler PRIVATE -Wall -Wextra -O2)
-
 set(COUNTRY_MESH_OUTPUTS)
-foreach(scale 50m 10m)
-  set(input "${CMAKE_SOURCE_DIR}/assets/countries_${scale}.geojson")
-  if(EXISTS "${input}")
-    set(output "${CMAKE_BINARY_DIR}/generated-assets/countries_${scale}.gmesh")
-    add_custom_command(OUTPUT "${output}"
-      COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/generated-assets"
-      COMMAND $<TARGET_FILE:country_mesh_compiler> "${input}" "${output}"
-      DEPENDS country_mesh_compiler "${input}"
-      COMMENT "Triangulating Natural Earth ${scale} country boundaries"
-      VERBATIM)
-    list(APPEND COUNTRY_MESH_OUTPUTS "${output}")
-  endif()
-endforeach()
-if(COUNTRY_MESH_OUTPUTS)
-  add_custom_target(country_meshes ALL DEPENDS ${COUNTRY_MESH_OUTPUTS})
-  if(GLOBTOO_BUILD_APP)
-    add_dependencies(globtoo country_meshes)
+if(GLOBTOO_PRECOMPILED_COUNTRIES)
+  foreach(scale 50m 10m)
+    set(mesh "${GLOBTOO_COUNTRY_MESH_DIR}/countries_${scale}.gmesh")
+    if(EXISTS "${mesh}")
+      list(APPEND COUNTRY_MESH_OUTPUTS "${mesh}")
+    endif()
+  endforeach()
+else()
+  add_executable(country_mesh_compiler
+    tools/build_country_mesh.cpp src/country_geometry.cpp src/country_mesh_io.cpp)
+  target_include_directories(country_mesh_compiler PRIVATE src ${GEOS_INCLUDE_DIR})
+  target_link_libraries(country_mesh_compiler PRIVATE ${GEOS_C_LIB})
+  target_compile_options(country_mesh_compiler PRIVATE -Wall -Wextra -O2)
+
+  foreach(scale 50m 10m)
+    set(input "${CMAKE_SOURCE_DIR}/assets/countries_${scale}.geojson")
+    if(EXISTS "${input}")
+      set(output "${CMAKE_BINARY_DIR}/generated-assets/countries_${scale}.gmesh")
+      add_custom_command(OUTPUT "${output}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/generated-assets"
+        COMMAND $<TARGET_FILE:country_mesh_compiler> "${input}" "${output}"
+        DEPENDS country_mesh_compiler "${input}"
+        COMMENT "Triangulating Natural Earth ${scale} country boundaries"
+        VERBATIM)
+      list(APPEND COUNTRY_MESH_OUTPUTS "${output}")
+    endif()
+  endforeach()
+  if(COUNTRY_MESH_OUTPUTS)
+    add_custom_target(country_meshes ALL DEPENDS ${COUNTRY_MESH_OUTPUTS})
+    if(GLOBTOO_BUILD_APP)
+      add_dependencies(globtoo country_meshes)
+    endif()
   endif()
 endif()
 
@@ -597,7 +645,7 @@ if(GLOBTOO_BUILD_APP)
         "${GLOBTOO_EARTH_TEXTURE}" "$<TARGET_FILE_DIR:globtoo>/assets/earth.jpg"
       VERBATIM)
   endif()
-  if(EXISTS "${CMAKE_SOURCE_DIR}/assets/countries.geojson")
+  if(NOT GLOBTOO_PRECOMPILED_COUNTRIES AND EXISTS "${CMAKE_SOURCE_DIR}/assets/countries.geojson")
     add_custom_command(TARGET globtoo POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/assets/countries.geojson" "$<TARGET_FILE_DIR:globtoo>/assets/countries.geojson"
@@ -611,8 +659,8 @@ if(GLOBTOO_BUILD_APP)
   endif()
   if(COUNTRY_MESH_OUTPUTS)
     add_custom_command(TARGET globtoo POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_BINARY_DIR}/generated-assets" "$<TARGET_FILE_DIR:globtoo>/assets"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${COUNTRY_MESH_OUTPUTS} "$<TARGET_FILE_DIR:globtoo>/assets"
       VERBATIM)
   endif()
 endif()
@@ -621,7 +669,9 @@ endif()
 # shell copy logic. The GeoJSON sources stay out of the package; only their
 # compiled, versioned binary meshes are needed at runtime.
 if(GLOBTOO_BUILD_APP)
-  install(TARGETS globtoo RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  install(TARGETS globtoo
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}")
   install(DIRECTORY "${CMAKE_SOURCE_DIR}/shaders/"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/shaders")
   install(FILES "${CMAKE_SOURCE_DIR}/assets/globtoo-icon.png"
@@ -667,7 +717,7 @@ if(GLOBTOO_BUILD_APP)
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets"
       RENAME "earth.jpg")
   endif()
-  if(EXISTS "${CMAKE_SOURCE_DIR}/assets/countries.geojson")
+  if(NOT GLOBTOO_PRECOMPILED_COUNTRIES AND EXISTS "${CMAKE_SOURCE_DIR}/assets/countries.geojson")
     install(FILES "${CMAKE_SOURCE_DIR}/assets/countries.geojson"
       DESTINATION "${CMAKE_INSTALL_DATADIR}/globtoo/assets")
   endif()
@@ -723,15 +773,15 @@ if(BUILD_TESTING)
   if(GLOBTOO_BUILD_APP)
     add_executable(input_mouse_test
       tests/input_mouse_test.cpp src/input.cpp src/map_view.cpp src/camera.cpp)
-    target_include_directories(input_mouse_test PRIVATE src ${SDL3_INCLUDE_DIRS})
-    target_link_libraries(input_mouse_test PRIVATE globtoo_body ${SDL3_LIBRARIES})
+    target_include_directories(input_mouse_test PRIVATE src)
+    target_link_libraries(input_mouse_test PRIVATE globtoo_body)
     target_compile_options(input_mouse_test PRIVATE -Wall -Wextra -UNDEBUG)
     add_test(NAME input_mouse COMMAND input_mouse_test)
     add_executable(ui_event_test tests/ui_event_test.cpp
       src/ui.cpp src/input.cpp src/camera.cpp src/map_view.cpp src/scene.cpp
       src/shader.cpp src/resources.cpp src/geographic_features.cpp)
-    target_include_directories(ui_event_test PRIVATE src ${SDL3_INCLUDE_DIRS})
-    target_link_libraries(ui_event_test PRIVATE globtoo_body ${SDL3_LIBRARIES} ${GLES2_LIB} m)
+    target_include_directories(ui_event_test PRIVATE src)
+    target_link_libraries(ui_event_test PRIVATE globtoo_body)
     target_compile_options(ui_event_test PRIVATE -Wall -Wextra -UNDEBUG)
     add_test(NAME ui_event COMMAND ui_event_test)
   endif()

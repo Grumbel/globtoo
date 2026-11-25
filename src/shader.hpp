@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include <GLES2/gl2.h>
+#include "gles2.hpp"
 #include <string>
 
 // Uniform locations are stable for the lifetime of a linked GLES program.

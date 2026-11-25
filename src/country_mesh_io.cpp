@@ -5,7 +5,6 @@
 #include "geocoordinates.hpp"
 #include <cmath>
 
-#include <bit>
 #include <cstdint>
 #include <fstream>
 #include <limits>
@@ -39,24 +38,24 @@ bool fail(std::string* error, const char* message) {
 
 bool write_floats(std::ostream& file, const std::vector<float>& values) {
     static_assert(sizeof(float) == sizeof(uint32_t));
-    if constexpr (std::endian::native == std::endian::little) {
+    if constexpr (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) {
         file.write(reinterpret_cast<const char*>(values.data()),
                    static_cast<std::streamsize>(values.size() * sizeof(float)));
     } else {
-        for (float v : values) put32(file, std::bit_cast<uint32_t>(v));
+        for (float v : values) put32(file, __builtin_bit_cast(uint32_t, v));
     }
     return file.good();
 }
 
 bool read_floats(std::istream& file, std::vector<float>& values) {
-    if constexpr (std::endian::native == std::endian::little) {
+    if constexpr (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) {
         return static_cast<bool>(file.read(reinterpret_cast<char*>(values.data()),
                                            static_cast<std::streamsize>(values.size() * sizeof(float))));
     } else {
         for (auto& v : values) {
             uint32_t bits;
             if (!get32(file, bits)) return false;
-            v = std::bit_cast<float>(bits);
+            v = __builtin_bit_cast(float, bits);
         }
         return true;
     }
@@ -105,8 +104,8 @@ bool write_country_mesh(const std::string& path, const CountryGeometry& mesh,
         !write_floats(file, mesh.border_lonlat) ||
         !write_floats(file, mesh.fill_lonlat)) return fail(error, "failed writing geometry");
     for (const auto& label : mesh.labels) {
-        put32(file, std::bit_cast<uint32_t>(label.longitude));
-        put32(file, std::bit_cast<uint32_t>(label.latitude));
+        put32(file, __builtin_bit_cast(uint32_t, label.longitude));
+        put32(file, __builtin_bit_cast(uint32_t, label.latitude));
         put32(file, static_cast<uint32_t>(label.name.size()));
         file.write(label.name.data(), static_cast<std::streamsize>(label.name.size()));
     }
@@ -171,8 +170,8 @@ bool read_country_mesh(const std::string& path, CountryGeometry& mesh,
             if (!get32(file,a) || !get32(file,b) || !get32(file,n) || n > 512)
                 return fail(error, "invalid label header");
             CountryGeometry::Label label;
-            label.longitude = std::bit_cast<float>(a);
-            label.latitude = std::bit_cast<float>(b);
+            label.longitude = __builtin_bit_cast(float, a);
+            label.latitude = __builtin_bit_cast(float, b);
             if (!std::isfinite(label.longitude) || !std::isfinite(label.latitude))
                 return fail(error, "invalid label coordinates");
             label.name.resize(n);

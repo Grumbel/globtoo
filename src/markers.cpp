@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <locale>
+#include <sstream>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -37,14 +39,23 @@ std::string normalized(std::string s) {
     return s;
 }
 
-bool number(std::string_view s, double& result) {
+template<typename Float>
+bool number(std::string_view s, Float& result) {
     if (s.empty()) return false;
     if (s.front()=='+') s.remove_prefix(1);
     if (s.empty()) return false;
     const auto* begin=s.data();
     const auto* end=begin+s.size();
-    const auto r=std::from_chars(begin,end,result,std::chars_format::general);
-    return r.ec==std::errc{} && r.ptr==end && std::isfinite(result);
+    if constexpr (requires { std::from_chars(begin,end,result); }) {
+        const auto r=std::from_chars(begin,end,result);
+        return r.ec==std::errc{} && r.ptr==end && std::isfinite(result);
+    } else {
+        // ArkOS ships the GCC 9 library, whose from_chars is integer-only.
+        std::istringstream stream{std::string(s)};
+        stream.imbue(std::locale::classic());
+        return bool(stream >> std::noskipws >> result) && stream.eof() &&
+               std::isfinite(result);
+    }
 }
 
 bool is_direction(char c) {
@@ -360,7 +371,7 @@ bool parse_command_line(int argc, const char* const* argv,
         // Both --option=value and --option value are supported. The latter
         // intentionally consumes signed coordinate strings beginning with '-'.
         const auto equals=arg.find('=');
-        const auto key=(!positional_done && arg.starts_with("--") &&
+        const auto key=(!positional_done && arg.substr(0, 2) == "--" &&
                         equals!=std::string_view::npos) ? arg.substr(0,equals) : arg;
         const auto next=[&]() -> std::optional<std::string_view> {
             if (key.size()!=arg.size()) return arg.substr(equals+1);
@@ -514,7 +525,7 @@ bool parse_command_line(int argc, const char* const* argv,
         return false;
     }
     if (output.action==CommandAction::DownloadAsset &&
-        !(argc==3 || (argc==2 && std::string_view(argv[1]).starts_with("--download-asset=")))) {
+        !(argc==3 || (argc==2 && std::string_view(argv[1]).substr(0, sizeof("--download-asset=")-1) == "--download-asset="))) {
         error="--download-asset must be used by itself";
         return false;
     }

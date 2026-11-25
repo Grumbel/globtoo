@@ -26,6 +26,7 @@ std::vector<std::string> asset_paths(const char* asset_name) {
     return {resource_path(std::string("assets/") + asset_name)};
 }
 
+#ifndef GLOBTOO_PRECOMPILED_COUNTRIES
 bool read_geojson(const std::string& path, CountryGeometry& geometry) {
     std::ifstream file(path, std::ios::binary);
     if (!file) return false;
@@ -38,6 +39,8 @@ bool read_geojson(const std::string& path, CountryGeometry& geometry) {
     }
     return true;
 }
+
+#endif
 
 bool upload(CountryMeshGPU& gpu, const CountryGeometry& geo, const char* label) {
     if (geo.border_xyz.empty() || geo.fill_xyz_rgb.empty() ||
@@ -125,13 +128,19 @@ bool load_compiled(CountryMeshGPU& gpu, const char* asset_name, const char* labe
 } // namespace
 
 bool countries_init(Countries& c, const char* geojson_path) {
+#ifndef GLOBTOO_PRECOMPILED_COUNTRIES
     if (geojson_path && *geojson_path) {
         CountryGeometry geometry;
         if (!read_geojson(geojson_path, geometry) ||
             !upload(c.low, geometry, "custom")) return false;
-    } else {
+    } else
+#else
+    (void)geojson_path;
+#endif
+    {
         load_compiled(c.low, "countries_50m.gmesh", "50m");
         load_compiled(c.high, "countries_10m.gmesh", "10m");
+#ifndef GLOBTOO_PRECOMPILED_COUNTRIES
         // Backwards compatibility: local development can still provide just
         // assets/countries.geojson, without running the mesh compiler.
         if (!c.low.available() && !c.high.available()) {
@@ -142,6 +151,7 @@ bool countries_init(Countries& c, const char* geojson_path) {
                 }
             }
         }
+#endif
     }
     if (!c.low.available() && !c.high.available()) {
         fprintf(stderr, "countries: no valid country meshes found\n");

@@ -6,7 +6,7 @@
 #include "map_view.hpp"
 #include "shader.hpp"
 #include "texture.hpp"
-#include <GLES2/gl2.h>
+#include "gles2.hpp"
 
 // A flat ring annulus in the body's equatorial plane (y = 0), drawn after
 // the globe. Its radial structure is a procedural RingProfile texture.

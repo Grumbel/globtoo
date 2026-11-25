@@ -18,7 +18,9 @@ constexpr int max_cached=32;
 // generation) happens on the render thread, so keep that per-frame cost low.
 constexpr int uploads_per_frame=2;
 // Decoded but not yet uploaded tiles (RGBA, 4 MiB each at 1024²).
+#ifndef __EMSCRIPTEN__
 constexpr size_t max_decoded=4;
+#endif
 constexpr double pi=geo::pi;
 
 double angular_distance(const std::array<double,3>& a,const std::array<double,3>& b) {
@@ -38,6 +40,30 @@ struct Decoded {
 } // namespace
 
 struct RasterLoader {
+#ifdef __EMSCRIPTEN__
+    explicit RasterLoader(int size) : tile_size(size) {}
+
+    int take_ready(std::vector<Decoded>& ready) {
+        ready.swap(done);
+        return -1;
+    }
+
+    void submit(std::vector<Request> queue, std::vector<Decoded> keep) {
+        done = std::move(keep);
+        // Decode a bounded batch per frame on browsers without pthreads.
+        while (!queue.empty() && done.size() < uploads_per_frame) {
+            const auto& request = queue.back();
+            Decoded result{request.index, {}, false};
+            result.ok = decode_image_rgba(request.path.c_str(), tile_size,
+                                          tile_size, result.image);
+            done.push_back(std::move(result));
+            queue.pop_back();
+        }
+    }
+
+    const int tile_size;
+    std::vector<Decoded> done;
+#else
     std::mutex mutex;
     std::condition_variable wake;
     std::vector<Request> queue; // highest priority at the back
@@ -53,6 +79,24 @@ struct RasterLoader {
         wake.notify_all();
         thread.join();
     }
+    int take_ready(std::vector<Decoded>& ready) {
+        std::lock_guard<std::mutex> lock(mutex);
+        ready.swap(done);
+        return busy;
+    }
+
+    void submit(std::vector<Request> requests, std::vector<Decoded> keep) {
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            // The decoder may have taken a tile from the old queue meanwhile.
+            requests.erase(std::remove_if(requests.begin(), requests.end(),
+                [&](const Request& q) { return q.index == busy; }), requests.end());
+            queue = std::move(requests);
+            for (auto& decoded : keep) done.push_back(std::move(decoded));
+        }
+        wake.notify_one();
+    }
+
     void run() {
         std::unique_lock<std::mutex> lock(mutex);
         for (;;) {
@@ -72,6 +116,7 @@ struct RasterLoader {
             done.push_back(std::move(result));
         }
     }
+#endif
 };
 
 namespace {
@@ -260,12 +305,7 @@ int raster_cache_draw(RasterCache& r,const Camera& cam,const MapView& map,
 
     // 3. Upload finished decodes and hand the decoder its new queue.
     std::vector<Decoded> ready;
-    int busy=-1;
-    if (r.loader) {
-        std::lock_guard<std::mutex> lock(r.loader->mutex);
-        ready.swap(r.loader->done);
-        busy=r.loader->busy;
-    }
+    const int busy = r.loader ? r.loader->take_ready(ready) : -1;
     std::vector<Decoded> keep;
     int uploads=0;
     for (auto& decoded : ready) {
@@ -305,16 +345,7 @@ int raster_cache_draw(RasterCache& r,const Camera& cam,const MapView& map,
             queue.push_back({entry.second,(std::filesystem::path(r.root)/
                 raster_tile_filename(cell.column,cell.row,cell.level)).string()});
         }
-        {
-            std::lock_guard<std::mutex> lock(r.loader->mutex);
-            // The decoder may have taken a tile from the old queue meanwhile.
-            const int now_busy=r.loader->busy;
-            queue.erase(std::remove_if(queue.begin(),queue.end(),
-                [&](const Request& q) { return q.index==now_busy; }),queue.end());
-            r.loader->queue=std::move(queue);
-            for (auto& decoded : keep) r.loader->done.push_back(std::move(decoded));
-        }
-        r.loader->wake.notify_one();
+        r.loader->submit(std::move(queue), std::move(keep));
     }
 
     // 4. Draw the loaded wanted tiles. Other loaded tiles (finer ones left

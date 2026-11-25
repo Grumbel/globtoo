@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # globtoo
 
-Tactile free-spinning Earth globe (globtoo) for Linux.
+Tactile free-spinning Earth globe (globtoo).
 
 - SDL3 + OpenGL ES 2.0
 - Data-oriented / ECS-ish (plain structs + free functions, no class hierarchies)
@@ -54,10 +54,30 @@ metadata, and resources without requiring a launcher that changes the current
 directory. To inspect a packaged build, use `find result -type f` or
 `man -l result/share/man/man1/globtoo.1`.
 
+## Cross-builds (Nix)
+
+Build these packages from an x86-64 Linux host. Each includes the Earth
+preview and Natural Earth 50m country boundaries for offline use.
+
+| Command | Output and how to run it |
+| --- | --- |
+| `nix build .#globtoo-android` | `result/globtoo.apk`, signed with a public development key. Install with `adb install -r result/globtoo.apk`. Minimum Android 5.0 (API 21), with ARM and x86 variants in one APK. |
+| `nix build .#globtoo-wasm` | WebGL site in `result/`. Run `python3 -m http.server --directory result` and open `http://localhost:8000/`. |
+| `nix build .#globtoo-win32` | 32-bit Windows folder. Run `bin/globtoo.exe` with `bin/` and `share/` in the same parent folder. |
+| `nix build .#globtoo-win64` | 64-bit Windows folder with the same layout. |
+| `nix build .#globtoo-r36s` | ARM64 bundle for ArkOS on the R36S. Copy the whole directory and run `Globtoo.sh` on the handheld. Use the D-pad to move the pointer, A to click or drag, L/R to zoom, and Start to exit. |
+
+The Windows builds require a driver that supports an OpenGL ES profile via
+WGL, or compatible EGL and GLES2 libraries such as ANGLE. The portable
+builds keep the full body catalog and use solid colors for bodies without
+bundled textures. The native packages above provide the larger imagery sets
+and 10m geographic overlays.
+
 ## Install with CMake (Linux)
 
-Dependencies: C++20 compiler, CMake 3.16+, SDL3, OpenGL ES 2.0/EGL, GEOS
-and pkg-config. For a complete political map, provide the Natural Earth
+Dependencies: C++20 compiler, CMake 3.16+, SDL3 (including its CMake
+package), OpenGL ES 2.0 and GEOS. The optional downloader uses pkg-config,
+libcurl and OpenSSL. For a complete political map, provide the Natural Earth
 50m/10m GeoJSON inputs under `assets/` before configuring (Nix downloads them
 automatically). The optional populated-place and river overlays require
 `assets/places_10m.geojson` and `assets/rivers_10m.geojson` at configure

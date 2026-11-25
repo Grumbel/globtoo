@@ -4,7 +4,7 @@
 #pragma once
 #include "camera.hpp"
 #include "shader.hpp"
-#include <GLES2/gl2.h>
+#include "gles2.hpp"
 
 struct Stars {
     GLuint vbo = 0;

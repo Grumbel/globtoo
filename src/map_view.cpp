@@ -12,7 +12,9 @@
 #include <fstream>
 #include <string>
 #include <string_view>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 namespace {
 constexpr double pi = geo::pi;
@@ -57,9 +59,10 @@ std::string timezone_name() {
     if (const char* tz = std::getenv("TZ"); tz && *tz) {
         std::string name(tz[0] == ':' ? tz + 1 : tz);
         constexpr std::string_view prefix = "/usr/share/zoneinfo/";
-        if (name.starts_with(prefix)) name.erase(0, prefix.size());
+        if (name.compare(0, prefix.size(), prefix) == 0) name.erase(0, prefix.size());
         return name;
     }
+#ifndef _WIN32
     char link[1024];
     const ssize_t n = readlink("/etc/localtime", link, sizeof(link) - 1);
     if (n > 0) {
@@ -68,6 +71,7 @@ std::string timezone_name() {
         if (const auto where = path.rfind("/zoneinfo/"); where != std::string::npos)
             return path.substr(where + 10);
     }
+#endif
     std::ifstream file("/etc/timezone");
     std::string name;
     if (file >> name) return name;
@@ -464,8 +468,13 @@ std::array<double, 2> timezone_center() {
     // POSIX offset fallback for timezone definitions without geographic data.
     std::time_t now = std::time(nullptr);
     std::tm local{}, utc{};
+#ifdef _WIN32
+    localtime_s(&local, &now);
+    gmtime_s(&utc, &now);
+#else
     localtime_r(&now, &local);
     gmtime_r(&now, &utc);
+#endif
     // mktime interprets both tm as local; their difference is the UTC offset.
     const double offset_hours = std::difftime(std::mktime(&local), std::mktime(&utc)) / 3600.0;
     return {std::clamp(offset_hours * 15.0, -180.0, 180.0), 0.0};

@@ -5,7 +5,7 @@
 #include "geographic_features.hpp"
 #include "map_view.hpp"
 #include "shader.hpp"
-#include <GLES2/gl2.h>
+#include "gles2.hpp"
 #include <array>
 
 struct GeographicOverlay {
