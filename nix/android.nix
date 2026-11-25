@@ -43,7 +43,7 @@ in pkgs.stdenvNoCC.mkDerivation {
 
     mkdir -p classes apk/res/drawable
     cp assets/globtoo-icon.png apk/res/drawable/icon.png
-    javac -source 8 -target 8 -bootclasspath "$android_jar" -d classes \
+    javac -encoding UTF-8 -source 8 -target 8 -bootclasspath "$android_jar" -d classes \
       "$sdl_source"/android-project/app/src/main/java/org/libsdl/app/*.java \
       nix/android/GlobtooActivity.java
     "$bt/d8" --min-api ${api} --lib "$android_jar" --output apk $(find classes -name '*.class')
