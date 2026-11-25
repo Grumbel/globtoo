@@ -176,6 +176,35 @@ int main() {
     assert(ui_event(ui,event,cam,map,globe,countries,input));
     assert(ui.grid_visible);
 
+    // Draw the grid at the equator and at the pole with identical zoom.
+    {
+        Ui grid_ui{};
+        grid_ui.grid_visible=true;
+        const float aspect=static_cast<float>(grid_ui.viewport_w)/grid_ui.viewport_h;
+        for (bool flat : {false,true}) {
+            Camera grid_cam{};
+            MapView grid_map{};
+            grid_map.globe_to_flat=flat ? 1.f : 0.f;
+            camera_center_on(grid_cam,0.,0.);
+            ui_draw_graticule(grid_ui,grid_cam,grid_map,aspect);
+            const double wide_step=grid_ui.grid_lat_step;
+            grid_cam.distance=1.08f;
+            grid_map.zoom=MapView::max_zoom;
+            grid_ui.triangles.clear();
+            ui_draw_graticule(grid_ui,grid_cam,grid_map,aspect);
+            const double close_step=grid_ui.grid_lat_step;
+            assert(close_step<wide_step);
+            assert(grid_ui.grid_lon_step==close_step);
+            camera_center_on(grid_cam,90.,90.);
+            grid_map.center_lat=std::acos(0.);
+            grid_map.roll=.8;
+            grid_ui.triangles.clear();
+            ui_draw_graticule(grid_ui,grid_cam,grid_map,aspect);
+            assert(grid_ui.grid_lat_step==close_step);
+            assert(grid_ui.grid_lon_step==close_step);
+        }
+    }
+
     // New third-row overlays are independent, and can be toggled separately.
     click_at(event,ui,globe.body,UiCommand::Capitals);
     assert(ui_event(ui,event,cam,map,globe,countries,input));

@@ -669,9 +669,16 @@ void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspe
     ui.scale_bar_km=grid::round_distance_km(km_for_150px);
     ui.scale_bar_pixels=static_cast<float>(ui.scale_bar_km /
         ui.body_radius_km*scale.pixels_east);
-    const double coslat=std::abs(std::cos(scale.lat*geo::to_rad));
-    ui.grid_lon_step=grid::angular_step(scale.pixels_east * coslat * geo::to_rad);
-    ui.grid_lat_step=grid::angular_step(scale.pixels_north * geo::to_rad);
+    // Use the nominal projection scale at the center of the globe or map.
+    // Blend the tangent magnification and depth as the scene morphs.
+    const double morph=map.globe_to_flat;
+    const double depth=std::lerp(static_cast<double>(cam.distance)-1.,
+                                 static_cast<double>(map.map_distance),morph);
+    const double magnification=std::lerp(1.,static_cast<double>(map.zoom),morph);
+    const double focal_pixels=ui.viewport_h*.5/std::tan(Camera::vertical_fov*.5);
+    const double step=grid::angular_step(focal_pixels*magnification/depth*geo::to_rad);
+    ui.grid_lon_step=step;
+    ui.grid_lat_step=step;
     if (!ui.grid_visible) return;
 
     // Only sample the cap around the visible center. At close zoom this
@@ -680,15 +687,13 @@ void ui_draw_graticule(Ui& ui, const Camera& cam, const MapView& map, float aspe
         1.5*std::hypot(ui.viewport_w,ui.viewport_h)/
         std::max(1.,std::min(scale.pixels_east,scale.pixels_north)));
     const double lat_span=span*geo::to_deg;
+    const double coslat=std::abs(std::cos(scale.lat*geo::to_rad));
     const double lon_span=(std::abs(scale.lat)+lat_span>=90.) ? 180. :
         std::min(180.,lat_span/std::max(.1,coslat));
     const double min_lat=std::max(-90.,scale.lat-lat_span);
     const double max_lat=std::min(90.,scale.lat+lat_span);
     const double min_lon=lon_span>=180. ? -180. : scale.lon-lon_span;
     const double max_lon=lon_span>=180. ?  180. : scale.lon+lon_span;
-    // Cap the count near geographic poles, where meridians converge.
-    while ((max_lon-min_lon)/ui.grid_lon_step>100.) ui.grid_lon_step*=2.;
-    while ((max_lat-min_lat)/ui.grid_lat_step>100.) ui.grid_lat_step*=2.;
 
     const Color color{.84f,.91f,1.f,.52f};
     // Re-project each sampled geographic segment through the same code as
