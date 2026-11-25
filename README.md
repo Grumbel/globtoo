@@ -308,7 +308,10 @@ Mouse: **left-drag** spins the globe or rotates/reprojects the Earth in 2D;
 **middle-drag** grabs and slides a 2D map like a paper sheet, while on the
 3D globe it rolls the view. **Shift+middle-drag** or **Shift+left-drag** rolls a
 flat map around the viewport center (unless North Lock is enabled). Mouse
-wheel zooms with smaller, reciprocal increments. The rotation is retained when unfolding or folding.
+wheel zooms with smaller, reciprocal increments. Spread two fingers to zoom in
+or pinch them together to zoom out on the globe or any flat projection.
+On a touchscreen, twist two fingers to roll the globe or flat map when North Lock is off.
+The rotation is retained when unfolding or folding.
 The geographic grid and distance ruler track the point beneath screen center
 after middle-drag; folding to 3D centers that same point.
 Flat maps can be dragged north or south **through the poles**. Rather than
@@ -339,6 +342,21 @@ The **globe↔map transitions animate the same geometry** between a sphere and
 flattened projected coordinates. Projection-to-projection changes are smoothly
 interpolated too; this is not a crossfade between static images. See
 `docs/MAP_VIEW.md` for design details and current limitations.
+
+### Gamepad
+
+Globtoo uses the first available SDL-mapped controller and switches to another
+connected controller if it is unplugged. Controls are active while the window
+has focus.
+
+| Control | Action |
+| --- | --- |
+| Left stick | Rotate the globe or move the flat map |
+| Left / right trigger | Zoom out / in continuously |
+| Left / right shoulder | Zoom out / in one step |
+| D-pad | Move the pointer |
+| South face button (A on Xbox, Cross on PlayStation) | Click a control or hold while moving the pointer to drag |
+| Start | Hide or restore the on-screen controls (quit on R36S) |
 
 ## Architecture notes
 

@@ -161,6 +161,12 @@ Roll the map around the view center (unless North Lock is enabled).
 .TP
 .B Mouse wheel
 Zoom in or out with small, reciprocal increments.
+.TP
+.B Two-finger pinch
+Spread two fingers to zoom in or bring them together to zoom out in any projection.
+.TP
+.B Two-finger twist
+Twist two fingers on a touchscreen to roll the globe or flat map when North Lock is off.
 .SH KEYBOARD CONTROLS
 .TP
 .B F
@@ -190,6 +196,26 @@ Toggle trackball relative-mouse mode when viewing the 3D globe.
 .TP
 .B Escape
 Exit trackball mode, or quit Globtoo.
+.SH GAMEPAD CONTROLS
+Globtoo uses the first available SDL-mapped controller while the window has focus.
+.TP
+.B Left stick
+Rotate the globe or move the flat map.
+.TP
+.B Left / right trigger
+Zoom out / in continuously.
+.TP
+.B Left / right shoulder
+Zoom out / in one step.
+.TP
+.B D-pad
+Move the pointer.
+.TP
+.B South face button (A / Cross)
+Click an on-screen control, or hold while moving the pointer to drag.
+.TP
+.B Start
+Hide or restore the on-screen controls. On R36S, quit Globtoo.
 .SH VIEWS
 The GUI provides a globe and four projections: equirectangular (Plate
 Carr\('ee), Mercator, Mollweide, and Hammer. The map transforms smoothly

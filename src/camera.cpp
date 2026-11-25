@@ -27,7 +27,7 @@ Mat4 Camera::proj_matrix(float aspect) const {
     // Stars use their own projection and are drawn with depth disabled.
     const float near_plane = std::max(0.05f, (distance - content_radius - 0.01f) * 0.9f);
     const float far_plane  = distance + content_radius + 0.1f;
-    return Mat4::perspective(0.7f, aspect, near_plane, far_plane);
+    return Mat4::perspective(vertical_fov, aspect, near_plane, far_plane);
 }
 
 Vec3 camera_view_to_world(const Camera& cam, Vec3 v) {
@@ -35,6 +35,8 @@ Vec3 camera_view_to_world(const Camera& cam, Vec3 v) {
 }
 
 void camera_update(Camera& cam, float dt) {
+    if (cam.grab_active) return;
+
     float speed = sqrtf(cam.ang_vel.x * cam.ang_vel.x +
                         cam.ang_vel.y * cam.ang_vel.y +
                         cam.ang_vel.z * cam.ang_vel.z);
@@ -73,8 +75,7 @@ void camera_apply_drag_arcball(Camera& cam, float dx, float dy, float sensitivit
 }
 
 static bool ray_sphere(const Camera& cam, float ndc_x, float ndc_y, float aspect, Vec3& out_hit) {
-    const float fovy = 0.7f;
-    float tan_half = tanf(fovy * 0.5f);
+    const float tan_half = tanf(Camera::vertical_fov * 0.5f);
     Vec3 dir_view = Mat4::normalize({
         ndc_x * tan_half * aspect,
         ndc_y * tan_half,
@@ -107,7 +108,7 @@ bool camera_grab_begin(Camera& cam, float ndc_x, float ndc_y, float aspect) {
         cam.grab_active = false;
         return false;
     }
-    cam.grab_prev = hit;
+    cam.grab_anchor = hit;
     cam.grab_active = true;
     cam.ang_vel = {0, 0, 0};
     return true;
@@ -121,41 +122,32 @@ bool camera_grab_move(Camera& cam, float ndc_x, float ndc_y, float aspect, float
     if (!ray_sphere(cam, ndc_x, ndc_y, aspect, hit))
         return false;
 
-    // grab_prev is the fixed world-space point on the Earth that was pressed.
-    // Do not update it during the drag — that caused a feedback loop.
-    Vec3 a = cam.grab_prev;
-    Vec3 b = hit;
-
-    float d = std::clamp(Mat4::dot(a, b), -1.f, 1.f);
-    float angle = acosf(d);
-    if (angle < 1e-5f)
+    // Rotate the camera so the grabbed world point follows the pointer.
+    const Vec3 cross = Mat4::cross(hit, cam.grab_anchor);
+    const float sine = sqrtf(Mat4::dot(cross, cross));
+    if (sine < 1e-8f)
         return true;
 
-    // Clamp per-frame rotation so a tiny mouse move cannot explode
-    const float max_step = 0.12f; // ~7 degrees
-    if (angle > max_step)
-        angle = max_step;
+    const float angle = atan2f(sine, Mat4::dot(hit, cam.grab_anchor));
+    const Quat delta = Quat::from_axis_angle(cross, angle);
+    cam.orientation = Quat::normalize(Quat::multiply(delta, cam.orientation));
 
-    Vec3 axis = Mat4::cross(a, b);
-    float alen = sqrtf(Mat4::dot(axis, axis));
-    if (alen < 1e-8f)
-        return true;
-    axis = { axis.x / alen, axis.y / alen, axis.z / alen };
-
-    // Rotation that takes a → b on the fixed sphere. Apply the conjugate to
-    // the camera so the world (Earth) appears to rotate by that amount and
-    // the grabbed point stays under the cursor.
-    Quat delta = Quat::from_axis_angle(axis, angle);
-    Quat conj = { -delta.x, -delta.y, -delta.z, delta.w };
-    cam.orientation = Quat::normalize(Quat::multiply(conj, cam.orientation));
-
-    // Soft inertia from this step (not angle/dt — that spikes on small dt)
-    (void)dt;
-    const float vel_scale = 12.f;
-    cam.ang_vel.x = axis.x * (-angle) * vel_scale;
-    cam.ang_vel.y = axis.y * (-angle) * vel_scale;
-    cam.ang_vel.z = axis.z * (-angle) * vel_scale;
+    // Bound the rate for batched events and filter short-term sampling jitter.
+    const float sample_time = std::max(dt, .004f);
+    const float speed = std::min(angle / sample_time, 20.f);
+    const float blend = Mat4::dot(cam.ang_vel, cam.ang_vel) > 0.f
+        ? -std::expm1(-sample_time / .025f) : 1.f;
+    const float scale = speed / sine;
+    cam.ang_vel = {
+        std::lerp(cam.ang_vel.x, cross.x * scale, blend),
+        std::lerp(cam.ang_vel.y, cross.y * scale, blend),
+        std::lerp(cam.ang_vel.z, cross.z * scale, blend)
+    };
     return true;
+}
+
+void camera_grab_reanchor(Camera& cam, float ndc_x, float ndc_y, float aspect) {
+    ray_sphere(cam, ndc_x, ndc_y, aspect, cam.grab_anchor);
 }
 
 void camera_grab_end(Camera& cam) {

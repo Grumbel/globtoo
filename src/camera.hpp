@@ -10,6 +10,8 @@ enum class ControlMode {
 };
 
 struct Camera {
+    static constexpr float vertical_fov = .7f;
+
     // Camera orbit orientation (world). Earth is fixed at origin.
     Quat orientation = Quat::identity();
     Vec3 ang_vel = {0, 0, 0};
@@ -27,7 +29,7 @@ struct Camera {
     ControlMode mode = ControlMode::Grab;
 
     bool  grab_active = false;
-    Vec3  grab_prev{};
+    Vec3  grab_anchor{};
 
     Mat4 view_matrix() const;
     Mat4 proj_matrix(float aspect) const;
@@ -37,6 +39,7 @@ void camera_update(Camera& cam, float dt);
 void camera_apply_drag_arcball(Camera& cam, float dx, float dy, float sensitivity);
 bool camera_grab_begin(Camera& cam, float ndc_x, float ndc_y, float aspect);
 bool camera_grab_move(Camera& cam, float ndc_x, float ndc_y, float aspect, float dt);
+void camera_grab_reanchor(Camera& cam, float ndc_x, float ndc_y, float aspect);
 void camera_grab_end(Camera& cam);
 void camera_apply_zoom(Camera& cam, float delta);
 void camera_grab_kill_inertia(Camera& cam);

@@ -320,8 +320,18 @@ void map_align_north(MapView& m, Camera& cam) {
 }
 
 void map_enforce_north(MapView& m, Camera& cam) {
-    if (m.north_locked && std::abs(map_north_heading(m,cam)) > 1e-6)
-        map_align_north(m,cam);
+    if (!m.north_locked) return;
+    const float heading = static_cast<float>(map_north_heading(m, cam));
+    if (std::abs(heading) <= 1e-6f) return;
+
+    if (m.flat_goal > .5f) {
+        map_apply_roll(m, heading, 1.f);
+    } else {
+        // Ongoing north alignment is a roll correction during navigation.
+        const Vec3 velocity = cam.ang_vel;
+        camera_apply_roll(cam, heading, 1.f);
+        cam.ang_vel = velocity;
+    }
 }
 
 void camera_center_on(Camera& cam, double lon, double lat) {

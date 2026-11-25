@@ -56,13 +56,13 @@ static bool init_sdl(int w, int h) {
     // Used by desktop environments (notably Wayland) to associate the window
     // with io.github.Grumbel.globtoo.desktop and its installed icon.
     SDL_SetAppMetadata("Globtoo", GLOBTOO_VERSION, "io.github.Grumbel.globtoo");
-    SDL_InitFlags subsystems = SDL_INIT_VIDEO;
-#ifdef GLOBTOO_R36S
-    subsystems |= SDL_INIT_GAMEPAD;
-#endif
-    if (!SDL_Init(subsystems)) {
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         return false;
+    }
+
+    if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
+        fprintf(stderr, "Gamepad initialization failed: %s\n", SDL_GetError());
     }
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -102,15 +102,26 @@ static bool init_sdl(int w, int h) {
     return true;
 }
 
-#ifdef GLOBTOO_R36S
-static void move_gamepad_cursor(SDL_Gamepad* pad, int w, int h, float dt) {
-    if (!pad) return;
+static SDL_Gamepad* open_gamepad() {
+    int count = 0;
+    SDL_JoystickID* ids = SDL_GetGamepads(&count);
+    SDL_Gamepad* pad = nullptr;
+    for (int i = 0; ids && i < count && !pad; ++i) {
+        pad = SDL_OpenGamepad(ids[i]);
+    }
+    SDL_free(ids);
+    return pad;
+}
+
+static void move_gamepad_cursor(SDL_Gamepad* pad, float dt) {
     const auto held = [pad](SDL_GamepadButton button) {
         return static_cast<int>(SDL_GetGamepadButton(pad, button));
     };
     const int dx = held(SDL_GAMEPAD_BUTTON_DPAD_RIGHT) - held(SDL_GAMEPAD_BUTTON_DPAD_LEFT);
     const int dy = held(SDL_GAMEPAD_BUTTON_DPAD_DOWN) - held(SDL_GAMEPAD_BUTTON_DPAD_UP);
     if (dx == 0 && dy == 0) return;
+    int w, h;
+    if (!SDL_GetWindowSize(window, &w, &h) || w <= 0 || h <= 0) return;
     float x, y;
     SDL_GetMouseState(&x, &y);
     const float step = 360.f * dt;
@@ -122,11 +133,13 @@ static void translate_gamepad_button(SDL_Event& event) {
     const bool pressed = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
     if (!pressed && event.type != SDL_EVENT_GAMEPAD_BUTTON_UP) return;
     const auto button = event.gbutton.button;
+    const Uint64 timestamp = event.gbutton.timestamp;
     float x, y;
     SDL_GetMouseState(&x, &y);
     if (button == SDL_GAMEPAD_BUTTON_SOUTH) {
         event = {};
         event.type = pressed ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+        event.button.timestamp = timestamp;
         event.button.button = SDL_BUTTON_LEFT;
         event.button.down = pressed;
         event.button.x = x;
@@ -139,10 +152,15 @@ static void translate_gamepad_button(SDL_Event& event) {
         event.wheel.mouse_x = x;
         event.wheel.mouse_y = y;
     } else if (pressed && button == SDL_GAMEPAD_BUTTON_START) {
+#ifdef GLOBTOO_R36S
         event.type = SDL_EVENT_QUIT;
+#else
+        event = {};
+        event.type = SDL_EVENT_KEY_DOWN;
+        event.key.key = SDLK_TAB;
+#endif
     }
 }
-#endif
 
 int main(int argc, char** argv) {
     CommandLine options;
@@ -292,14 +310,14 @@ int main(int argc, char** argv) {
     Ui ui{};
     if (!ui_init(ui)) fprintf(stderr,"Warning: on-screen controls failed to init\n");
 
-    fprintf(stderr, "Controls: M/Shift+M=next/previous body, F=planetary landmark labels, on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel=zoom, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
+    fprintf(stderr, "Controls: M/Shift+M=next/previous body, F=planetary landmark labels, on-screen buttons, left-drag=rotate Earth/reproject, middle-drag=pan 2D / roll globe, Shift+middle-drag=roll map, Shift+left-drag=roll, wheel/pinch=zoom, two-finger twist=roll globe, 1..5=views, Tab=show/hide GUI, G=Grab/Arcball, Space=shading, B=borders, N=names, P=political, V=texture, Grid=on-screen toggle, Esc=quit\n");
     fprintf(stderr, "Control mode: Grab (camera orbits fixed Earth; stars fixed in space)\n");
 
     auto last = std::chrono::steady_clock::now();
 
-#ifdef GLOBTOO_R36S
-    SDL_Gamepad* gamepad = nullptr;
-#endif
+    SDL_Gamepad* gamepad = SDL_WasInit(SDL_INIT_GAMEPAD) ? open_gamepad() : nullptr;
+    SDL_JoystickID gamepad_id = gamepad ? SDL_GetGamepadID(gamepad) : 0;
+    bool gamepad_drag = false;
     while (!input.quit) {
         int w, h;
         SDL_GetWindowSizeInPixels(window, &w, &h);
@@ -316,24 +334,51 @@ int main(int argc, char** argv) {
         ui.viewport_h = input.viewport_h;
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
-#ifdef GLOBTOO_R36S
-            if (e.type == SDL_EVENT_GAMEPAD_ADDED && !gamepad)
-                gamepad = SDL_OpenGamepad(e.gdevice.which);
-            if (e.type == SDL_EVENT_GAMEPAD_REMOVED && gamepad &&
-                e.gdevice.which == SDL_GetGamepadID(gamepad)) {
-                SDL_CloseGamepad(gamepad);
-                gamepad = nullptr;
+            const bool gamepad_removed = e.type == SDL_EVENT_GAMEPAD_REMOVED &&
+                gamepad && e.gdevice.which == gamepad_id;
+            if (gamepad_removed || (e.type == SDL_EVENT_GAMEPAD_ADDED && !gamepad)) {
+                if (gamepad) SDL_CloseGamepad(gamepad);
+                gamepad = open_gamepad();
+                gamepad_id = gamepad ? SDL_GetGamepadID(gamepad) : 0;
             }
-            translate_gamepad_button(e);
-#endif
+            if (gamepad_drag && (gamepad_removed || e.type == SDL_EVENT_WINDOW_FOCUS_LOST)) {
+                input.dragging = false;
+                input.drag_button = 0;
+                input.rotation_drag = false;
+                camera_grab_end(cam);
+                camera_grab_kill_inertia(cam);
+                gamepad_drag = false;
+            }
+
+            bool gamepad_press = false;
+            if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || e.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
+                if (!gamepad || e.gbutton.which != gamepad_id ||
+                    !(SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS))
+                    continue;
+                if (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                    if (e.type == SDL_EVENT_GAMEPAD_BUTTON_UP && !gamepad_drag) continue;
+                    if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && input.dragging) continue;
+                    gamepad_press = e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
+                }
+                translate_gamepad_button(e);
+            }
+
+            if (input.touch_pinching &&
+                ((e.type == SDL_EVENT_MOUSE_MOTION && e.motion.which == SDL_TOUCH_MOUSEID) ||
+                 ((e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
+                  e.button.which == SDL_TOUCH_MOUSEID)))
+                continue;
+
             if (!ui_event(ui,e,cam,map,globe,countries,input))
                 input_handle_event(input, cam, map, globe, countries, e);
+            gamepad_drag = input.dragging && (gamepad_drag || gamepad_press);
         }
 
-#ifdef GLOBTOO_R36S
-        move_gamepad_cursor(gamepad, input.viewport_w, input.viewport_h, dt);
-#endif
-        if (map.flat_goal < .5f) camera_update(cam, dt);
+        if (gamepad && !input.quit && (SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS)) {
+            if (!input.trackball) move_gamepad_cursor(gamepad, dt);
+            input_update_gamepad(input, cam, map, gamepad);
+        }
+        if (map.flat_goal < .5f && !input.dragging) camera_update(cam, dt);
         map_update(map,dt);
         map_enforce_north(map,cam);
 
@@ -382,9 +427,7 @@ int main(int argc, char** argv) {
 #endif
     }
 
-#ifdef GLOBTOO_R36S
     if (gamepad) SDL_CloseGamepad(gamepad);
-#endif
     ui_shutdown(ui);
     planet_rings_shutdown(saturn_rings);
     geographic_overlay_shutdown(geography);
